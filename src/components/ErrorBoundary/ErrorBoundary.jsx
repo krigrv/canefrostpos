@@ -49,7 +49,7 @@ class ErrorBoundary extends React.Component {
               Reload Page
             </Button>
           </Box>
-          {process.env.NODE_ENV === 'development' && (
+          {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
             <Box mt={3} maxWidth={800}>
               <Typography variant="h6" gutterBottom>
                 Error Details:

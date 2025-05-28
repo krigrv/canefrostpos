@@ -389,6 +389,11 @@ function InventoryProvider({ children }) {
     }, 0)
   }
 
+  // Calculate cart subtotal (total before tax)
+  const getCartSubtotal = () => {
+    return getCartTotal() - getCartTax()
+  }
+
   const value = {
     products,
     cart,
@@ -404,6 +409,7 @@ function InventoryProvider({ children }) {
     uploadAllInventoryToFirebase,
     getCartTotal,
     getCartTax,
+    getCartSubtotal,
     getCategoryGroup
   }
 

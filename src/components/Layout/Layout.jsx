@@ -95,13 +95,25 @@ function Layout({ children }) {
         </Box>
       </Toolbar>
       <Divider />
-      <List>
+      <List sx={{ pt: 1 }}>
         {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
             <ListItemButton
               selected={location.pathname === item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                navigate(item.path)
+                // Close mobile drawer after navigation
+                if (mobileOpen) {
+                  setMobileOpen(false)
+                }
+              }}
               sx={{
+                minHeight: 48,
+                px: 2,
+                py: 1.5,
+                borderRadius: 1,
+                mx: 1,
+                transition: 'all 0.2s ease-in-out',
                 '&.Mui-selected': {
                   backgroundColor: '#111827',
                   color: 'white',
@@ -109,16 +121,32 @@ function Layout({ children }) {
                     backgroundColor: '#1F2937',
                   },
                 },
+                '&:hover': {
+                  backgroundColor: location.pathname === item.path ? '#1F2937' : '#F3F4F6',
+                },
+                // Touch-friendly sizing
+                '@media (hover: none)': {
+                  minHeight: 52,
+                },
               }}
             >
               <ListItemIcon
                 sx={{
-                  color: location.pathname === item.path ? 'white' : 'inherit',
+                  color: location.pathname === item.path ? 'white' : '#6B7280',
+                  minWidth: 40,
+                  transition: 'color 0.2s ease-in-out',
                 }}
               >
                 {item.icon}
               </ListItemIcon>
-              <ListItemText primary={item.text} />
+              <ListItemText 
+                primary={item.text}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: location.pathname === item.path ? 600 : 500,
+                  color: location.pathname === item.path ? 'white' : '#374151'
+                }}
+              />
             </ListItemButton>
           </ListItem>
         ))}
@@ -134,27 +162,64 @@ function Layout({ children }) {
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
+          zIndex: (theme) => theme.zIndex.drawer + 1,
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ 
+              mr: 2, 
+              display: { sm: 'none' },
+              minWidth: 44,
+              minHeight: 44
+            }}
           >
             <MenuIcon />
           </IconButton>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexGrow: 1 }}>
-            <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
+          
+          {/* Mobile-optimized header layout */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: { xs: 'flex-start', sm: 'center' },
+            flexGrow: 1,
+            overflow: 'hidden'
+          }}>
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div" 
+              sx={{ 
+                fontWeight: 'bold',
+                fontSize: { xs: '1.1rem', sm: '1.25rem' },
+                letterSpacing: { xs: '0.5px', sm: '1px' }
+              }}
+            >
               CANEFROST
             </Typography>
           </Box>
+          
+          {/* Responsive user info and menu */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ mr: 2 }}>
+            {/* Hide welcome text on very small screens */}
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mr: 2,
+                display: { xs: 'none', md: 'block' },
+                maxWidth: 150,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+            >
               Welcome, {currentUser?.displayName || currentUser?.email}
             </Typography>
+            
             <IconButton
               size="large"
               aria-label="account of current user"
@@ -162,6 +227,10 @@ function Layout({ children }) {
               aria-haspopup="true"
               onClick={handleMenuClick}
               color="inherit"
+              sx={{
+                minWidth: 44,
+                minHeight: 44
+              }}
             >
               <AccountCircle />
             </IconButton>
@@ -224,43 +293,65 @@ function Layout({ children }) {
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
+        aria-label="navigation menu"
       >
+        {/* Mobile drawer */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true,
+            keepMounted: true, // Better open performance on mobile
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              backgroundColor: '#FAFAFA',
+              borderRight: '1px solid #E5E7EB'
+            },
           }}
         >
           {drawer}
         </Drawer>
+        
+        {/* Desktop drawer */}
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              backgroundColor: '#FAFAFA',
+              borderRight: '1px solid #E5E7EB'
+            },
           }}
           open
         >
           {drawer}
         </Drawer>
       </Box>
+      
+      {/* Main content area with responsive padding */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
+          p: { xs: 1, sm: 3 },
           width: { sm: `calc(100% - ${drawerWidth}px)` },
+          minHeight: '100vh',
+          backgroundColor: '#FFFFFF'
         }}
       >
-        <Toolbar />
-        {children}
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
+        <Box sx={{ 
+          maxWidth: '100%',
+          overflow: 'hidden'
+        }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   )
