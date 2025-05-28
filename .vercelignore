@@ -1,0 +1,72 @@
+# Dependencies
+node_modules
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Firebase files (keep config but ignore cache)
+.firebase
+firebase-debug.log
+
+# Build files (will be generated)
+dist
+build
+
+# Database and upload scripts (not needed for frontend)
+cleanup-database.js
+firebase-upload.js
+upload-to-firebase.js
+simple-firebase-upload.js
+authenticated-upload.js
+clean_json.py
+load_inventory.py
+show_menu.py
+
+# Data files
+*.csv
+Canefrost_Inventory_Upload.json
+formatted_inventory.json
+
+# Documentation
+AUTHENTICATION_SETUP.md
+FIREBASE_RULES_SETUP.md
+FIREBASE_SETUP.md
+
+# Test files
+test.html
+BasicTest.jsx
+SimpleApp.jsx
+TestApp.jsx

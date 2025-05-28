@@ -1,0 +1,754 @@
+[
+  {
+    "name": "AVOCADO 240ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST01",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "BLACK SALTED 240ml",
+    "category": "Cane Blend",
+    "price": 35,
+    "barcode": "CFRST02",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "BLUEBERRY 240ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST03",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "COFFEE 240ml",
+    "category": "Cane Blend",
+    "price": 60,
+    "barcode": "CFRST04",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "DRAGON FRUIT 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST05",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "FIG 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST06",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GINGER 240ml",
+    "category": "Cane Blend",
+    "price": 35,
+    "barcode": "CFRST07",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GOOSEBERRY 240ml",
+    "category": "Cane Blend",
+    "price": 40,
+    "barcode": "CFRST08",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GRAPES 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST09",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GUAVA 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST10",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ICE APPLE 240ml",
+    "category": "Cane Blend",
+    "price": 60,
+    "barcode": "CFRST11",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JACKFRUIT 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST12",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JALJEERA 240ml",
+    "category": "Cane Blend",
+    "price": 35,
+    "barcode": "CFRST13",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JAMUN 240ml",
+    "category": "Cane Blend",
+    "price": 60,
+    "barcode": "CFRST14",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JUSTCANE (PLAIN) 240ml",
+    "category": "Cane Blend",
+    "price": 30,
+    "barcode": "CFRST15",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "LEMON 240ml",
+    "category": "Cane Blend",
+    "price": 30,
+    "barcode": "CFRST16",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "LEMON & GINGER 240ml",
+    "category": "Cane Blend",
+    "price": 35,
+    "barcode": "CFRST17",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MINT 240ml",
+    "category": "Cane Blend",
+    "price": 35,
+    "barcode": "CFRST18",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MINT & LEMON 240ml",
+    "category": "Cane Blend",
+    "price": 40,
+    "barcode": "CFRST19",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MINT, LEMON & GINGER 240ml",
+    "category": "Cane Blend",
+    "price": 40,
+    "barcode": "CFRST20",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MOSAMBI 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST21",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MUSKMELON 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST22",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ORANGE 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST23",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "PINEAPPLE 240ml",
+    "category": "Cane Blend",
+    "price": 50,
+    "barcode": "CFRST24",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "POMEGRANATE 240ml",
+    "category": "Cane Blend",
+    "price": 60,
+    "barcode": "CFRST25",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "STRAWBERRY 240ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST26",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATERMELON 240ml",
+    "category": "Cane Blend",
+    "price": 40,
+    "barcode": "CFRST27",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "AVOCADO 500 ml",
+    "category": "Cane Blend",
+    "price": 140,
+    "barcode": "CFRST28",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "BLACK SALTED 500 ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST29",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "BLUEBERRY 500 ml",
+    "category": "Cane Blend",
+    "price": 140,
+    "barcode": "CFRST30",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "COFFEE 500 ml",
+    "category": "Cane Blend",
+    "price": 120,
+    "barcode": "CFRST31",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "DRAGON FRUIT 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST32",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "FIG 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST33",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GINGER 500 ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST34",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GOOSEBERRY 500 ml",
+    "category": "Cane Blend",
+    "price": 80,
+    "barcode": "CFRST35",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GRAPES 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST36",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GUAVA 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST37",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ICE APPLE 500 ml",
+    "category": "Cane Blend",
+    "price": 120,
+    "barcode": "CFRST38",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JACKFRUIT 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST39",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JALJEERA 500 ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST40",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JAMUN 500 ml",
+    "category": "Cane Blend",
+    "price": 120,
+    "barcode": "CFRST41",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JUSTCANE (PLAIN) 500 ml",
+    "category": "Cane Blend",
+    "price": 60,
+    "barcode": "CFRST42",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "LEMON 500 ml",
+    "category": "Cane Blend",
+    "price": 60,
+    "barcode": "CFRST43",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "LEMON & GINGER 500 ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST44",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MINT 500 ml",
+    "category": "Cane Blend",
+    "price": 70,
+    "barcode": "CFRST45",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MINT & LEMON 500 ml",
+    "category": "Cane Blend",
+    "price": 80,
+    "barcode": "CFRST46",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MINT, LEMON & GINGER 500 ml",
+    "category": "Cane Blend",
+    "price": 80,
+    "barcode": "CFRST47",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MOSAMBI 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST48",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MUSKMELON 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST49",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ORANGE 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST50",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "PINEAPPLE 500 ml",
+    "category": "Cane Blend",
+    "price": 100,
+    "barcode": "CFRST51",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "POMEGRANATE 500 ml",
+    "category": "Cane Blend",
+    "price": 120,
+    "barcode": "CFRST52",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "STRAWBERRY 500 ml",
+    "category": "Cane Blend",
+    "price": 140,
+    "barcode": "CFRST53",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "TENDER COCONUT 500ml",
+    "category": "Cane Blend",
+    "price": 120,
+    "barcode": "CFRST54",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATERMELON 500 ml",
+    "category": "Cane Blend",
+    "price": 80,
+    "barcode": "CFRST55",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "BLUEBERRY CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 200,
+    "barcode": "CFRST56",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "DRAGON FRUIT CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 160,
+    "barcode": "CFRST57",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "FIG CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 160,
+    "barcode": "CFRST58",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GRAPES CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 160,
+    "barcode": "CFRST59",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ICE APPLE CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 210,
+    "barcode": "CFRST60",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JAMUN CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 160,
+    "barcode": "CFRST61",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MOSAMBI CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 150,
+    "barcode": "CFRST62",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ORANGE CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 180,
+    "barcode": "CFRST63",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "PINEAPPLE CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 160,
+    "barcode": "CFRST64",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "POMEGRANATE CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 200,
+    "barcode": "CFRST65",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "STRAWBERRY CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 200,
+    "barcode": "CFRST66",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATERMELON CANE FUSION",
+    "category": "Cane Fusion",
+    "price": 160,
+    "barcode": "CFRST67",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ALMOND & CASHEW",
+    "category": "Cane Pops",
+    "price": 30,
+    "barcode": "CFRST68",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "AVOCADO CANESICLE",
+    "category": "Cane Pops",
+    "price": 25,
+    "barcode": "CFRST69",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "CHOCO CHIPS CANESICLE",
+    "category": "Cane Pops",
+    "price": 15,
+    "barcode": "CFRST70",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "COFFEE CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST71",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "DRAGON CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST72",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "FIG CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST73",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GOOSEBERRY CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST74",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GRAPES CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST75",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "GUAVA CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST76",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JAMUN CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST77",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "JUSTCANE CANESICLE",
+    "category": "Cane Pops",
+    "price": 10,
+    "barcode": "CFRST78",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "LEMON & GINGER CANESICLE",
+    "category": "Cane Pops",
+    "price": 15,
+    "barcode": "CFRST79",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MUSKMELON CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST80",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "ORANGE CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST81",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "PINEAPPLE CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST82",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "POMEGRANATE CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST83",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "STRAWBERRY CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST84",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "TENDER COCONUT CANESICLE",
+    "category": "Cane Pops",
+    "price": 25,
+    "barcode": "CFRST85",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATERMELON CANESICLE",
+    "category": "Cane Pops",
+    "price": 20,
+    "barcode": "CFRST86",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATERMELON BLAST",
+    "category": "Cane Special",
+    "price": 350,
+    "barcode": "CFRST87",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "MUSKMELON BLAST",
+    "category": "Cane Special",
+    "price": 130,
+    "barcode": "CFRST88",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "TENDER COCONUT 50",
+    "category": "Others",
+    "price": 50,
+    "barcode": "CFRST89",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "TENDER COCONUT 90",
+    "category": "Others",
+    "price": 90,
+    "barcode": "CFRST90",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATER BOTTLE 1 LITRE",
+    "category": "Others",
+    "price": 20,
+    "barcode": "CFRST91",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "WATER BOTTLE 500ML",
+    "category": "Others",
+    "price": 10,
+    "barcode": "CFRST92",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "PEANUT BARFI",
+    "category": "Others",
+    "price": 5,
+    "barcode": "CFRST93",
+    "taxPercentage": 12,
+    "stock": 50
+  },
+  {
+    "name": "PACKAGING CHARGE",
+    "category": "Others",
+    "price": 10,
+    "barcode": "CFRST94",
+    "taxPercentage": 12,
+    "stock": 50
+  }
+]

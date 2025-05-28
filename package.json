@@ -1,0 +1,40 @@
+{
+  "name": "canefrost-pos",
+  "version": "1.0.0",
+  "description": "Point of Sale system for Canefrost Juice Shop",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite",
+    "vercel-build": "vite build",
+    "upload-firebase": "node firebase-upload.js",
+    "upload-to-firebase": "node upload-to-firebase.js",
+    "simple-upload": "node simple-firebase-upload.js",
+    "auth-upload": "node authenticated-upload.js",
+    "cleanup-db": "node cleanup-database.js"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.10.5",
+    "@emotion/styled": "^11.10.5",
+    "@mui/icons-material": "^5.11.9",
+    "@mui/material": "^5.11.10",
+    "@mui/x-data-grid": "^5.17.24",
+    "date-fns": "^2.29.3",
+    "firebase": "^11.8.1",
+    "firebase-admin": "^12.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.0",
+    "react-router-dom": "^6.8.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.27",
+    "@types/react-dom": "^18.0.10",
+    "@vitejs/plugin-react": "^4.5.0",
+    "vite": "^6.3.5"
+  }
+}
