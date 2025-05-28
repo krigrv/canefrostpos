@@ -35,6 +35,8 @@ dist-ssr
 .firebaserc
 firebase-debug.log
 firestore-debug.log
+serviceAccountKey.json
+canefrostpos-firebase-adminsdk-*.json
 
 # Build outputs
 build/

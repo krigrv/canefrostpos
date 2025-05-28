@@ -5,16 +5,25 @@ import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import fs from 'fs';
 import readline from 'readline';
 
-// Firebase configuration
+// Load environment variables
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyBqa15sDD7JuNOxY85O7fhMXD8DfYwvUWk",
-  authDomain: "canefrostpos.firebaseapp.com",
-  projectId: "canefrostpos",
-  storageBucket: "canefrostpos.firebasestorage.app",
-  messagingSenderId: "113733653005",
-  appId: "1:113733653005:web:a67061a992f1e843cafb44",
-  measurementId: "G-P772WL4CTB"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// Validate environment variables
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error('Missing required Firebase environment variables. Please check your .env file.');
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -142,12 +151,14 @@ async function authenticatedUpload() {
       console.error('❌ Authentication failed:', authError.message);
       
       // Fallback to mock authentication for development
-      if (email === 'admin@canefrost.com' && password === 'admin123') {
+      const adminEmail = process.env.VITE_ADMIN_EMAIL || 'admin@canefrost.com';
+      const adminPassword = process.env.VITE_ADMIN_PASSWORD || 'admin123';
+      if (email === adminEmail && password === adminPassword) {
         console.log('✅ Using development mock authentication');
       } else {
         console.log('\n💡 For development, you can use:');
-        console.log('   Email: admin@canefrost.com');
-        console.log('   Password: admin123');
+        console.log(`   Email: ${adminEmail}`);
+        console.log(`   Password: ${adminPassword}`);
         process.exit(1);
       }
     }

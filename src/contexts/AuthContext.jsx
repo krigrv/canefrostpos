@@ -54,7 +54,9 @@ export function AuthProvider({ children }) {
       return result;
     } catch (error) {
       // Fallback to mock authentication for development
-      if (email === 'admin@canefrost.com' && password === 'admin123') {
+      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@canefrost.com';
+      const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin123';
+      if (email === adminEmail && password === adminPassword) {
         const mockUser = { 
           email, 
           displayName: 'Admin User',

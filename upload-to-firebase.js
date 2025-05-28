@@ -4,16 +4,25 @@ import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, writeBatch }
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import fs from 'fs';
 
-// Firebase configuration
+// Load environment variables
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Firebase configuration using environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyBqa15sDD7JuNOxY85O7fhMXD8DfYwvUWk",
-  authDomain: "canefrostpos.firebaseapp.com",
-  projectId: "canefrostpos",
-  storageBucket: "canefrostpos.firebasestorage.app",
-  messagingSenderId: "113733653005",
-  appId: "1:113733653005:web:a67061a992f1e843cafb44",
-  measurementId: "G-P772WL4CTB"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+
+// Validate environment variables
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  throw new Error('Missing required Firebase environment variables. Please check your .env file.');
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

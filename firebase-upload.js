@@ -3,18 +3,24 @@ const fs = require('fs');
 const path = require('path');
 
 // Initialize Firebase Admin SDK
+// Load environment variables
+import dotenv from 'dotenv';
+dotenv.config();
+
+const projectId = process.env.VITE_FIREBASE_PROJECT_ID || 'canefrostpos';
+
 // Note: You'll need to download your service account key from Firebase Console
 // and place it in the project root as 'serviceAccountKey.json'
 try {
   const serviceAccount = require('./serviceAccountKey.json');
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    projectId: 'canefrostpos'
+    projectId: projectId
   });
 } catch (error) {
   console.log('Service account key not found. Using default credentials.');
   admin.initializeApp({
-    projectId: 'canefrostpos'
+    projectId: projectId
   });
 }
 
