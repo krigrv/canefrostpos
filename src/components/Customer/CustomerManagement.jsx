@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Box,
   Typography,
@@ -43,84 +43,12 @@ import {
 } from '@mui/icons-material'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useCustomers } from '../../contexts/CustomerContext'
 
 function CustomerManagement() {
   const [tabValue, setTabValue] = useState(0)
   const [searchTerm, setSearchTerm] = useState('')
-  const [customers, setCustomers] = useState([
-    {
-      id: 1,
-      name: 'Rajesh Kumar',
-      email: 'rajesh@email.com',
-      phone: '+91 9876543210',
-      address: '123 MG Road, Bangalore',
-      joinDate: '2024-01-15',
-      totalPurchases: 15600,
-      visitCount: 24,
-      lastVisit: '2024-12-18',
-      loyaltyPoints: 156,
-      tier: 'Gold',
-      favoriteItems: ['LEMON 500ml', 'ORANGE 240ml', 'JUSTCANE (PLAIN) 500ml']
-    },
-    {
-      id: 2,
-      name: 'Priya Sharma',
-      email: 'priya@email.com',
-      phone: '+91 9876543211',
-      address: '456 Brigade Road, Bangalore',
-      joinDate: '2024-02-20',
-      totalPurchases: 8900,
-      visitCount: 18,
-      lastVisit: '2024-12-19',
-      loyaltyPoints: 89,
-      tier: 'Silver',
-      favoriteItems: ['STRAWBERRY 240ml', 'BLUEBERRY 500ml']
-    },
-    {
-      id: 3,
-      name: 'Amit Patel',
-      email: 'amit@email.com',
-      phone: '+91 9876543212',
-      address: '789 Commercial Street, Bangalore',
-      joinDate: '2024-03-10',
-      totalPurchases: 25400,
-      visitCount: 35,
-      lastVisit: '2024-12-20',
-      loyaltyPoints: 254,
-      tier: 'Platinum',
-      favoriteItems: ['POMEGRANATE 500ml', 'JAMUN 240ml', 'ICE APPLE 500ml']
-    }
-  ])
-  
-  const [purchaseHistory, setPurchaseHistory] = useState([
-    {
-      id: 1,
-      customerId: 1,
-      customerName: 'Rajesh Kumar',
-      date: '2024-12-18',
-      items: ['LEMON 500ml', 'ORANGE 240ml'],
-      total: 110,
-      pointsEarned: 11
-    },
-    {
-      id: 2,
-      customerId: 2,
-      customerName: 'Priya Sharma',
-      date: '2024-12-19',
-      items: ['STRAWBERRY 240ml', 'BLUEBERRY 500ml'],
-      total: 210,
-      pointsEarned: 21
-    },
-    {
-      id: 3,
-      customerId: 3,
-      customerName: 'Amit Patel',
-      date: '2024-12-20',
-      items: ['POMEGRANATE 500ml', 'JAMUN 240ml', 'ICE APPLE 500ml'],
-      total: 300,
-      pointsEarned: 30
-    }
-  ])
+  const { customers, addCustomer, updateCustomer, deleteCustomer, loading } = useCustomers()
   
   const [openDialog, setOpenDialog] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
@@ -167,35 +95,39 @@ function CustomerManagement() {
     setOpenDialog(true)
   }
 
-  const handleSaveCustomer = () => {
-    if (editingCustomer) {
-      setCustomers(customers.map(c => 
-        c.id === editingCustomer.id 
-          ? { ...c, ...formData }
-          : c
-      ))
-      toast.success('Customer updated successfully')
-    } else {
-      const newCustomer = {
-        id: Date.now(),
-        ...formData,
-        joinDate: format(new Date(), 'yyyy-MM-dd'),
-        totalPurchases: 0,
-        visitCount: 0,
-        lastVisit: null,
-        loyaltyPoints: 0,
-        tier: 'Bronze',
-        favoriteItems: []
+  const handleSaveCustomer = async () => {
+    try {
+      if (editingCustomer) {
+        await updateCustomer(editingCustomer.id, formData)
+        toast.success('Customer updated successfully')
+      } else {
+        const newCustomer = {
+          ...formData,
+          joinDate: new Date(),
+          totalPurchases: 0,
+          visitCount: 0,
+          lastVisit: null,
+          loyaltyPoints: 0,
+          tier: 'Bronze',
+          favoriteItems: [],
+          createdAt: new Date()
+        }
+        await addCustomer(newCustomer)
+        toast.success('Customer added successfully')
       }
-      setCustomers([...customers, newCustomer])
-      toast.success('Customer added successfully')
+      setOpenDialog(false)
+    } catch (error) {
+      toast.error('Error saving customer')
     }
-    setOpenDialog(false)
   }
 
-  const handleDeleteCustomer = (id) => {
-    setCustomers(customers.filter(c => c.id !== id))
-    toast.success('Customer removed')
+  const handleDeleteCustomer = async (id) => {
+    try {
+      await deleteCustomer(id)
+      toast.success('Customer removed')
+    } catch (error) {
+      toast.error('Error removing customer')
+    }
   }
 
   const TabPanel = ({ children, value, index }) => (
@@ -206,21 +138,46 @@ function CustomerManagement() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{ 
+          fontSize: { xs: '1.5rem', md: '2rem' },
+          textTransform: 'capitalize'
+        }}
+      >
         Customer Management
       </Typography>
 
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-          <Tab icon={<PersonIcon />} label="Customers" />
-          <Tab icon={<HistoryIcon />} label="Purchase History" />
-          <Tab icon={<StarIcon />} label="Loyalty Program" />
+        <Tabs 
+          value={tabValue} 
+          onChange={(e, newValue) => setTabValue(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': {
+              fontSize: { xs: '0.75rem', md: '0.875rem' },
+              minHeight: { xs: 40, md: 48 },
+              textTransform: 'capitalize'
+            }
+          }}
+        >
+          <Tab icon={<PersonIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="All Customers" />
+          <Tab icon={<HistoryIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Purchase History" />
+          <Tab icon={<StarIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Loyalty Program" />
         </Tabs>
       </Paper>
 
       {/* Customers Tab */}
       <TabPanel value={tabValue} index={0}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+        <Box sx={{ 
+          mb: 3, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: { xs: 1, md: 2 },
+          flexDirection: { xs: 'column', sm: 'row' }
+        }}>
           <TextField
             placeholder="Search customers..."
             value={searchTerm}
@@ -228,38 +185,70 @@ function CustomerManagement() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <SearchIcon sx={{ fontSize: { xs: 18, md: 20 } }} />
                 </InputAdornment>
               ),
             }}
-            sx={{ width: 300 }}
+            size="small"
+            sx={{ 
+              flexGrow: 1,
+              width: { xs: '100%', sm: 'auto' },
+              '& .MuiInputBase-input': {
+                fontSize: { xs: '0.875rem', md: '1rem' }
+              }
+            }}
           />
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={<AddIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
             onClick={handleAddCustomer}
+            sx={{
+              fontSize: { xs: '0.75rem', md: '0.875rem' },
+              py: { xs: 1, md: 0.75 },
+              minHeight: { xs: 40, md: 36 },
+              width: { xs: '100%', sm: 'auto' },
+              textTransform: 'capitalize'
+            }}
           >
             Add Customer
           </Button>
         </Box>
 
-        <Grid container spacing={3}>
+        <Grid container spacing={{ xs: 2, md: 3 }}>
           {filteredCustomers.map((customer) => (
             <Grid item xs={12} md={6} lg={4} key={customer.id}>
-              <Card>
-                <CardContent>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
+                    <Avatar sx={{ 
+                      mr: 2, 
+                      bgcolor: 'primary.main',
+                      width: { xs: 40, md: 48 },
+                      height: { xs: 40, md: 48 },
+                      fontSize: { xs: '1rem', md: '1.25rem' }
+                    }}>
                       {customer.name.charAt(0)}
                     </Avatar>
                     <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6">{customer.name}</Typography>
+                      <Typography 
+                        variant="h6"
+                        sx={{ 
+                          fontSize: { xs: '1rem', md: '1.25rem' },
+                          textTransform: 'capitalize'
+                        }}
+                      >
+                        {customer.name}
+                      </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {getTierIcon(customer.tier)}
                         <Chip 
                           label={customer.tier} 
                           color={getTierColor(customer.tier)}
                           size="small"
+                          sx={{
+                            fontSize: { xs: '0.625rem', md: '0.75rem' },
+                            height: { xs: 24, md: 28 }
+                          }}
                         />
                       </Box>
                     </Box>

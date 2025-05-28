@@ -2,6 +2,10 @@ import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { InventoryProvider } from './contexts/InventoryContext'
+import { SettingsProvider } from './contexts/SettingsContext'
+import { StaffProvider } from './contexts/StaffContext'
+import { CustomerProvider } from './contexts/CustomerContext'
+import { SyncProvider } from './contexts/SyncContext'
 import Login from './components/Auth/Login'
 import Dashboard from './components/Dashboard/Dashboard'
 import ProductManagement from './components/ProductManagement/ProductManagement'
@@ -134,11 +138,19 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <InventoryProvider>
-          <div className="app">
-            <AppRoutes />
-          </div>
-        </InventoryProvider>
+        <SyncProvider>
+          <SettingsProvider>
+            <InventoryProvider>
+              <StaffProvider>
+                <CustomerProvider>
+                  <div className="app">
+                    <AppRoutes />
+                  </div>
+                </CustomerProvider>
+              </StaffProvider>
+            </InventoryProvider>
+          </SettingsProvider>
+        </SyncProvider>
       </AuthProvider>
     </Router>
   )

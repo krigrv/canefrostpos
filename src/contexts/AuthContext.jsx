@@ -53,20 +53,7 @@ export function AuthProvider({ children }) {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return result;
     } catch (error) {
-      // Fallback to mock authentication for development
-      const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@canefrost.com';
-      const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin123';
-      if (email === adminEmail && password === adminPassword) {
-        const mockUser = { 
-          email, 
-          displayName: 'Admin User',
-          emailVerified: true,
-          uid: 'mock-admin-uid'
-        };
-        setCurrentUser(mockUser);
-        setIsAuthenticated(true);
-        return { user: mockUser };
-      }
+      console.error('Login failed:', error);
       throw error;
     }
   }

@@ -11,7 +11,8 @@ import {
   Card,
   CardContent,
   Divider,
-  IconButton
+  IconButton,
+  Grid
 } from '@mui/material'
 import { Google as GoogleIcon } from '@mui/icons-material'
 import { useAuth } from '../../contexts/AuthContext'
@@ -62,41 +63,100 @@ function Login() {
     setGoogleLoading(false)
   }
 
-  // Demo login function
-  const handleDemoLogin = () => {
-    setEmail('admin@canefrost.com')
-    setPassword('admin123')
-    toast.info('Admin credentials filled. Click Login to continue.')
-  }
+
 
   return (
-    <Container component="main" maxWidth="sm">
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: '#F9FAFB'
-        }}
-      >
-        <Card sx={{ width: '100%', maxWidth: 400, boxShadow: 3 }}>
-          <CardContent sx={{ p: 4 }}>
-            <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Typography variant="h4" component="h1" gutterBottom color="primary">
-                🥤 Canefrost POS
-              </Typography>
-              <Typography variant="subtitle1" color="text.secondary">
-                Juice Shop Management System
-              </Typography>
+    <Box sx={{ minHeight: '100vh', display: 'flex' }}>
+      <Grid container sx={{ minHeight: '100vh' }}>
+        {/* Left Side - Content */}
+        <Grid 
+          item 
+          xs={false} 
+          md={6} 
+          sx={{
+            backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.6), rgba(255, 255, 255, 0.3)), url("/images/home.jpg")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            display: { xs: 'none', md: 'flex' },
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            color: 'white',
+            p: 4
+          }}
+        >
+          <Box sx={{ textAlign: 'center', maxWidth: 500 }}>
+            <Typography variant="h2" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+              🥤 Canefrost POS
+            </Typography>
+            <Typography variant="h5" sx={{ mb: 4, opacity: 0.9 }}>
+              Modern Juice Shop Management System
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 4, opacity: 0.8, lineHeight: 1.6 }}>
+              Streamline your juice shop operations with our comprehensive point-of-sale system. 
+              Manage inventory, track sales, and serve customers efficiently.
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>📊</Typography>
+                <Typography variant="body2">Sales Analytics</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>📦</Typography>
+                <Typography variant="body2">Inventory Management</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>👥</Typography>
+                <Typography variant="body2">Customer Management</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="h6" sx={{ mb: 1 }}>💳</Typography>
+                <Typography variant="body2">Multiple Payment Options</Typography>
+              </Box>
             </Box>
+          </Box>
+        </Grid>
 
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
+        {/* Right Side - Login Form */}
+        <Grid 
+          item 
+          xs={12} 
+          md={6} 
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            background: '#F9FAFB',
+            p: 4,
+            minHeight: { xs: '100vh', md: 'auto' }
+          }}
+        >
+          <Card sx={{ width: '100%', maxWidth: 400, boxShadow: 3 }}>
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ textAlign: 'center', mb: 3 }}>
+                <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2 }}>
+                  <Typography variant="h4" component="h1" gutterBottom color="primary">
+                    🥤 Canefrost POS
+                  </Typography>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
+                    Modern Juice Shop Management System
+                  </Typography>
+                </Box>
+                <Typography variant="h4" component="h2" gutterBottom color="primary">
+                  Welcome Back
+                </Typography>
+                <Typography variant="subtitle1" color="text.secondary">
+                  Sign in to your account
+                </Typography>
+              </Box>
+
+              {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {error}
+                </Alert>
+              )}
 
             <Box component="form" onSubmit={handleSubmit}>
               <TextField
@@ -149,28 +209,12 @@ function Login() {
                 {googleLoading ? 'Signing in...' : 'Sign in with Google'}
               </Button>
 
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={handleDemoLogin}
-                disabled={loading || googleLoading}
-                sx={{ mb: 2 }}
-              >
-                Use Demo Credentials
-              </Button>
-            </Box>
-
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary" align="center">
-                <strong>Demo Credentials:</strong><br />
-                Email: demo@canefrost.com<br />
-                Password: demo123
-              </Typography>
             </Box>
           </CardContent>
         </Card>
-      </Box>
-    </Container>
+      </Grid>
+    </Grid>
+  </Box>
   )
 }
 

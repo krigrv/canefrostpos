@@ -149,18 +149,8 @@ async function authenticatedUpload() {
       
     } catch (authError) {
       console.error('❌ Authentication failed:', authError.message);
-      
-      // Fallback to mock authentication for development
-      const adminEmail = process.env.VITE_ADMIN_EMAIL || 'admin@canefrost.com';
-      const adminPassword = process.env.VITE_ADMIN_PASSWORD || 'admin123';
-      if (email === adminEmail && password === adminPassword) {
-        console.log('✅ Using development mock authentication');
-      } else {
-        console.log('\n💡 For development, you can use:');
-        console.log(`   Email: ${adminEmail}`);
-        console.log(`   Password: ${adminPassword}`);
-        process.exit(1);
-      }
+      console.log('\n💡 Please check your Firebase authentication credentials.');
+      process.exit(1);
     }
     
     // Categorize products by volume

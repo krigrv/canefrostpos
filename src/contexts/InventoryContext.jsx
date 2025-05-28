@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { createContext, useState, useEffect } from 'react'
 import { db } from '../firebase/config'
 import {
   collection,
@@ -7,10 +7,17 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  onSnapshot
+  getDoc,
+  setDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  limit
 } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { InventoryContext } from '../hooks/useInventory'
+import { useSync } from './SyncContext'
+import { v4 as uuidv4 } from 'uuid'
 
 function InventoryProvider({ children }) {
   console.log('📦 InventoryProvider rendering at:', new Date().toISOString())
@@ -18,12 +25,15 @@ function InventoryProvider({ children }) {
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pendingUpdates, setPendingUpdates] = useState(new Set())
+  const { queueOperation, isOnline, syncCollection } = useSync()
   // Load products from Firestore with real-time updates
   useEffect(() => {
     console.log('InventoryContext: Setting up real-time listener')
     
+    const productsQuery = query(collection(db, 'products'), orderBy('name', 'asc'))
     const unsubscribe = onSnapshot(
-      collection(db, 'products'),
+      productsQuery,
       (snapshot) => {
         const productsData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -31,7 +41,27 @@ function InventoryProvider({ children }) {
         }))
         
         console.log(`InventoryContext: Loaded ${productsData.length} products (real-time)`)
-        setProducts(productsData)
+        console.log('Pending updates:', Array.from(pendingUpdates))
+        
+        // Merge with existing products, preserving pending updates
+        setProducts(prevProducts => {
+          const mergedProducts = productsData.map(newProduct => {
+            // If this product has pending updates, keep the local version
+            if (pendingUpdates.has(newProduct.id)) {
+              const existingProduct = prevProducts.find(p => p.id === newProduct.id)
+              console.log(`Preserving local version for product ${newProduct.id}`)
+              return existingProduct || newProduct
+            }
+            return newProduct
+          })
+          
+          // Add any local products that aren't in Firebase yet and don't have pending updates
+          const localOnlyProducts = prevProducts.filter(p => 
+            !productsData.find(fp => fp.id === p.id) && !pendingUpdates.has(p.id)
+          )
+          
+          return [...mergedProducts, ...localOnlyProducts]
+        })
         setLoading(false)
       },
       (error) => {
@@ -45,6 +75,23 @@ function InventoryProvider({ children }) {
       console.log('InventoryContext: Cleanup - unsubscribing from real-time listener')
       unsubscribe()
     }
+  }, [pendingUpdates])
+
+  // Cleanup mechanism for stuck pending updates
+  useEffect(() => {
+    const cleanup = setInterval(() => {
+      setPendingUpdates(prev => {
+        if (prev.size > 0) {
+          console.log('Cleaning up pending updates:', Array.from(prev))
+          // Clear pending updates that are older than 30 seconds
+          // In a real app, you'd want more sophisticated tracking
+          return new Set()
+        }
+        return prev
+      })
+    }, 30000) // Clean up every 30 seconds
+
+    return () => clearInterval(cleanup)
   }, [])
 
   // Category mapping function
@@ -72,117 +119,8 @@ function InventoryProvider({ children }) {
     return 'spiced, herbal & others'
   }
 
-  // Load default products from CSV data
-  const loadDefaultProducts = () => {
-    const defaultProducts = [
-      // Cane Blend 240ml
-    { id: 'CFRST01', name: 'AVOCADO 240ml', category: 'Cane Blend', price: 70, barcode: 'CFRST01', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST02', name: 'BLACK SALTED 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST02', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST03', name: 'BLUEBERRY 240ml', category: 'Cane Blend', price: 70, barcode: 'CFRST03', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST04', name: 'COFFEE 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST04', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST05', name: 'DRAGON FRUIT 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST05', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST06', name: 'FIG 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST06', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST07', name: 'GINGER 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST07', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST08', name: 'GOOSEBERRY 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST08', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST09', name: 'GRAPES 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST09', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST10', name: 'GUAVA 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST10', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST11', name: 'ICE APPLE 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST11', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST12', name: 'JACKFRUIT 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST12', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST13', name: 'JALJEERA 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST13', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST14', name: 'JAMUN 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST14', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST15', name: 'JUSTCANE (PLAIN) 240ml', category: 'Cane Blend', price: 30, barcode: 'CFRST15', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST16', name: 'LEMON 240ml', category: 'Cane Blend', price: 30, barcode: 'CFRST16', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST17', name: 'LEMON & GINGER 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST17', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST18', name: 'MINT 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST18', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST19', name: 'MINT & LEMON 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST19', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST20', name: 'MINT, LEMON & GINGER 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST20', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST21', name: 'MOSAMBI 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST21', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST22', name: 'MUSKMELON 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST22', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST23', name: 'ORANGE 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST23', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST24', name: 'PINEAPPLE 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST24', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST25', name: 'POMEGRANATE 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST25', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST26', name: 'STRAWBERRY 240ml', category: 'Cane Blend', price: 70, barcode: 'CFRST26', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST27', name: 'WATERMELON 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST27', taxPercentage: 12, stock: 50 },
-      
-      // Cane Blend 500ml
-    { id: 'CFRST28', name: 'AVOCADO 500 ml', category: 'Cane Blend', price: 140, barcode: 'CFRST28', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST29', name: 'BLACK SALTED 500 ml', category: 'Cane Blend', price: 70, barcode: 'CFRST29', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST30', name: 'BLUEBERRY 500 ml', category: 'Cane Blend', price: 140, barcode: 'CFRST30', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST31', name: 'COFFEE 500 ml', category: 'Cane Blend', price: 120, barcode: 'CFRST31', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST32', name: 'DRAGON FRUIT 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST32', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST33', name: 'FIG 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST33', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST34', name: 'GINGER 500 ml', category: 'Cane Blend', price: 70, barcode: 'CFRST34', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST35', name: 'GOOSEBERRY 500 ml', category: 'Cane Blend', price: 80, barcode: 'CFRST35', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST36', name: 'GRAPES 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST36', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST37', name: 'GUAVA 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST37', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST38', name: 'ICE APPLE 500 ml', category: 'Cane Blend', price: 120, barcode: 'CFRST38', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST39', name: 'JACKFRUIT 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST39', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST40', name: 'JALJEERA 500 ml', category: 'Cane Blend', price: 70, barcode: 'CFRST40', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST41', name: 'JAMUN 500 ml', category: 'Cane Blend', price: 120, barcode: 'CFRST41', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST42', name: 'JUSTCANE (PLAIN) 500 ml', category: 'Cane Blend', price: 60, barcode: 'CFRST42', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST43', name: 'LEMON 500 ml', category: 'Cane Blend', price: 60, barcode: 'CFRST43', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST44', name: 'LEMON & GINGER 500 ml', category: 'Cane Blend', price: 70, barcode: 'CFRST44', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST45', name: 'MINT 500 ml', category: 'Cane Blend', price: 70, barcode: 'CFRST45', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST46', name: 'MINT & LEMON 500 ml', category: 'Cane Blend', price: 80, barcode: 'CFRST46', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST47', name: 'MINT, LEMON & GINGER 500 ml', category: 'Cane Blend', price: 80, barcode: 'CFRST47', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST48', name: 'MOSAMBI 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST48', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST49', name: 'MUSKMELON 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST49', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST50', name: 'ORANGE 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST50', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST51', name: 'PINEAPPLE 500 ml', category: 'Cane Blend', price: 100, barcode: 'CFRST51', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST52', name: 'POMEGRANATE 500 ml', category: 'Cane Blend', price: 120, barcode: 'CFRST52', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST53', name: 'STRAWBERRY 500 ml', category: 'Cane Blend', price: 140, barcode: 'CFRST53', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST54', name: 'TENDER COCONUT 500ml', category: 'Cane Blend', price: 120, barcode: 'CFRST54', taxPercentage: 12, stock: 50 },
-    { id: 'CFRST55', name: 'WATERMELON 500 ml', category: 'Cane Blend', price: 80, barcode: 'CFRST55', taxPercentage: 12, stock: 50 },
-      
-      // Cane Fusion
-      { id: 'CFRST56', name: 'BLUEBERRY CANE FUSION', category: 'Cane Fusion', price: 200, barcode: 'CFRST56', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST57', name: 'DRAGON FRUIT CANE FUSION', category: 'Cane Fusion', price: 160, barcode: 'CFRST57', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST58', name: 'FIG CANE FUSION', category: 'Cane Fusion', price: 160, barcode: 'CFRST58', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST59', name: 'GRAPES CANE FUSION', category: 'Cane Fusion', price: 160, barcode: 'CFRST59', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST60', name: 'ICE APPLE CANE FUSION', category: 'Cane Fusion', price: 210, barcode: 'CFRST60', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST61', name: 'JAMUN CANE FUSION', category: 'Cane Fusion', price: 160, barcode: 'CFRST61', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST62', name: 'MOSAMBI CANE FUSION', category: 'Cane Fusion', price: 150, barcode: 'CFRST62', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST63', name: 'ORANGE CANE FUSION', category: 'Cane Fusion', price: 180, barcode: 'CFRST63', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST64', name: 'PINEAPPLE CANE FUSION', category: 'Cane Fusion', price: 160, barcode: 'CFRST64', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST65', name: 'POMEGRANATE CANE FUSION', category: 'Cane Fusion', price: 200, barcode: 'CFRST65', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST66', name: 'STRAWBERRY CANE FUSION', category: 'Cane Fusion', price: 200, barcode: 'CFRST66', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST67', name: 'WATERMELON CANE FUSION', category: 'Cane Fusion', price: 160, barcode: 'CFRST67', taxPercentage: 12, stock: 50 },
-      
-      // Canepops
-      { id: 'CFRST68', name: 'ALMOND & CASHEW', category: 'Cane Pops', price: 30, barcode: 'CFRST68', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST69', name: 'AVOCADO', category: 'Cane Pops', price: 25, barcode: 'CFRST69', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST70', name: 'CHOCO CHIPS', category: 'Cane Pops', price: 15, barcode: 'CFRST70', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST71', name: 'COFFEE', category: 'Cane Pops', price: 20, barcode: 'CFRST71', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST72', name: 'DRAGON', category: 'Cane Pops', price: 20, barcode: 'CFRST72', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST73', name: 'FIG', category: 'Cane Pops', price: 20, barcode: 'CFRST73', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST74', name: 'GOOSEBERRY', category: 'Cane Pops', price: 20, barcode: 'CFRST74', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST75', name: 'GRAPES', category: 'Cane Pops', price: 20, barcode: 'CFRST75', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST76', name: 'GUAVA', category: 'Cane Pops', price: 20, barcode: 'CFRST76', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST77', name: 'JAMUN', category: 'Cane Pops', price: 20, barcode: 'CFRST77', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST78', name: 'JUSTCANE', category: 'Cane Pops', price: 10, barcode: 'CFRST78', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST79', name: 'LEMON & GINGER', category: 'Cane Pops', price: 15, barcode: 'CFRST79', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST80', name: 'MUSKMELON', category: 'Cane Pops', price: 20, barcode: 'CFRST80', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST81', name: 'ORANGE', category: 'Cane Pops', price: 20, barcode: 'CFRST81', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST82', name: 'PINEAPPLE', category: 'Cane Pops', price: 20, barcode: 'CFRST82', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST83', name: 'POMEGRANATE', category: 'Cane Pops', price: 20, barcode: 'CFRST83', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST84', name: 'STRAWBERRY', category: 'Cane Pops', price: 20, barcode: 'CFRST84', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST85', name: 'TENDER COCONUT', category: 'Cane Pops', price: 25, barcode: 'CFRST85', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST86', name: 'WATERMELON', category: 'Cane Pops', price: 20, barcode: 'CFRST86', taxPercentage: 12, stock: 50 },
-      
-      // Cane Special
-      { id: 'CFRST87', name: 'WATERMELON BLAST', category: 'Cane Special', price: 350, barcode: 'CFRST87', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST88', name: 'MUSKMELON BLAST', category: 'Cane Special', price: 130, barcode: 'CFRST88', taxPercentage: 12, stock: 50 },
-      
-      // Others
-      { id: 'CFRST89', name: 'TENDER COCONUT 50', category: 'Others', price: 50, barcode: 'CFRST89', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST90', name: 'TENDER COCONUT 90', category: 'Others', price: 90, barcode: 'CFRST90', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST91', name: 'WATER BOTTLE 1 LITRE', category: 'Others', price: 20, barcode: 'CFRST91', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST92', name: 'WATER BOTTLE 500ML', category: 'Others', price: 10, barcode: 'CFRST92', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST93', name: 'PEANUT BARFI', category: 'Others', price: 5, barcode: 'CFRST93', taxPercentage: 12, stock: 50 },
-      { id: 'CFRST94', name: 'PACKAGING CHARGE', category: 'Others', price: 10, barcode: 'CFRST94', taxPercentage: 12, stock: 50 }
-    ]
-    setProducts(defaultProducts)
-  }
+
+
 
   // Add product to cart
   const addToCart = (product, quantity = 1) => {
@@ -232,36 +170,203 @@ function InventoryProvider({ children }) {
     setCart([])
   }
 
-  // Add new product
+  // Add product with sync support
   const addProduct = async (productData) => {
+    const newProduct = {
+      ...productData,
+      id: Date.now().toString(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+    
     try {
-      await addDoc(collection(db, 'products'), productData)
-      toast.success('Product added successfully')
+      // Add to local state immediately for optimistic updates
+      setProducts(prev => [...prev, newProduct])
+      
+      // Add to pending updates to prevent real-time listener from overriding
+      setPendingUpdates(prev => new Set([...prev, newProduct.id]))
+      
+      if (isOnline) {
+        // Try immediate sync
+        await setDoc(doc(db, 'products', newProduct.id), newProduct)
+        // Remove from pending updates after successful sync
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(newProduct.id)
+          return newSet
+        })
+      } else {
+        // Queue for sync when online
+        queueOperation({
+          type: 'create',
+          collection: 'products',
+          id: newProduct.id,
+          data: newProduct
+        })
+        throw new Error('Device is offline - product will sync when online')
+      }
+      
+      return newProduct
     } catch (error) {
       console.error('Error adding product:', error)
-      toast.error('Failed to add product')
+      
+      // Remove from pending updates on error
+      setPendingUpdates(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(newProduct.id)
+        return newSet
+      })
+      
+      // Revert optimistic update on error
+      setProducts(prev => prev.filter(p => p.id !== newProduct.id))
+      
+      // Queue for retry if immediate sync failed and we're online
+      if (isOnline) {
+        queueOperation({
+          type: 'create',
+          collection: 'products',
+          id: newProduct.id,
+          data: newProduct
+        })
+      }
+      
+      throw error // Re-throw to let the component handle the error
     }
   }
 
-  // Update product
+  // Update product with sync support
   const updateProduct = async (productId, productData) => {
     try {
-      await updateDoc(doc(db, 'products', productId), productData)
-      toast.success('Product updated successfully')
+      // Optimistic update
+      setProducts(prev => prev.map(p => 
+        p.id === productId ? { ...p, ...productData, updatedAt: new Date() } : p
+      ))
+      
+      // Add to pending updates to prevent real-time listener conflicts
+      setPendingUpdates(prev => new Set([...prev, productId]))
+      
+      if (isOnline) {
+        // Try immediate sync
+        const productRef = doc(db, 'products', productId)
+        const productDoc = await getDoc(productRef)
+        
+        if (productDoc.exists()) {
+          await updateDoc(productRef, {
+            ...productData,
+            updatedAt: new Date()
+          })
+        } else {
+          await setDoc(productRef, {
+            id: productId,
+            ...productData,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+        }
+        
+        // Remove from pending updates on success
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(productId)
+          return newSet
+        })
+      } else {
+        // Queue for later sync
+        queueOperation({
+          type: 'update',
+          collection: 'products',
+          id: productId,
+          data: productData
+        })
+        throw new Error('Device is offline - changes will sync when online')
+      }
     } catch (error) {
       console.error('Error updating product:', error)
-      toast.error('Failed to update product')
+      
+      // Remove from pending updates on error to allow real-time listener to work
+      setPendingUpdates(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(productId)
+        return newSet
+      })
+      
+      // Revert optimistic update on error
+      const originalProduct = products.find(p => p.id === productId)
+      if (originalProduct) {
+        setProducts(prev => prev.map(p => 
+          p.id === productId ? originalProduct : p
+        ))
+      }
+      
+      // Queue for retry if immediate sync failed and we're online
+      if (isOnline) {
+        queueOperation({
+          type: 'update',
+          collection: 'products',
+          id: productId,
+          data: productData
+        })
+      }
+      
+      throw error // Re-throw to let the component handle the error
     }
   }
 
-  // Delete product
+  // Delete product with sync support
   const deleteProduct = async (productId) => {
+    // Store the product to delete for potential restoration
+    const productToDelete = products.find(p => p.id === productId)
+    
     try {
-      await deleteDoc(doc(db, 'products', productId))
-      toast.success('Product deleted successfully')
+      // Remove from local state immediately for optimistic updates
+      setProducts(prev => prev.filter(p => p.id !== productId))
+      
+      // Add to pending updates to prevent real-time listener from re-adding
+      setPendingUpdates(prev => new Set([...prev, productId]))
+      
+      if (isOnline) {
+        // Try immediate sync
+        await deleteDoc(doc(db, 'products', productId))
+        // Remove from pending updates after successful sync
+        setPendingUpdates(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(productId)
+          return newSet
+        })
+      } else {
+        // Queue for sync when online
+        queueOperation({
+          type: 'delete',
+          collection: 'products',
+          id: productId
+        })
+        throw new Error('Device is offline - deletion will sync when online')
+      }
     } catch (error) {
       console.error('Error deleting product:', error)
-      toast.error('Failed to delete product')
+      
+      // Restore product on error
+      if (productToDelete) {
+        setProducts(prev => [...prev, productToDelete])
+      }
+      
+      // Remove from pending updates on error
+      setPendingUpdates(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(productId)
+        return newSet
+      })
+      
+      // Queue for retry if immediate sync failed and we're online
+      if (isOnline) {
+        queueOperation({
+          type: 'delete',
+          collection: 'products',
+          id: productId
+        })
+      }
+      
+      throw error // Re-throw to let the component handle the error
     }
   }
 
@@ -314,66 +419,7 @@ function InventoryProvider({ children }) {
     }
   }
 
-  // Clear all products and upload defaults to Firestore
-  const resetToDefaultProducts = async () => {
-    try {
-      setLoading(true)
-      
-      // Get all products from Firebase
-      const snapshot = await getDocs(collection(db, 'products'))
-      
-      // Delete all existing products
-      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref))
-      await Promise.all(deletePromises)
-      
-      // Get default products data
-      const defaultProducts = [
-        // Cane Blend 240ml
-        { id: 'CFRST01', name: 'AVOCADO 240ml', category: 'Cane Blend', price: 70, barcode: 'CFRST01', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST02', name: 'BLACK SALTED 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST02', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST03', name: 'BLUEBERRY 240ml', category: 'Cane Blend', price: 70, barcode: 'CFRST03', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST04', name: 'COFFEE 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST04', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST05', name: 'DRAGON FRUIT 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST05', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST06', name: 'FIG 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST06', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST07', name: 'GINGER 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST07', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST08', name: 'GOOSEBERRY 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST08', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST09', name: 'GRAPES 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST09', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST10', name: 'GUAVA 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST10', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST11', name: 'ICE APPLE 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST11', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST12', name: 'JACKFRUIT 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST12', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST13', name: 'JALJEERA 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST13', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST14', name: 'JAMUN 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST14', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST15', name: 'JUSTCANE (PLAIN) 240ml', category: 'Cane Blend', price: 30, barcode: 'CFRST15', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST16', name: 'LEMON 240ml', category: 'Cane Blend', price: 30, barcode: 'CFRST16', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST17', name: 'LEMON & GINGER 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST17', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST18', name: 'MINT 240ml', category: 'Cane Blend', price: 35, barcode: 'CFRST18', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST19', name: 'MINT & LEMON 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST19', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST20', name: 'MINT, LEMON & GINGER 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST20', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST21', name: 'MOSAMBI 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST21', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST22', name: 'MUSKMELON 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST22', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST23', name: 'ORANGE 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST23', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST24', name: 'PINEAPPLE 240ml', category: 'Cane Blend', price: 50, barcode: 'CFRST24', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST25', name: 'POMEGRANATE 240ml', category: 'Cane Blend', price: 60, barcode: 'CFRST25', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST26', name: 'STRAWBERRY 240ml', category: 'Cane Blend', price: 70, barcode: 'CFRST26', taxPercentage: 12, stock: 50 },
-        { id: 'CFRST27', name: 'WATERMELON 240ml', category: 'Cane Blend', price: 40, barcode: 'CFRST27', taxPercentage: 12, stock: 50 }
-      ]
-      
-      // Upload default products to Firestore
-      const uploadPromises = defaultProducts.map(product => {
-        const { id, ...productData } = product
-        return addDoc(collection(db, 'products'), productData)
-      })
-      
-      await Promise.all(uploadPromises)
-      
-      toast.success('Products reset to defaults and uploaded to Firestore successfully')
-    } catch (error) {
-      console.error('Error resetting products:', error)
-      toast.error('Failed to reset products')
-    } finally {
-      setLoading(false)
-    }
-  }
+
 
   // Calculate cart total
   const getCartTotal = () => {
@@ -394,6 +440,131 @@ function InventoryProvider({ children }) {
     return getCartTotal() - getCartTax()
   }
 
+  // Check for duplicate sales
+  const checkForDuplicates = async (newSale) => {
+    try {
+      const salesQuery = query(
+        collection(db, 'sales'),
+        orderBy('timestamp', 'desc'),
+        limit(50) // Check last 50 sales for performance
+      )
+      const snapshot = await getDocs(salesQuery)
+      
+      const recentSales = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+      }))
+      
+      // Check for duplicates within last 5 minutes with same total and items count
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+      const newSaleTime = new Date(newSale.timestamp)
+      
+      const duplicates = recentSales.filter(sale => {
+        const saleTime = new Date(sale.timestamp)
+        return (
+          Math.abs(saleTime - newSaleTime) < 10000 && // Within 10 seconds
+          Math.abs(sale.total - newSale.total) < 0.01 && // Same total (accounting for floating point)
+          sale.items?.length === newSale.items?.length && // Same number of items
+          sale.paymentMethod === newSale.paymentMethod // Same payment method
+        )
+      })
+      
+      return duplicates.length > 0
+    } catch (error) {
+      console.error('Error checking for duplicates:', error)
+      return false // If check fails, allow the sale to proceed
+    }
+  }
+
+  // Clean up duplicate sales
+  const cleanupDuplicates = async () => {
+    try {
+      console.log('Starting duplicate cleanup...')
+      const salesQuery = query(collection(db, 'sales'), orderBy('timestamp', 'desc'))
+      const snapshot = await getDocs(salesQuery)
+      
+      const allSales = snapshot.docs.map(doc => ({
+        id: doc.id,
+        docRef: doc.ref,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+      }))
+      
+      const duplicatesToDelete = []
+      const seenSales = new Map()
+      
+      // Group sales by potential duplicate criteria
+      allSales.forEach(sale => {
+        const key = `${sale.total}_${sale.items?.length}_${sale.paymentMethod}_${Math.floor(new Date(sale.timestamp).getTime() / 10000)}` // 10-second window
+        
+        if (seenSales.has(key)) {
+          // This is a potential duplicate
+          const existingSale = seenSales.get(key)
+          const timeDiff = Math.abs(new Date(sale.timestamp) - new Date(existingSale.timestamp))
+          
+          // If within 10 seconds and same details, mark as duplicate
+          if (timeDiff < 10000) {
+            duplicatesToDelete.push(sale)
+          }
+        } else {
+          seenSales.set(key, sale)
+        }
+      })
+      
+      // Delete duplicates
+      if (duplicatesToDelete.length > 0) {
+        console.log(`Found ${duplicatesToDelete.length} duplicate sales to delete`)
+        const deletePromises = duplicatesToDelete.map(sale => deleteDoc(sale.docRef))
+        await Promise.all(deletePromises)
+        
+        toast.success(`Removed ${duplicatesToDelete.length} duplicate sales`)
+        console.log(`Successfully deleted ${duplicatesToDelete.length} duplicate sales`)
+        return duplicatesToDelete.length
+      } else {
+        toast.info('No duplicate sales found')
+        console.log('No duplicate sales found')
+        return 0
+      }
+    } catch (error) {
+      console.error('Error cleaning up duplicates:', error)
+      toast.error('Failed to clean up duplicates')
+      throw error
+    }
+  }
+
+  // Add sale to Firebase with duplicate prevention
+  const addSale = async (saleData) => {
+    try {
+      console.log('Adding sale to Firebase:', saleData)
+      
+      // Check for duplicates before adding
+      const isDuplicate = await checkForDuplicates(saleData)
+      if (isDuplicate) {
+        console.log('Duplicate sale detected, skipping...')
+        toast.warning('Duplicate sale detected and prevented')
+        return null
+      }
+      
+      // Add unique transaction ID if not present
+      const saleWithId = {
+        ...saleData,
+        transactionId: saleData.transactionId || uuidv4(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      
+      const docRef = await addDoc(collection(db, 'sales'), saleWithId)
+      console.log('Sale added with ID:', docRef.id)
+      toast.success('Sale recorded successfully!')
+      return docRef.id
+    } catch (error) {
+      console.error('Error adding sale to Firebase:', error)
+      toast.error('Failed to record sale')
+      throw error
+    }
+  }
+
   const value = {
     products,
     cart,
@@ -405,12 +576,13 @@ function InventoryProvider({ children }) {
     addProduct,
     updateProduct,
     deleteProduct,
-    resetToDefaultProducts,
     uploadAllInventoryToFirebase,
     getCartTotal,
     getCartTax,
     getCartSubtotal,
-    getCategoryGroup
+    getCategoryGroup,
+    addSale,
+    cleanupDuplicates
   }
 
   return (

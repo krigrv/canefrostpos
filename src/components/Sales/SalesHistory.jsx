@@ -32,9 +32,16 @@ import {
   Receipt as ReceiptIcon,
   TrendingUp as TrendingUpIcon,
   ShoppingCart as ShoppingCartIcon,
-  AttachMoney as AttachMoneyIcon
+  AttachMoney as AttachMoneyIcon,
+  Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material'
 import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns'
+import { db } from '../../firebase/config'
+import { collection, onSnapshot, query, orderBy, updateDoc, doc } from 'firebase/firestore'
+import toast from 'react-hot-toast'
 
 function SalesHistory() {
   const [sales, setSales] = useState([])
@@ -42,22 +49,33 @@ function SalesHistory() {
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedSale, setSelectedSale] = useState(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedSale, setEditedSale] = useState(null)
 
   // Real-time sales data from Firestore - No mock data
   useEffect(() => {
-    // Initialize with empty sales array - real sales will be added through the POS system
-    setSales([])
+    console.log('SalesHistory: Setting up real-time listener for sales')
     
-    // TODO: Add Firestore listener for real-time sales data
-    // const unsubscribe = onSnapshot(collection(db, 'sales'), (snapshot) => {
-    //   const salesData = snapshot.docs.map(doc => ({
-    //     id: doc.id,
-    //     ...doc.data(),
-    //     timestamp: doc.data().timestamp?.toDate()
-    //   }))
-    //   setSales(salesData)
-    // })
-    // return () => unsubscribe()
+    const salesQuery = query(collection(db, 'sales'), orderBy('timestamp', 'desc'))
+    const unsubscribe = onSnapshot(
+      salesQuery,
+      (snapshot) => {
+        const salesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+        }))
+        
+        console.log(`SalesHistory: Loaded ${salesData.length} sales records (real-time)`)
+        setSales(salesData)
+      },
+      (error) => {
+        console.error('SalesHistory: Error loading sales:', error)
+        toast.error('Error loading sales data')
+      }
+    )
+    
+    return () => unsubscribe()
   }, [])
 
   // Filter sales based on search and date
@@ -96,16 +114,99 @@ function SalesHistory() {
   const handleViewDetails = (sale) => {
     setSelectedSale(sale)
     setDetailsOpen(true)
+    setIsEditing(false)
+    setEditedSale(null)
   }
 
   const handleCloseDetails = () => {
     setDetailsOpen(false)
     setSelectedSale(null)
+    setIsEditing(false)
+    setEditedSale(null)
+  }
+
+  const handleEditOrder = () => {
+    setIsEditing(true)
+    setEditedSale({ ...selectedSale })
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditedSale(null)
+  }
+
+  const handleSaveEdit = async () => {
+    try {
+      const saleRef = doc(db, 'sales', editedSale.id)
+      const { id, ...updateData } = editedSale
+      
+      await updateDoc(saleRef, updateData)
+      
+      setSelectedSale(editedSale)
+      setIsEditing(false)
+      setEditedSale(null)
+      toast.success('Sale updated successfully')
+    } catch (error) {
+      console.error('Error updating sale:', error)
+      toast.error('Failed to update sale')
+    }
+  }
+
+  const handleEditChange = (field, value) => {
+    setEditedSale(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleItemChange = (index, field, value) => {
+    const updatedItems = [...editedSale.items]
+    updatedItems[index] = {
+      ...updatedItems[index],
+      [field]: field === 'quantity' || field === 'price' ? parseFloat(value) || 0 : value
+    }
+    
+    // Recalculate totals
+    const subtotal = updatedItems.reduce((sum, item) => sum + (item.quantity * item.price), 0)
+    const tax = subtotal * 0.18 // Assuming 18% tax
+    const total = subtotal + tax
+    
+    setEditedSale(prev => ({
+      ...prev,
+      items: updatedItems,
+      subtotal,
+      tax,
+      total
+    }))
+  }
+
+  const handleRemoveItem = (index) => {
+    const updatedItems = editedSale.items.filter((_, i) => i !== index)
+    
+    // Recalculate totals
+    const subtotal = updatedItems.reduce((sum, item) => sum + (item.quantity * item.price), 0)
+    const tax = subtotal * 0.18
+    const total = subtotal + tax
+    
+    setEditedSale(prev => ({
+      ...prev,
+      items: updatedItems,
+      subtotal,
+      tax,
+      total
+    }))
   }
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{ 
+          fontSize: { xs: '1.5rem', md: '2rem' },
+          textTransform: 'capitalize'
+        }}
+      >
         Sales History
       </Typography>
 
@@ -262,9 +363,16 @@ function SalesHistory() {
       {/* Sale Details Dialog */}
       <Dialog open={detailsOpen} onClose={handleCloseDetails} maxWidth="md" fullWidth>
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <ReceiptIcon sx={{ mr: 1 }} />
-            Order Details - {selectedSale?.id}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <ReceiptIcon sx={{ mr: 1 }} />
+              Order Details - {selectedSale?.id}
+            </Box>
+            {!isEditing && (
+              <IconButton onClick={handleEditOrder} color="primary">
+                <EditIcon />
+              </IconButton>
+            )}
           </Box>
         </DialogTitle>
         <DialogContent>
@@ -279,7 +387,17 @@ function SalesHistory() {
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2" color="text.secondary">Customer</Typography>
-                  <Typography variant="body1">{selectedSale.customerName}</Typography>
+                  {isEditing ? (
+                    <TextField
+                      value={editedSale?.customerName || ''}
+                      onChange={(e) => handleEditChange('customerName', e.target.value)}
+                      size="small"
+                      fullWidth
+                      sx={{ mt: 1 }}
+                    />
+                  ) : (
+                    <Typography variant="body1">{selectedSale.customerName}</Typography>
+                  )}
                 </Grid>
                 <Grid item xs={12} md={6}>
                   <Typography variant="body2" color="text.secondary">Payment Method</Typography>
@@ -293,15 +411,55 @@ function SalesHistory() {
 
               <Typography variant="h6" gutterBottom>Items Ordered</Typography>
               <List>
-                {selectedSale.items.map((item, index) => (
+                {(isEditing ? editedSale?.items : selectedSale.items)?.map((item, index) => (
                   <ListItem key={index}>
-                    <ListItemText
-                      primary={item.name}
-                      secondary={`Quantity: ${item.quantity} × ₹${item.price}`}
-                    />
-                    <Typography variant="body2" fontWeight="bold">
-                      ₹{(item.quantity * item.price).toFixed(2)}
-                    </Typography>
+                    {isEditing ? (
+                      <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <TextField
+                          label="Item Name"
+                          value={item.name}
+                          onChange={(e) => handleItemChange(index, 'name', e.target.value)}
+                          size="small"
+                          sx={{ flex: 1 }}
+                        />
+                        <TextField
+                          label="Quantity"
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          size="small"
+                          sx={{ width: 100 }}
+                        />
+                        <TextField
+                          label="Price"
+                          type="number"
+                          value={item.price}
+                          onChange={(e) => handleItemChange(index, 'price', e.target.value)}
+                          size="small"
+                          sx={{ width: 100 }}
+                        />
+                        <Typography variant="body2" fontWeight="bold" sx={{ minWidth: 80 }}>
+                          ₹{(item.quantity * item.price).toFixed(2)}
+                        </Typography>
+                        <IconButton 
+                          onClick={() => handleRemoveItem(index)} 
+                          color="error" 
+                          size="small"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    ) : (
+                      <>
+                        <ListItemText
+                          primary={item.name}
+                          secondary={`Quantity: ${item.quantity} × ₹${item.price}`}
+                        />
+                        <Typography variant="body2" fontWeight="bold">
+                          ₹{(item.quantity * item.price).toFixed(2)}
+                        </Typography>
+                      </>
+                    )}
                   </ListItem>
                 ))}
               </List>
@@ -310,24 +468,44 @@ function SalesHistory() {
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant="body1">Subtotal:</Typography>
-                <Typography variant="body1">₹{selectedSale.subtotal.toFixed(2)}</Typography>
+                <Typography variant="body1">
+                  ₹{(isEditing ? editedSale?.subtotal : selectedSale.subtotal)?.toFixed(2)}
+                </Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                 <Typography variant="body1">Tax:</Typography>
-                <Typography variant="body1">₹{selectedSale.tax.toFixed(2)}</Typography>
+                <Typography variant="body1">
+                  ₹{(isEditing ? editedSale?.tax : selectedSale.tax)?.toFixed(2)}
+                </Typography>
               </Box>
               <Divider sx={{ my: 1 }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="h6">Total:</Typography>
                 <Typography variant="h6" color="primary">
-                  ₹{selectedSale.total.toFixed(2)}
+                  ₹{(isEditing ? editedSale?.total : selectedSale.total)?.toFixed(2)}
                 </Typography>
               </Box>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDetails}>Close</Button>
+          {isEditing ? (
+            <>
+              <Button onClick={handleCancelEdit} startIcon={<CancelIcon />}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveEdit} 
+                variant="contained" 
+                startIcon={<SaveIcon />}
+                color="primary"
+              >
+                Save Changes
+              </Button>
+            </>
+          ) : (
+            <Button onClick={handleCloseDetails}>Close</Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

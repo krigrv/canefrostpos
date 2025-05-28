@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
+import { useSettings } from '../../contexts/SettingsContext'
 import {
   Box,
   Typography,
-  Paper,
   Grid,
   Card,
   CardContent,
@@ -14,9 +14,20 @@ import {
   ListItemText,
   Switch,
   FormControlLabel,
+  Paper,
   Divider,
   Alert,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Checkbox,
+  TextField
 } from '@mui/material'
 import {
   People as PeopleIcon,
@@ -38,14 +49,33 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 function Settings() {
+  const { settings: contextSettings, saveSettings } = useSettings()
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState(0)
   const [settings, setSettings] = useState({
-    notifications: true,
-    autoBackup: true,
-    receiptPrinting: true,
-    taxCalculation: true,
-    inventoryAlerts: true,
-    salesReports: true
+    enableNotifications: true,
+    enableAutoBackup: false,
+    enableTwoFactor: true,
+    enableDarkMode: false,
+    enableSoundEffects: true,
+    enableEmailAlerts: false
+  })
+
+  const [printSettingsOpen, setPrintSettingsOpen] = useState(false)
+  const [printSettings, setPrintSettings] = useState({
+    businessName: contextSettings.businessName || 'CANEFROST JUICE SHOP',
+    businessAddress: contextSettings.businessAddress || 'Fresh Juices & Beverages\nPhone: +91 9876543210',
+    gstNumber: contextSettings.gstNumber || '29XXXXX1234X1ZX',
+    fontSize: contextSettings.fontSize || 'medium',
+    printerWidth: contextSettings.printerWidth || '80mm',
+    lineSpacing: contextSettings.lineSpacing || 'normal',
+    showBusinessName: contextSettings.showBusinessName !== undefined ? contextSettings.showBusinessName : true,
+    showBusinessAddress: contextSettings.showBusinessAddress !== undefined ? contextSettings.showBusinessAddress : true,
+    showGSTNumber: contextSettings.showGSTNumber !== undefined ? contextSettings.showGSTNumber : true,
+    showLogo: true,
+    showAddress: true,
+    showTax: true,
+    showPackaging: true
   })
 
   const handleSettingChange = (setting) => {
@@ -80,6 +110,14 @@ function Settings() {
       features: ['Sales Reports', 'Peak Hours', 'Popular Items', 'Tax & Audit'],
       action: () => navigate('/reports'),
       color: 'info'
+    },
+    {
+      title: 'Print Settings',
+      description: 'Customize receipt printing and preview options',
+      icon: <PrintIcon sx={{ fontSize: 40, color: 'secondary.main' }} />,
+      color: 'secondary',
+      features: ['Receipt Layout', 'Font Size', 'Print Preview', 'Paper Settings'],
+      action: () => setPrintSettingsOpen(true)
     }
   ]
 
@@ -144,12 +182,12 @@ function Settings() {
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   {card.icon}
-                  <Typography variant="h6" sx={{ ml: 2 }}>
+                  <Typography variant="h6" sx={{ ml: 2, textTransform: 'capitalize' }}>
                     {card.title}
                   </Typography>
                 </Box>
                 
-                <Typography variant="body2" color="text.secondary" gutterBottom>
+                <Typography variant="body2" color="text.secondary" gutterBottom sx={{ textTransform: 'capitalize' }}>
                   {card.description}
                 </Typography>
                 
@@ -160,7 +198,7 @@ function Settings() {
                       label={feature}
                       size="small"
                       variant="outlined"
-                      sx={{ mr: 0.5, mb: 0.5 }}
+                      sx={{ mr: 0.5, mb: 0.5, textTransform: 'capitalize' }}
                     />
                   ))}
                 </Box>
@@ -173,6 +211,7 @@ function Settings() {
                   color={card.color}
                   onClick={card.action}
                   startIcon={<SettingsIcon />}
+                  sx={{ textTransform: 'capitalize' }}
                 >
                   Manage
                 </Button>
@@ -291,6 +330,288 @@ function Settings() {
           </Alert>
         </Grid>
       </Grid>
+
+      {/* Print Settings Dialog */}
+      <Dialog open={printSettingsOpen} onClose={() => setPrintSettingsOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ textTransform: 'capitalize' }}>Print Settings - 80mm Thermal Printer</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            {/* Business Information */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize' }}>Business Information</Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Business Name"
+                value={printSettings.businessName}
+                onChange={(e) => setPrintSettings(prev => ({ ...prev, businessName: e.target.value }))}
+                helperText="This will appear at the top of receipts"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Business Address"
+                multiline
+                rows={3}
+                value={printSettings.businessAddress}
+                onChange={(e) => setPrintSettings(prev => ({ ...prev, businessAddress: e.target.value }))}
+                helperText="Use \n for line breaks. Include phone number and other contact details"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="GST Number"
+                value={printSettings.gstNumber}
+                onChange={(e) => setPrintSettings(prev => ({ ...prev, gstNumber: e.target.value }))}
+                helperText="Your GST registration number"
+              />
+            </Grid>
+            
+            {/* Printer Settings */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize', mt: 2 }}>Printer Settings</Typography>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Font Size</InputLabel>
+                <Select
+                  value={printSettings.fontSize}
+                  label="Font Size"
+                  onChange={(e) => setPrintSettings(prev => ({ ...prev, fontSize: e.target.value }))}
+                >
+                  <MenuItem value="small">Small</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="large">Large</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Printer Width</InputLabel>
+                <Select
+                  value={printSettings.printerWidth}
+                  label="Printer Width"
+                  onChange={(e) => setPrintSettings(prev => ({ ...prev, printerWidth: e.target.value }))}
+                >
+                  <MenuItem value="58mm">58mm</MenuItem>
+                  <MenuItem value="80mm">80mm (Recommended)</MenuItem>
+                  <MenuItem value="A4">A4</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Line Spacing</InputLabel>
+                <Select
+                  value={printSettings.lineSpacing}
+                  label="Line Spacing"
+                  onChange={(e) => setPrintSettings(prev => ({ ...prev, lineSpacing: e.target.value }))}
+                >
+                  <MenuItem value="compact">Compact</MenuItem>
+                  <MenuItem value="normal">Normal</MenuItem>
+                  <MenuItem value="relaxed">Relaxed</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            {/* Receipt Content */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize', mt: 2 }}>Receipt Content</Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showBusinessName}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showBusinessName: e.target.checked }))}
+                      />
+                    }
+                    label="Show Business Name"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showBusinessAddress}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showBusinessAddress: e.target.checked }))}
+                      />
+                    }
+                    label="Show Business Address"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showGSTNumber}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showGSTNumber: e.target.checked }))}
+                      />
+                    }
+                    label="Show GST Number"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showDateTime || true}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showDateTime: e.target.checked }))}
+                      />
+                    }
+                    label="Show Date & Time"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showReceiptNumber || true}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showReceiptNumber: e.target.checked }))}
+                      />
+                    }
+                    label="Show Receipt Number"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showPaymentMethod || true}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showPaymentMethod: e.target.checked }))}
+                      />
+                    }
+                    label="Show Payment Method"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showCustomerInfo || true}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showCustomerInfo: e.target.checked }))}
+                      />
+                    }
+                    label="Show Customer Info"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showItemCodes || false}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showItemCodes: e.target.checked }))}
+                      />
+                    }
+                    label="Show Item Codes"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showTaxBreakdown || true}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showTaxBreakdown: e.target.checked }))}
+                      />
+                    }
+                    label="Show Tax Breakdown"
+                  />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={printSettings.showDividers || true}
+                        onChange={(e) => setPrintSettings(prev => ({ ...prev, showDividers: e.target.checked }))}
+                      />
+                    }
+                    label="Show Divider Lines"
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+            
+            {/* Thermal Printer Customization */}
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize', mt: 2 }}>Thermal Printer Customization</Typography>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Header Text"
+                value={printSettings.thermalHeaderText || 'Thank you for choosing us!'}
+                onChange={(e) => setPrintSettings(prev => ({ ...prev, thermalHeaderText: e.target.value }))}
+                helperText="Custom message at the top of receipt"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Footer Text"
+                value={printSettings.thermalFooterText || 'Visit us again soon!'}
+                onChange={(e) => setPrintSettings(prev => ({ ...prev, thermalFooterText: e.target.value }))}
+                helperText="Custom message at the bottom of receipt"
+              />
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Header Alignment</InputLabel>
+                <Select
+                  value={printSettings.headerAlignment || 'center'}
+                  label="Header Alignment"
+                  onChange={(e) => setPrintSettings(prev => ({ ...prev, headerAlignment: e.target.value }))}
+                >
+                  <MenuItem value="left">Left</MenuItem>
+                  <MenuItem value="center">Center</MenuItem>
+                  <MenuItem value="right">Right</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Footer Alignment</InputLabel>
+                <Select
+                  value={printSettings.footerAlignment || 'center'}
+                  label="Footer Alignment"
+                  onChange={(e) => setPrintSettings(prev => ({ ...prev, footerAlignment: e.target.value }))}
+                >
+                  <MenuItem value="left">Left</MenuItem>
+                  <MenuItem value="center">Center</MenuItem>
+                  <MenuItem value="right">Right</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Print Density</InputLabel>
+                <Select
+                  value={printSettings.printDensity || 'normal'}
+                  label="Print Density"
+                  onChange={(e) => setPrintSettings(prev => ({ ...prev, printDensity: e.target.value }))}
+                >
+                  <MenuItem value="light">Light</MenuItem>
+                  <MenuItem value="normal">Normal</MenuItem>
+                  <MenuItem value="dark">Dark</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPrintSettingsOpen(false)}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={async () => {
+              try {
+                await saveSettings({
+                  businessName: printSettings.businessName,
+                  businessAddress: printSettings.businessAddress,
+                  gstNumber: printSettings.gstNumber,
+                  fontSize: printSettings.fontSize,
+                  printerWidth: printSettings.printerWidth,
+                  lineSpacing: printSettings.lineSpacing,
+                  showBusinessName: printSettings.showBusinessName,
+                  showBusinessAddress: printSettings.showBusinessAddress,
+                  showGSTNumber: printSettings.showGSTNumber
+                })
+                setPrintSettingsOpen(false)
+                toast.success('Print settings saved successfully!')
+              } catch (error) {
+                toast.error('Failed to save print settings')
+              }
+            }}
+          >
+            Save Settings
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }

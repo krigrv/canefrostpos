@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Box,
   Typography,
@@ -44,58 +44,11 @@ import {
 } from '@mui/icons-material'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useStaff } from '../../contexts/StaffContext'
 
 function StaffManagement() {
   const [tabValue, setTabValue] = useState(0)
-  const [staff, setStaff] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john@canefrost.com',
-      role: 'Manager',
-      phone: '+91 9876543210',
-      status: 'Active',
-      joinDate: '2024-01-15',
-      totalSales: 45000,
-      shiftsThisWeek: 5,
-      currentShift: 'Morning (9 AM - 5 PM)'
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane@canefrost.com',
-      role: 'Cashier',
-      phone: '+91 9876543211',
-      status: 'Active',
-      joinDate: '2024-02-01',
-      totalSales: 28000,
-      shiftsThisWeek: 6,
-      currentShift: 'Evening (2 PM - 10 PM)'
-    }
-  ])
-  
-  const [shifts, setShifts] = useState([
-    {
-      id: 1,
-      staffId: 1,
-      staffName: 'John Doe',
-      date: '2024-12-20',
-      startTime: '09:00',
-      endTime: '17:00',
-      status: 'Completed',
-      sales: 8500
-    },
-    {
-      id: 2,
-      staffId: 2,
-      staffName: 'Jane Smith',
-      date: '2024-12-20',
-      startTime: '14:00',
-      endTime: '22:00',
-      status: 'Active',
-      sales: 6200
-    }
-  ])
+  const { staff, shifts, addStaffMember, updateStaffMember, deleteStaffMember, addShift, updateShift, deleteShift, loading } = useStaff()
   
   const [openDialog, setOpenDialog] = useState(false)
   const [editingStaff, setEditingStaff] = useState(null)
@@ -131,41 +84,50 @@ function StaffManagement() {
     setOpenDialog(true)
   }
 
-  const handleSaveStaff = () => {
-    if (editingStaff) {
-      setStaff(staff.map(s => 
-        s.id === editingStaff.id 
-          ? { ...s, ...formData }
-          : s
-      ))
-      toast.success('Staff member updated successfully')
-    } else {
-      const newStaff = {
-        id: Date.now(),
-        ...formData,
-        status: 'Active',
-        joinDate: format(new Date(), 'yyyy-MM-dd'),
-        totalSales: 0,
-        shiftsThisWeek: 0,
-        currentShift: 'Not Assigned'
+  const handleSaveStaff = async () => {
+    try {
+      if (editingStaff) {
+        await updateStaffMember(editingStaff.id, formData)
+        toast.success('Staff member updated successfully')
+      } else {
+        const newStaff = {
+          ...formData,
+          status: 'Active',
+          joinDate: new Date(),
+          totalSales: 0,
+          shiftsThisWeek: 0,
+          currentShift: 'Not Assigned',
+          createdAt: new Date()
+        }
+        await addStaffMember(newStaff)
+        toast.success('Staff member added successfully')
       }
-      setStaff([...staff, newStaff])
-      toast.success('Staff member added successfully')
+      setOpenDialog(false)
+    } catch (error) {
+      toast.error('Error saving staff member')
     }
-    setOpenDialog(false)
   }
 
-  const handleDeleteStaff = (id) => {
-    setStaff(staff.filter(s => s.id !== id))
-    toast.success('Staff member removed')
+  const handleDeleteStaff = async (id) => {
+    try {
+      await deleteStaffMember(id)
+      toast.success('Staff member removed')
+    } catch (error) {
+      toast.error('Error removing staff member')
+    }
   }
 
-  const toggleStaffStatus = (id) => {
-    setStaff(staff.map(s => 
-      s.id === id 
-        ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' }
-        : s
-    ))
+  const toggleStaffStatus = async (id) => {
+    try {
+      const staffMember = staff.find(s => s.id === id)
+      if (staffMember) {
+        await updateStaffMember(id, {
+          status: staffMember.status === 'Active' ? 'Inactive' : 'Active'
+        })
+      }
+    } catch (error) {
+      toast.error('Error updating staff status')
+    }
   }
 
   const TabPanel = ({ children, value, index }) => (
@@ -176,26 +138,67 @@ function StaffManagement() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography 
+        variant="h4" 
+        gutterBottom
+        sx={{ 
+          fontSize: { xs: '1.5rem', md: '2rem' },
+          textTransform: 'capitalize'
+        }}
+      >
         Staff Management
       </Typography>
 
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-          <Tab icon={<PersonIcon />} label="Staff Members" />
-          <Tab icon={<ScheduleIcon />} label="Shift Management" />
-          <Tab icon={<AssessmentIcon />} label="Performance" />
+        <Tabs 
+          value={tabValue} 
+          onChange={(e, newValue) => setTabValue(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': {
+              fontSize: { xs: '0.75rem', md: '0.875rem' },
+              minHeight: { xs: 40, md: 48 },
+              textTransform: 'capitalize'
+            }
+          }}
+        >
+          <Tab icon={<PersonIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="All Staff" />
+          <Tab icon={<ScheduleIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Shifts" />
+          <Tab icon={<AssessmentIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Performance" />
         </Tabs>
       </Paper>
 
       {/* Staff Members Tab */}
       <TabPanel value={tabValue} index={0}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant="h6">Staff Members</Typography>
+        <Box sx={{ 
+          mb: 3, 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 2, sm: 0 }
+        }}>
+          <Typography 
+            variant="h6"
+            sx={{ 
+              fontSize: { xs: '1rem', md: '1.25rem' },
+              textTransform: 'capitalize'
+            }}
+          >
+            Staff Members ({staff.length})
+          </Typography>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
+            startIcon={<AddIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
             onClick={handleAddStaff}
+            sx={{
+              fontSize: { xs: '0.75rem', md: '0.875rem' },
+              py: { xs: 1, md: 0.75 },
+              minHeight: { xs: 40, md: 36 },
+              width: { xs: '100%', sm: 'auto' },
+              textTransform: 'capitalize'
+            }}
           >
             Add Staff Member
           </Button>

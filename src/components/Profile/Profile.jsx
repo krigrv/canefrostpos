@@ -20,6 +20,9 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material'
 import { useAuth } from '../../contexts/AuthContext'
+import { db } from '../../firebase/config'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
+import toast from 'react-hot-toast'
 
 function Profile() {
   const { currentUser, updateUserProfile } = useAuth()
@@ -41,13 +44,28 @@ function Profile() {
     fssaiNumber: ''
   })
 
-  // Load saved business details from localStorage on component mount
+  // Load saved business details from Firebase on component mount
   useEffect(() => {
-    const savedDetails = localStorage.getItem('businessDetails')
-    if (savedDetails) {
-      setBusinessDetails(JSON.parse(savedDetails))
+    const loadBusinessDetails = async () => {
+      if (currentUser) {
+        try {
+          const userDocRef = doc(db, 'users', currentUser.uid)
+          const userDoc = await getDoc(userDocRef)
+          if (userDoc.exists() && userDoc.data().businessDetails) {
+            setBusinessDetails(userDoc.data().businessDetails)
+          }
+        } catch (error) {
+          console.error('Error loading business details:', error)
+          // Fallback to localStorage for migration
+          const savedDetails = localStorage.getItem('businessDetails')
+          if (savedDetails) {
+            setBusinessDetails(JSON.parse(savedDetails))
+          }
+        }
+      }
     }
-  }, [])
+    loadBusinessDetails()
+  }, [currentUser])
 
   // Update display name when currentUser changes
   useEffect(() => {
@@ -125,8 +143,21 @@ function Profile() {
         throw new Error('GSTIN should be 15 characters long')
       }
 
-      // Save to localStorage (in a real app, this would be saved to Firestore)
-      localStorage.setItem('businessDetails', JSON.stringify(businessDetails))
+      // Save to Firebase Firestore
+      if (currentUser) {
+        const userDocRef = doc(db, 'users', currentUser.uid)
+        await setDoc(userDocRef, {
+          businessDetails: businessDetails,
+          updatedAt: new Date()
+        }, { merge: true })
+        
+        // Also save to localStorage as backup
+        localStorage.setItem('businessDetails', JSON.stringify(businessDetails))
+        
+        toast.success('Business details saved successfully!')
+      } else {
+        throw new Error('User not authenticated')
+      }
       
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
@@ -139,7 +170,16 @@ function Profile() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 600 }}>
+      <Typography 
+        variant="h4" 
+        gutterBottom 
+        sx={{ 
+          mb: 3, 
+          fontWeight: 600,
+          fontSize: { xs: '1.5rem', md: '2rem' },
+          textTransform: 'capitalize'
+        }}
+      >
         Business Profile
       </Typography>
 

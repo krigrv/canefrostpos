@@ -22,7 +22,9 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Select
+  Select,
+  useTheme,
+  useMediaQuery
 } from '@mui/material'
 import {
   Add as AddIcon,
@@ -36,7 +38,9 @@ import { useInventory } from '../../hooks/useInventory'
 import toast from 'react-hot-toast'
 
 function ProductManagement() {
-  const { products, addProduct, updateProduct, deleteProduct, resetToDefaultProducts, uploadAllInventoryToFirebase } = useInventory()
+  const { products, addProduct, updateProduct, deleteProduct, uploadAllInventoryToFirebase } = useInventory()
+  const theme = useTheme()
+  const isXsScreen = useMediaQuery(theme.breakpoints.down('sm'))
   
   // Dynamically get unique categories from products
   const categories = React.useMemo(() => {
@@ -127,12 +131,15 @@ function ProductManagement() {
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData)
+        toast.success('Product updated successfully')
       } else {
         await addProduct(productData)
+        toast.success('Product added successfully')
       }
       handleCloseDialog()
     } catch (error) {
       console.error('Error saving product:', error)
+      toast.error(`Failed to ${editingProduct ? 'update' : 'add'} product: ${error.message || 'Unknown error'}`)
     }
   }
 
@@ -140,8 +147,10 @@ function ProductManagement() {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await deleteProduct(productId)
+        toast.success('Product deleted successfully')
       } catch (error) {
         console.error('Error deleting product:', error)
+        toast.error(`Failed to delete product: ${error.message || 'Unknown error'}`)
       }
     }
   }
@@ -173,18 +182,7 @@ function ProductManagement() {
           gap: { xs: 1, sm: 2 },
           width: { xs: '100%', md: 'auto' }
         }}>
-          <Button
-            variant="outlined"
-            color="warning"
-            onClick={resetToDefaultProducts}
-            sx={{
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              py: { xs: 1, md: 0.75 },
-              minHeight: { xs: 40, md: 36 }
-            }}
-          >
-            Reset to Defaults
-          </Button>
+
           <Button
             variant="outlined"
             color="primary"
@@ -453,7 +451,7 @@ function ProductManagement() {
         onClose={handleCloseDialog} 
         maxWidth="md" 
         fullWidth
-        fullScreen={{ xs: true, sm: false }}
+        fullScreen={isXsScreen}
         sx={{
           '& .MuiDialog-paper': {
             borderRadius: { xs: 0, sm: 2 },
