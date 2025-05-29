@@ -62,7 +62,7 @@ function Login() {
         <div 
           className="hidden md:flex flex-col justify-center items-center text-white p-8"
           style={{
-            backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.6), rgba(255, 255, 255, 0.3)), url("/images/home.jpg")',
+            backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.6), rgba(255, 255, 255, 0.3)), url("/src/assets/images/home.jpg")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat'

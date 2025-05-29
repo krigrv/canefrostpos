@@ -173,7 +173,7 @@ function Layout({ children }) {
       <div className={`flex items-center min-h-[64px] px-${sidebarCollapsed ? '2' : '4'} ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
         <div className={`flex items-center ${sidebarCollapsed ? 'gap-0' : 'gap-2'}`}>
           <img 
-            src="/images/logo.jpg" 
+            src="/src/assets/images/logo.jpg" 
             alt="Canefrost Logo" 
             className={`object-cover rounded-lg transition-all duration-300 ${sidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
           />

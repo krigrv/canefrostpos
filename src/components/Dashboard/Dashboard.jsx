@@ -73,10 +73,10 @@ import { render, Printer as ThermalPrinter, Text, Row, Br, Line, Cut } from 'rea
 import { useReactToPrint } from 'react-to-print'
 
 // Import SVG icons
-import CitrusIcon from '../../../svg/citrus.svg'
-import BerriesIcon from '../../../svg/berries.svg'
-import TropicalIcon from '../../../svg/tropical.svg'
-import SpicedHerbalOthersIcon from '../../../svg/spicedherbalothers.svg'
+import CitrusIcon from '../../assets/icons/citrus.svg'
+import BerriesIcon from '../../assets/icons/berries.svg'
+import TropicalIcon from '../../assets/icons/tropical.svg'
+import SpicedHerbalOthersIcon from '../../assets/icons/spicedherbalothers.svg'
 
 function Dashboard() {
   const {
