@@ -1,45 +1,33 @@
 import React, { useState, useEffect } from 'react'
-import {
-  AppBar,
-  Box,
-  CssBaseline,
-  Drawer,
-  IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
-  Typography,
-  useTheme,
-  useMediaQuery,
-  Collapse,
-  Badge,
-  Chip,
-  Divider
-} from '@mui/material'
+import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
+import { Sheet, SheetContent } from '../ui/sheet'
+import { Separator } from '../ui/separator'
+import { Collapsible, CollapsibleContent } from '../ui/collapsible'
+import { Avatar, AvatarFallback } from '../ui/avatar'
+import { Card, CardContent } from '../ui/card'
 import {
   Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  Inventory as InventoryIcon,
+  LayoutDashboard as DashboardIcon,
+  Package as InventoryIcon,
   Receipt as ReceiptIcon,
-  Logout as LogoutIcon,
-  AccountCircle,
-  Person as PersonIcon,
+  LogOut as LogoutIcon,
+  User as AccountCircle,
+  User as PersonIcon,
   Settings as SettingsIcon,
-  Notifications as NotificationsIcon,
-  People as PeopleIcon,
-  PersonAdd as PersonAddIcon,
-  Assessment as AssessmentIcon,
+  Bell as NotificationsIcon,
+  Users as PeopleIcon,
+  UserPlus as PersonAddIcon,
+  BarChart3 as AssessmentIcon,
   ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  ExpandLess,
-  ExpandMore,
+  ChevronRight as ChevronRight,
+  ChevronUp as ExpandLess,
+  ChevronDown as ExpandMore,
   Store as StoreIcon,
-  BookOnline as BookOnlineIcon,
-  TrendingUp as TrendingUpIcon
-} from '@mui/icons-material'
+  BookOpen as BookOnlineIcon,
+  TrendingUp as TrendingUpIcon,
+  Palette as PaletteIcon
+} from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useSync } from '../../contexts/SyncContext'
@@ -86,6 +74,12 @@ const menuItems = [
       { text: 'Payment Report', path: '/reports/payments' },
       { text: 'DayBook', path: '/reports/daybook' }
     ]
+  },
+  { 
+    text: 'UI Demo', 
+    icon: <PaletteIcon />, 
+    path: '/demo',
+    badge: 'NEW'
   },
   { 
     text: 'Profile', 
@@ -176,128 +170,59 @@ function Layout({ children }) {
   const drawer = (
     <div>
       {/* Header with logo and collapse button */}
-      <Toolbar sx={{ 
-        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-        px: sidebarCollapsed ? 1 : 2
-      }}>
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          gap: sidebarCollapsed ? 0 : 2
-        }}>
+      <div className={`flex items-center min-h-[64px] px-${sidebarCollapsed ? '2' : '4'} ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center ${sidebarCollapsed ? 'gap-0' : 'gap-2'}`}>
           <img 
             src="/images/logo.jpg" 
             alt="Canefrost Logo" 
-            style={{ 
-              height: sidebarCollapsed ? '32px' : '40px', 
-              width: sidebarCollapsed ? '32px' : '40px', 
-              objectFit: 'cover',
-              borderRadius: '8px',
-              transition: 'all 0.3s ease'
-            }} 
+            className={`object-cover rounded-lg transition-all duration-300 ${sidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
           />
           {!sidebarCollapsed && (
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                fontWeight: 'bold',
-                color: '#1976d2',
-                fontSize: '1.1rem'
-              }}
-            >
-              CANEFROST
-            </Typography>
+            <h6 className="font-bold text-black text-lg">
+                CANEFROST
+              </h6>
           )}
-        </Box>
+        </div>
         {!sidebarCollapsed && (
-          <IconButton 
+          <Button 
+            variant="outline"
+            size="sm"
             onClick={handleSidebarToggle}
-            size="small"
-            sx={{ 
-              color: '#6B7280',
-              '&:hover': { backgroundColor: '#F3F4F6' }
-            }}
+            className="text-gray-500 hover:text-gray-700 hover:bg-gray-50 p-2 shadow-sm"
           >
-            <ChevronLeftIcon />
-          </IconButton>
+            <ChevronLeftIcon className="w-4 h-4" />
+          </Button>
         )}
         {sidebarCollapsed && (
-          <IconButton 
+          <Button
             onClick={handleSidebarToggle}
-            size="small"
-            sx={{ 
-              position: 'absolute',
-              right: -12,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              backgroundColor: 'white',
-              border: '1px solid #E5E7EB',
-              boxShadow: 1,
-              '&:hover': { backgroundColor: '#F9FAFB' },
-              zIndex: 1
-            }}
+            variant="outline"
+            size="icon"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 z-10"
           >
-            <ChevronRightIcon fontSize="small" />
-          </IconButton>
+            <ChevronRight className="h-3 w-3" />
+          </Button>
         )}
-      </Toolbar>
-      <Divider />
+      </div>
+      <Separator />
       
-      {/* User Profile Section */}
-      {!sidebarCollapsed && (
-        <Box sx={{ p: 2, borderBottom: '1px solid #E5E7EB' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-            <AccountCircle sx={{ fontSize: 32, color: '#6B7280', mr: 1.5 }} />
-            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Typography 
-                variant="subtitle2" 
-                fontWeight="bold"
-                sx={{ 
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {currentUser?.displayName || 'User'}
-              </Typography>
-              <Typography 
-                variant="caption" 
-                color="text.secondary"
-                sx={{ 
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  display: 'block'
-                }}
-              >
-                {currentUser?.email}
-              </Typography>
-            </Box>
-          </Box>
-          {lastSyncTime && (
-            <Typography 
-              variant="caption" 
-              color="text.secondary"
-              sx={{ 
-                fontSize: '0.7rem',
-                display: 'block',
-                textAlign: 'center',
-                mt: 1
-              }}
-            >
-              Last sync: {new Date(lastSyncTime.toDate()).toLocaleTimeString()}
-            </Typography>
-          )}
-        </Box>
-      )}
+
       
       {/* Navigation Menu */}
-      <List sx={{ pt: 1, px: 1 }}>
+      <div className="pt-2 px-2">
         {menuItems.map((item) => (
           <React.Fragment key={item.text}>
-            <ListItem disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                selected={item.path ? isPathActive(item.path) : isParentActive(item.children)}
+            <div className="mb-2">
+              <button
+                className={`w-full min-h-[48px] rounded-lg transition-all duration-200 flex items-center ${
+                  sidebarCollapsed ? 'justify-center px-2' : 'justify-start px-4'
+                } py-3 ${
+                  item.primary 
+                    ? 'bg-black text-white hover:bg-gray-800'
+                    : (item.path ? isPathActive(item.path) : isParentActive(item.children))
+                      ? 'bg-gray-100 text-black hover:bg-gray-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                }`}
                 onClick={() => {
                   if (item.expandable) {
                     handleExpandToggle(item.text)
@@ -310,311 +235,158 @@ function Layout({ children }) {
                     }
                   }
                 }}
-                sx={{
-                  minHeight: 48,
-                  px: sidebarCollapsed ? 1 : 2,
-                  py: 1.5,
-                  borderRadius: 2,
-                  transition: 'all 0.2s ease-in-out',
-                  backgroundColor: item.primary ? '#1976d2' : 'transparent',
-                  color: item.primary ? 'white' : 'inherit',
-                  '&.Mui-selected': {
-                    backgroundColor: item.primary ? '#1565c0' : '#E3F2FD',
-                    color: item.primary ? 'white' : '#1976d2',
-                    '&:hover': {
-                      backgroundColor: item.primary ? '#1565c0' : '#BBDEFB',
-                    },
-                  },
-                  '&:hover': {
-                    backgroundColor: item.primary ? '#1565c0' : 
-                      (item.path ? isPathActive(item.path) : isParentActive(item.children)) ? '#BBDEFB' : '#F5F5F5',
-                  },
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start'
-                }}
               >
-                <ListItemIcon
-                  sx={{
-                    color: item.primary ? 'white' : 
-                      (item.path ? isPathActive(item.path) : isParentActive(item.children)) ? '#1976d2' : '#6B7280',
-                    minWidth: sidebarCollapsed ? 'auto' : 40,
-                    mr: sidebarCollapsed ? 0 : 1,
-                    transition: 'all 0.2s ease-in-out',
-                  }}
-                >
+                <div className={`flex items-center justify-center ${sidebarCollapsed ? 'w-6' : 'w-10'}`}>
                   {item.icon}
-                </ListItemIcon>
+                </div>
                 {!sidebarCollapsed && (
                   <>
-                    <ListItemText 
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        fontSize: '0.875rem',
-                        fontWeight: (item.path ? isPathActive(item.path) : isParentActive(item.children)) || item.primary ? 600 : 500,
-                        color: item.color || (item.primary ? 'white' : 
-                          (item.path ? isPathActive(item.path) : isParentActive(item.children)) ? '#1976d2' : '#374151')
-                      }}
-                    />
+                    <span className="text-sm font-medium flex-1 text-left ml-3">
+                      {item.text}
+                    </span>
                     {item.badge && (
-                      <Chip 
-                        label={item.badge} 
-                        size="small" 
-                        sx={{ 
-                          height: 20, 
-                          fontSize: '0.7rem',
-                          backgroundColor: item.badge === 'NEW' ? '#4CAF50' : '#FF9800',
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }} 
-                      />
+                      <Badge 
+                        variant="secondary"
+                        className={`h-5 text-xs font-bold text-white ${
+                          item.badge === 'NEW' ? 'bg-green-500' : 'bg-orange-500'
+                        }`}
+                      >
+                        {item.badge}
+                      </Badge>
                     )}
                     {item.expandable && (
-                    expandedSections[item.text] ? <ExpandLess /> : <ExpandMore />
-                  )}
+                      <div className="ml-auto">
+                        {expandedSections[item.text] ? <ExpandLess className="w-4 h-4" /> : <ExpandMore className="w-4 h-4" />}
+                      </div>
+                    )}
                   </>
                 )}
-              </ListItemButton>
-            </ListItem>
+              </button>
+            </div>
             
             {/* Expandable submenu */}
             {item.expandable && !sidebarCollapsed && (
-              <Collapse in={expandedSections[item.text]} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
-                  {item.children?.map((child) => (
-                    <ListItem key={child.text} disablePadding sx={{ mb: 0.3 }}>
-                      <ListItemButton
-                        selected={isPathActive(child.path)}
-                        onClick={() => {
-                          navigate(child.path)
-                          if (mobileOpen) {
-                            setMobileOpen(false)
-                          }
-                        }}
-                        sx={{
-                          minHeight: 40,
-                          pl: 4,
-                          pr: 2,
-                          py: 1,
-                          borderRadius: 1,
-                          ml: 1,
-                          mr: 0.5,
-                          transition: 'all 0.2s ease-in-out',
-                          '&.Mui-selected': {
-                            backgroundColor: '#E3F2FD',
-                            color: '#1976d2',
-                            borderLeft: '3px solid #1976d2',
-                            '&:hover': {
-                              backgroundColor: '#BBDEFB',
-                            },
-                          },
-                          '&:hover': {
-                            backgroundColor: isPathActive(child.path) ? '#BBDEFB' : '#F5F5F5',
-                          },
-                        }}
-                      >
-                        <ListItemText 
-                          primary={child.text}
-                          primaryTypographyProps={{
-                            fontSize: '0.8rem',
-                            fontWeight: isPathActive(child.path) ? 600 : 400,
-                            color: isPathActive(child.path) ? '#1976d2' : '#6B7280'
+              <Collapsible open={expandedSections[item.text]}>
+                <CollapsibleContent>
+                  <div className="pl-4">
+                    {item.children?.map((child) => (
+                      <div key={child.text} className="mb-1">
+                        <button
+                          className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
+                            isPathActive(child.path)
+                              ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                          onClick={() => {
+                            navigate(child.path)
+                            if (mobileOpen) {
+                              setMobileOpen(false)
+                            }
                           }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              </Collapse>
+                        >
+                          <span className={`text-sm ${
+                            isPathActive(child.path) ? 'font-semibold' : 'font-normal'
+                          }`}>
+                            {child.text}
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
           </React.Fragment>
         ))}
-      </List>
+      </div>
     </div>
   )
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
-          ml: { sm: `${currentDrawerWidth}px` },
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          backgroundColor: '#FFFFFF',
-          color: '#1F2937',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-          transition: 'all 0.3s ease'
-        }}
-      >
-        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
+    <div className="flex">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30 h-14">
+        <div className="flex items-center justify-between h-full px-4">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleDrawerToggle}
-            sx={{ 
-              mr: 2, 
-              display: { sm: 'none' },
-              minWidth: 44,
-              minHeight: 44
-            }}
+            className="mr-2 sm:hidden"
           >
-            <MenuIcon />
-          </IconButton>
+            <MenuIcon className="h-5 w-5" />
+          </Button>
           
-          {/* Mobile-optimized header layout */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: { xs: 'flex-start', sm: 'center' },
-            flexGrow: 1,
-            overflow: 'hidden'
-          }}>
-            <Typography 
-              variant="h6" 
-              noWrap 
-              component="div" 
-              sx={{ 
-                fontWeight: 'bold',
-                fontSize: { xs: '1.1rem', sm: '1.25rem' },
-                letterSpacing: { xs: '0.5px', sm: '1px' }
-              }}
-            >
+          <div className="flex items-center justify-center flex-1">
+            <span className="font-bold text-xl tracking-wider">
               {businessName}
-            </Typography>
-          </Box>
+            </span>
+          </div>
           
-          {/* Welcome Message and Sync Status */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* Welcome Message */}
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                display: { xs: 'none', md: 'block' },
-                maxWidth: 200,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
+          <div className="flex items-center gap-2">
+            <span className="hidden md:block text-gray-500 text-sm">
               {lastSyncTime ? `Last synced: ${new Date(lastSyncTime).toLocaleString()}` : 'Never synced'}
-            </Typography>
+            </span>
             
-            {/* Sync Status */}
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                bgcolor: 'rgba(0,0,0,0.05)',
-                cursor: isOnline && syncStatus !== 'syncing' ? 'pointer' : 'default',
-                '&:hover': {
-                  bgcolor: isOnline && syncStatus !== 'syncing' ? 'rgba(0,0,0,0.1)' : 'rgba(0,0,0,0.05)'
-                }
-              }}
+            <div 
+              className={`flex items-center px-2 py-1 rounded bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors ${
+                isOnline && syncStatus !== 'syncing' ? 'cursor-pointer' : 'cursor-default'
+              }`}
               onClick={async () => {
                 if (isOnline && syncStatus !== 'syncing') {
                   await forceSyncAll()
                 }
               }}
             >
-              <Box
-                sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  bgcolor: isOnline 
-                    ? (syncStatus === 'syncing' ? '#ff9800' : '#4caf50')
-                    : '#f44336',
-                  mr: 1,
-                  animation: syncStatus === 'syncing' ? 'pulse 1.5s infinite' : 'none',
-                  '@keyframes pulse': {
-                    '0%': { opacity: 1 },
-                    '50%': { opacity: 0.5 },
-                    '100%': { opacity: 1 }
-                  }
-                }}
+              <div
+                className={`w-2 h-2 rounded-full mr-2 ${
+                  isOnline 
+                    ? (syncStatus === 'syncing' ? 'bg-orange-500 animate-pulse' : 'bg-green-500')
+                    : 'bg-red-500'
+                }`}
               />
-              <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+              <span className="text-xs text-gray-600">
                 {syncStatus === 'syncing' ? 'Syncing...' : isOnline ? 'Online' : 'Offline'}
-              </Typography>
-            </Box>
-          </Box>
-
-
-        </Toolbar>
-      </AppBar>
-      <Box
-        component="nav"
-        sx={{ width: { sm: currentDrawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="navigation menu"
-      >
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <nav>
         {/* Mobile drawer */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: drawerWidth, // Always full width on mobile
-              backgroundColor: '#FFFFFF',
-              borderRight: '1px solid #E5E7EB',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-            },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetContent side="left" className="w-64 p-0 bg-white border-r border-gray-200">
+            {drawer}
+          </SheetContent>
+        </Sheet>
+
         {/* Desktop drawer */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: currentDrawerWidth,
-              backgroundColor: '#FFFFFF',
-              borderRight: '1px solid #E5E7EB',
-              transition: 'width 0.3s ease',
-              overflow: 'visible' // Allow collapse button to show outside
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
+        <div className="hidden sm:block">
+          <div 
+            className={`fixed left-0 top-14 h-[calc(100vh-56px)] bg-white border-r border-gray-200 transition-all duration-300 z-10 ${
+              sidebarCollapsed ? 'w-16 overflow-visible' : 'w-64 overflow-hidden'
+            }`}
+          >
+            {drawer}
+          </div>
+        </div>
+      </nav>
       
       {/* Main content area with responsive padding */}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: { xs: 1, sm: 3 },
-          width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
-          minHeight: '100vh',
-          backgroundColor: '#F8FAFC',
-          transition: 'all 0.3s ease'
+      <main
+        className="flex-1 bg-gray-50 transition-all duration-300 overflow-auto"
+        style={{
+          marginLeft: sidebarCollapsed ? 64 : 256,
+          marginTop: '56px',
+          height: 'calc(100vh - 56px)',
+          width: sidebarCollapsed ? 'calc(100% - 64px)' : 'calc(100% - 256px)'
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
-        <Box sx={{ 
-          maxWidth: '100%',
-          overflow: 'hidden',
-          mt: 1
-        }}>
+        <div className="w-full h-full">
           {children}
-        </Box>
-      </Box>
-    </Box>
+        </div>
+      </main>
+    </div>
   )
 }
 

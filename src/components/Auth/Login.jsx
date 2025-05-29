@@ -1,20 +1,10 @@
 import React, { useState } from 'react'
-import {
-  Container,
-  Paper,
-  TextField,
-  Button,
-  Typography,
-  Box,
-  Alert,
-  CircularProgress,
-  Card,
-  CardContent,
-  Divider,
-  IconButton,
-  Grid
-} from '@mui/material'
-import { Google as GoogleIcon } from '@mui/icons-material'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Separator } from '../ui/separator'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -66,155 +56,158 @@ function Login() {
 
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex' }}>
-      <Grid container sx={{ minHeight: '100vh' }}>
+    <div className="min-h-screen flex">
+      <div className="grid grid-cols-1 md:grid-cols-2 min-h-screen w-full">
         {/* Left Side - Content */}
-        <Grid 
-          item 
-          xs={false} 
-          md={6} 
-          sx={{
+        <div 
+          className="hidden md:flex flex-col justify-center items-center text-white p-8"
+          style={{
             backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.6), rgba(255, 255, 255, 0.3)), url("/images/home.jpg")',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            display: { xs: 'none', md: 'flex' },
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            color: 'white',
-            p: 4
+            backgroundRepeat: 'no-repeat'
           }}
         >
-          <Box sx={{ textAlign: 'center', maxWidth: 500 }}>
-            <Typography variant="h2" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
+          <div className="text-center max-w-lg">
+            <h1 className="text-5xl font-bold mb-6">
               🥤 Canefrost POS
-            </Typography>
-            <Typography variant="h5" sx={{ mb: 4, opacity: 0.9 }}>
+            </h1>
+            <h2 className="text-2xl mb-8 opacity-90">
               Modern Juice Shop Management System
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 4, opacity: 0.8, lineHeight: 1.6 }}>
+            </h2>
+            <p className="text-lg mb-8 opacity-80 leading-relaxed">
               Streamline your juice shop operations with our comprehensive point-of-sale system. 
               Manage inventory, track sales, and serve customers efficiently.
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>📊</Typography>
-                <Typography variant="body2">Sales Analytics</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>📦</Typography>
-                <Typography variant="body2">Inventory Management</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>👥</Typography>
-                <Typography variant="body2">Customer Management</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>💳</Typography>
-                <Typography variant="body2">Multiple Payment Options</Typography>
-              </Box>
-            </Box>
-          </Box>
-        </Grid>
+            </p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📊</div>
+                <div className="text-sm">Sales Analytics</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl mb-2">📦</div>
+                <div className="text-sm">Inventory Management</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl mb-2">👥</div>
+                <div className="text-sm">Customer Management</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl mb-2">💳</div>
+                <div className="text-sm">Multiple Payment Options</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Right Side - Login Form */}
-        <Grid 
-          item 
-          xs={12} 
-          md={6} 
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            background: '#F9FAFB',
-            p: 4,
-            minHeight: { xs: '100vh', md: 'auto' }
-          }}
-        >
-          <Card sx={{ width: '100%', maxWidth: 400, boxShadow: 3 }}>
-            <CardContent sx={{ p: 4 }}>
-              <Box sx={{ textAlign: 'center', mb: 3 }}>
-                <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2 }}>
-                  <Typography variant="h4" component="h1" gutterBottom color="primary">
+        <div className="flex flex-col justify-center items-center bg-gray-50 p-8 min-h-screen md:min-h-auto">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardContent className="p-8">
+              <div className="text-center mb-6">
+                <div className="block md:hidden mb-4">
+                  <h1 className="text-3xl font-bold text-primary mb-2">
                     🥤 Canefrost POS
-                  </Typography>
-                  <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
+                  </h1>
+                  <p className="text-muted-foreground mb-4">
                     Modern Juice Shop Management System
-                  </Typography>
-                </Box>
-                <Typography variant="h4" component="h2" gutterBottom color="primary">
+                  </p>
+                </div>
+                <h2 className="text-3xl font-bold text-primary mb-2">
                   Welcome Back
-                </Typography>
-                <Typography variant="subtitle1" color="text.secondary">
+                </h2>
+                <p className="text-muted-foreground">
                   Sign in to your account
-                </Typography>
-              </Box>
+                </p>
+              </div>
 
               {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
+                <div className="flex items-center gap-2 p-3 mb-4 text-red-800 bg-red-100 border border-red-200 rounded-md">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm">{error}</span>
+                </div>
               )}
 
-            <Box component="form" onSubmit={handleSubmit}>
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                id="email"
-                label="Email Address"
-                name="email"
-                autoComplete="email"
-                autoFocus
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                name="password"
-                label="Password"
-                type="password"
-                id="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
-              />
-              
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                sx={{ mt: 3, mb: 2, py: 1.5 }}
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Sign In'}
-              </Button>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                    required
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                    required
+                  />
+                </div>
+                
+                <Button
+                  type="submit"
+                  className="w-full mt-6 py-3"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
 
-              <Divider sx={{ my: 2 }}>OR</Divider>
-              
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={handleGoogleLogin}
-                disabled={loading || googleLoading}
-                startIcon={googleLoading ? <CircularProgress size={20} /> : <GoogleIcon />}
-                sx={{ mb: 2, borderColor: '#111827', color: '#111827', '&:hover': { borderColor: '#374151', backgroundColor: '#F3F4F6' } }}
-              >
-                {googleLoading ? 'Signing in...' : 'Sign in with Google'}
-              </Button>
-
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
-  </Box>
+                <div className="relative my-4">
+                  <Separator />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="bg-white px-2 text-xs text-muted-foreground">OR</span>
+                  </div>
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleGoogleLogin}
+                  disabled={loading || googleLoading}
+                >
+                  {googleLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                      Sign in with Google
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 

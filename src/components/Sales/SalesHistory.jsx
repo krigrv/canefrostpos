@@ -1,46 +1,49 @@
 import React, { useState, useEffect } from 'react'
 import {
-  Box,
-  Typography,
-  Paper,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  Input,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
+  TableHeader,
   TableRow,
-  TextField,
-  Grid,
-  Card,
-  CardContent,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-  InputAdornment
-} from '@mui/material'
+  Badge,
+  Separator,
+  Checkbox,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui'
 import {
   Search as SearchIcon,
-  Visibility as VisibilityIcon,
+  Eye as VisibilityIcon,
   Receipt as ReceiptIcon,
   TrendingUp as TrendingUpIcon,
   ShoppingCart as ShoppingCartIcon,
-  AttachMoney as AttachMoneyIcon,
+  DollarSign as AttachMoneyIcon,
   Edit as EditIcon,
   Save as SaveIcon,
-  Cancel as CancelIcon,
-  Delete as DeleteIcon
-} from '@mui/icons-material'
+  X as CancelIcon,
+  Trash2 as DeleteIcon,
+  CheckSquare as SelectAllIcon
+} from 'lucide-react'
 import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns'
 import { db } from '../../firebase/config'
-import { collection, onSnapshot, query, orderBy, updateDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 
 function SalesHistory() {
@@ -51,6 +54,9 @@ function SalesHistory() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedSale, setEditedSale] = useState(null)
+  const [selectedSales, setSelectedSales] = useState([])
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false)
 
   // Real-time sales data from Firestore - No mock data
   useEffect(() => {
@@ -61,8 +67,9 @@ function SalesHistory() {
       salesQuery,
       (snapshot) => {
         const salesData = snapshot.docs.map(doc => ({
-          id: doc.id,
           ...doc.data(),
+          firestoreId: doc.id, // Store the actual Firestore document ID
+          id: doc.data().transactionId || doc.data().id || doc.id, // Use transactionId for display
           timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
         }))
         
@@ -197,318 +204,508 @@ function SalesHistory() {
     }))
   }
 
+  // Handle individual sale selection
+  const handleSelectSale = (saleId) => {
+    setSelectedSales(prev => 
+      prev.includes(saleId) 
+        ? prev.filter(id => id !== saleId)
+        : [...prev, saleId]
+    )
+  }
+
+  // Handle select all/none
+  const handleSelectAll = () => {
+    if (selectedSales.length === filteredSales.length) {
+      setSelectedSales([])
+    } else {
+      setSelectedSales(filteredSales.map(sale => sale.id))
+    }
+  }
+
+  // Delete single sale
+  const handleDeleteSale = async (sale) => {
+    try {
+      const docId = sale.firestoreId || sale.id
+      console.log('Deleting sale with Firestore ID:', docId)
+      await deleteDoc(doc(db, 'sales', docId))
+      toast.success('Sale deleted successfully!')
+      setDeleteDialogOpen(false)
+    } catch (error) {
+      console.error('Error deleting sale:', error)
+      toast.error('Failed to delete sale')
+    }
+  }
+
+  // Delete multiple sales
+  const handleDeleteSelected = async () => {
+    try {
+      const batch = writeBatch(db)
+      selectedSales.forEach(saleId => {
+        // Find the sale object to get the correct Firestore ID
+        const sale = sales.find(s => s.id === saleId)
+        const docId = sale?.firestoreId || saleId
+        console.log('Deleting selected sale with Firestore ID:', docId)
+        const saleRef = doc(db, 'sales', docId)
+        batch.delete(saleRef)
+      })
+      await batch.commit()
+      toast.success(`${selectedSales.length} sales deleted successfully`)
+      setSelectedSales([])
+      setDeleteDialogOpen(false)
+    } catch (error) {
+      console.error('Error deleting selected sales:', error)
+      toast.error('Failed to delete selected sales')
+    }
+  }
+
+  // Delete all sales
+  const handleDeleteAllSales = async () => {
+    try {
+      const batch = writeBatch(db)
+      sales.forEach(sale => {
+        const docId = sale.firestoreId || sale.id
+        console.log('Deleting sale with Firestore ID:', docId)
+        const saleRef = doc(db, 'sales', docId)
+        batch.delete(saleRef)
+      })
+      await batch.commit()
+      setDeleteAllDialogOpen(false)
+      toast.success(`All ${sales.length} sales deleted successfully!`)
+    } catch (error) {
+      console.error('Error deleting all sales:', error)
+      toast.error('Failed to delete all sales')
+    }
+  }
+
   return (
-    <Box>
-      <Typography 
-        variant="h4" 
-        gutterBottom
-        sx={{ 
-          fontSize: { xs: '1.5rem', md: '2rem' },
-          textTransform: 'capitalize'
-        }}
-      >
+    <div className="p-6">
+      <h1 className="text-2xl md:text-4xl font-bold mb-6 capitalize">
         Sales History
-      </Typography>
+      </h1>
 
       {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <AttachMoneyIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Today's Revenue</Typography>
-              </Box>
-              <Typography variant="h4" color="primary">
-                ₹{todaysRevenue.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ShoppingCartIcon color="secondary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Today's Orders</Typography>
-              </Box>
-              <Typography variant="h4" color="secondary">
-                {todaysOrders}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <TrendingUpIcon color="success" sx={{ mr: 1 }} />
-                <Typography variant="h6">Total Revenue</Typography>
-              </Box>
-              <Typography variant="h4" color="success.main">
-                ₹{totalRevenue.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ReceiptIcon color="info" sx={{ mr: 1 }} />
-                <Typography variant="h6">Total Orders</Typography>
-              </Box>
-              <Typography variant="h4" color="info.main">
-                {totalOrders}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center mb-2">
+              <AttachMoneyIcon className="h-5 w-5 text-primary mr-2" />
+              <h3 className="text-lg font-semibold">Today's Revenue</h3>
+            </div>
+            <p className="text-2xl font-bold text-primary">
+              ₹{todaysRevenue.toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center mb-2">
+              <ShoppingCartIcon className="h-5 w-5 text-secondary mr-2" />
+              <h3 className="text-lg font-semibold">Today's Orders</h3>
+            </div>
+            <p className="text-2xl font-bold text-secondary">
+              {todaysOrders}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center mb-2">
+              <TrendingUpIcon className="h-5 w-5 text-green-600 mr-2" />
+              <h3 className="text-lg font-semibold">Total Revenue</h3>
+            </div>
+            <p className="text-2xl font-bold text-green-600">
+              ₹{totalRevenue.toFixed(2)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center mb-2">
+              <ReceiptIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <h3 className="text-lg font-semibold">Total Orders</h3>
+            </div>
+            <p className="text-2xl font-bold text-blue-600">
+              {totalOrders}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Search and Filter */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              placeholder="Search by order ID or customer name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              type="date"
-              label="Filter by Date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              InputLabelProps={{
-                shrink: true,
-              }}
-            />
-          </Grid>
-        </Grid>
-      </Paper>
+      <Card className="p-4 mb-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                className="pl-10"
+                placeholder="Search by order ID or customer name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div>
+              <Input
+                type="date"
+                placeholder="Filter by Date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          {/* Delete Actions */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {selectedSales.length > 0 && (
+              <>
+                <Badge variant="secondary" className="px-2 py-1">
+                  {selectedSales.length} selected
+                </Badge>
+                <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <DeleteIcon className="h-4 w-4 mr-1" />
+                      Delete Selected
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Selected Sales</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete {selectedSales.length} selected sales? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700">
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+            
+            {sales.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-red-600 border-red-600 hover:bg-red-50">
+                    <DeleteIcon className="h-4 w-4 mr-1" />
+                    Delete All History
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete All Sales History</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete all sales history? This will permanently remove all {sales.length} sales records and cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAllSales} className="bg-red-600 hover:bg-red-700">
+                      Delete All
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* Sales Table */}
-      <TableContainer component={Paper}>
+      <Card>
         <Table>
-          <TableHead>
+          <TableHeader>
             <TableRow>
-              <TableCell>Order ID</TableCell>
-              <TableCell>Date & Time</TableCell>
-              <TableCell>Customer</TableCell>
-              <TableCell>Items</TableCell>
-              <TableCell>Payment Method</TableCell>
-              <TableCell>Total (₹)</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableHead className="w-12">
+                <Checkbox
+                  checked={selectedSales.length === filteredSales.length && filteredSales.length > 0}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
+              <TableHead>Order ID</TableHead>
+              <TableHead>Date & Time</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Items</TableHead>
+              <TableHead>Payment Method</TableHead>
+              <TableHead>Total (₹)</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
-          </TableHead>
+          </TableHeader>
           <TableBody>
             {filteredSales.map((sale) => (
               <TableRow key={sale.id}>
                 <TableCell>
-                  <Typography variant="body2" fontWeight="bold">
+                  <Checkbox
+                    checked={selectedSales.includes(sale.id)}
+                    onCheckedChange={() => handleSelectSale(sale.id)}
+                    aria-label={`Select sale ${sale.id}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <span className="font-bold text-sm">
                     {sale.id}
-                  </Typography>
+                  </span>
                 </TableCell>
                 <TableCell>
                   {format(new Date(sale.timestamp), 'MMM dd, yyyy HH:mm')}
                 </TableCell>
                 <TableCell>{sale.customerName}</TableCell>
                 <TableCell>
-                  <Chip 
-                    label={`${sale.items.length} items`} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                  />
+                  <Badge variant="outline" className="text-primary border-primary">
+                    {sale.items.length} items
+                  </Badge>
                 </TableCell>
                 <TableCell>
-                  <Chip 
-                    label={sale.paymentMethod} 
-                    size="small" 
-                    color={sale.paymentMethod === 'Cash' ? 'success' : 'info'}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" fontWeight="bold">
-                    ₹{sale.total.toFixed(2)}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <IconButton
-                    color="primary"
-                    onClick={() => handleViewDetails(sale)}
-                    size="small"
+                  <Badge 
+                    variant={sale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
+                    className={sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
                   >
-                    <VisibilityIcon />
-                  </IconButton>
+                    {sale.paymentMethod}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <span className="font-bold text-sm">
+                    ₹{sale.total.toFixed(2)}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewDetails(sale)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <VisibilityIcon className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                        >
+                          <DeleteIcon className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Sale</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this sale (Order ID: {sale.id})? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => handleDeleteSale(sale)} 
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </TableContainer>
+      </Card>
 
       {/* Sale Details Dialog */}
-      <Dialog open={detailsOpen} onClose={handleCloseDetails} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <ReceiptIcon sx={{ mr: 1 }} />
-              Order Details - {selectedSale?.id}
-            </Box>
-            {!isEditing && (
-              <IconButton onClick={handleEditOrder} color="primary">
-                <EditIcon />
-              </IconButton>
-            )}
-          </Box>
-        </DialogTitle>
-        <DialogContent>
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <ReceiptIcon className="h-5 w-5 mr-2" />
+                Order Details - {selectedSale?.id}
+              </div>
+              {!isEditing && (
+                <Button variant="ghost" size="sm" onClick={handleEditOrder}>
+                  <EditIcon className="h-4 w-4" />
+                </Button>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              View and edit order details, customer information, and payment details.
+            </DialogDescription>
+          </DialogHeader>
           {selectedSale && (
-            <Box>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" color="text.secondary">Date & Time</Typography>
-                  <Typography variant="body1">
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Date & Time</p>
+                  <p className="font-medium">
                     {format(new Date(selectedSale.timestamp), 'MMMM dd, yyyy HH:mm:ss')}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" color="text.secondary">Customer</Typography>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Customer</p>
                   {isEditing ? (
-                    <TextField
+                    <Input
                       value={editedSale?.customerName || ''}
                       onChange={(e) => handleEditChange('customerName', e.target.value)}
-                      size="small"
-                      fullWidth
-                      sx={{ mt: 1 }}
+                      className="mt-1"
                     />
                   ) : (
-                    <Typography variant="body1">{selectedSale.customerName}</Typography>
+                    <p className="font-medium">{selectedSale.customerName}</p>
                   )}
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" color="text.secondary">Payment Method</Typography>
-                  <Chip 
-                    label={selectedSale.paymentMethod} 
-                    size="small" 
-                    color={selectedSale.paymentMethod === 'Cash' ? 'success' : 'info'}
-                  />
-                </Grid>
-              </Grid>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Payment Method</p>
+                  <Badge 
+                    variant={selectedSale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
+                    className={selectedSale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
+                  >
+                    {selectedSale.paymentMethod}
+                  </Badge>
+                </div>
+              </div>
 
-              <Typography variant="h6" gutterBottom>Items Ordered</Typography>
-              <List>
-                {(isEditing ? editedSale?.items : selectedSale.items)?.map((item, index) => (
-                  <ListItem key={index}>
-                    {isEditing ? (
-                      <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <TextField
-                          label="Item Name"
-                          value={item.name}
-                          onChange={(e) => handleItemChange(index, 'name', e.target.value)}
-                          size="small"
-                          sx={{ flex: 1 }}
-                        />
-                        <TextField
-                          label="Quantity"
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                          size="small"
-                          sx={{ width: 100 }}
-                        />
-                        <TextField
-                          label="Price"
-                          type="number"
-                          value={item.price}
-                          onChange={(e) => handleItemChange(index, 'price', e.target.value)}
-                          size="small"
-                          sx={{ width: 100 }}
-                        />
-                        <Typography variant="body2" fontWeight="bold" sx={{ minWidth: 80 }}>
-                          ₹{(item.quantity * item.price).toFixed(2)}
-                        </Typography>
-                        <IconButton 
-                          onClick={() => handleRemoveItem(index)} 
-                          color="error" 
-                          size="small"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    ) : (
-                      <>
-                        <ListItemText
-                          primary={item.name}
-                          secondary={`Quantity: ${item.quantity} × ₹${item.price}`}
-                        />
-                        <Typography variant="body2" fontWeight="bold">
-                          ₹{(item.quantity * item.price).toFixed(2)}
-                        </Typography>
-                      </>
-                    )}
-                  </ListItem>
-                ))}
-              </List>
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Items Ordered</h3>
+                <div className="space-y-3">
+                  {(isEditing ? editedSale?.items : selectedSale.items)?.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <Input
+                            placeholder="Item Name"
+                            value={item.name}
+                            onChange={(e) => handleItemChange(index, 'name', e.target.value)}
+                            className="flex-1"
+                          />
+                          <Input
+                            placeholder="Quantity"
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                            className="w-20"
+                          />
+                          <Input
+                            placeholder="Price"
+                            type="number"
+                            value={item.price}
+                            onChange={(e) => handleItemChange(index, 'price', e.target.value)}
+                            className="w-24"
+                          />
+                          <span className="font-semibold text-sm min-w-[80px]">
+                            ₹{(item.quantity * item.price).toFixed(2)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveItem(index)}
+                          >
+                            <DeleteIcon className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-sm text-gray-600">Quantity: {item.quantity} × ₹{item.price}</p>
+                          </div>
+                          <span className="font-bold text-sm">
+                            ₹{(item.quantity * item.price).toFixed(2)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-              <Divider sx={{ my: 2 }} />
+              <Separator className="my-4" />
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body1">Subtotal:</Typography>
-                <Typography variant="body1">
-                  ₹{(isEditing ? editedSale?.subtotal : selectedSale.subtotal)?.toFixed(2)}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body1">Tax:</Typography>
-                <Typography variant="body1">
-                  ₹{(isEditing ? editedSale?.tax : selectedSale.tax)?.toFixed(2)}
-                </Typography>
-              </Box>
-              <Divider sx={{ my: 1 }} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="h6">Total:</Typography>
-                <Typography variant="h6" color="primary">
-                  ₹{(isEditing ? editedSale?.total : selectedSale.total)?.toFixed(2)}
-                </Typography>
-              </Box>
-            </Box>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>₹{(isEditing ? editedSale?.subtotal : selectedSale.subtotal)?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>GST:</span>
+                  <span>₹{(isEditing ? editedSale?.tax : selectedSale.tax)?.toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-semibold text-lg">
+                  <span>Total:</span>
+                  <span className="text-primary">₹{(isEditing ? editedSale?.total : selectedSale.total)?.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
           )}
-        </DialogContent>
-        <DialogActions>
           {isEditing ? (
-            <>
-              <Button onClick={handleCancelEdit} startIcon={<CancelIcon />}>
+            <div className="flex gap-2 mt-6">
+              <Button variant="outline" onClick={handleCancelEdit}>
+                <CancelIcon className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
-              <Button 
-                onClick={handleSaveEdit} 
-                variant="contained" 
-                startIcon={<SaveIcon />}
-                color="primary"
+              <Button
+                onClick={handleSaveEdit}
+                disabled={!editedSale}
               >
+                <SaveIcon className="w-4 h-4 mr-2" />
                 Save Changes
               </Button>
-            </>
+            </div>
           ) : (
-            <Button onClick={handleCloseDetails}>Close</Button>
+            <div className="mt-6">
+              <Button onClick={handleCloseDetails}>Close</Button>
+            </div>
           )}
-        </DialogActions>
+        </DialogContent>
       </Dialog>
-    </Box>
+
+      {/* Delete Selected Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Sales</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedSales.length} selected sale(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteSelected} 
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Selected
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete All Confirmation Dialog */}
+      <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Sales History</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete ALL sales history? This will permanently remove all {sales.length} sales records and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteAllSales} 
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
 

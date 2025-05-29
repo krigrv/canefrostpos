@@ -1,53 +1,22 @@
 import React, { useState } from 'react'
-import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  IconButton,
-  Card,
-  CardContent,
-  Tabs,
-  Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Switch,
-  Divider
-} from '@mui/material'
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Person as PersonIcon,
-  Schedule as ScheduleIcon,
-  Assessment as AssessmentIcon,
-  AccessTime as TimeIcon
-} from '@mui/icons-material'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useStaff } from '../../contexts/StaffContext'
+import { Button } from '../ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '../ui/switch'
+import { Badge } from '../ui/badge'
+import { Separator } from '../ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
+import { Plus, Edit, Trash2, User, Clock, BarChart3 } from 'lucide-react'
 
 function StaffManagement() {
-  const [tabValue, setTabValue] = useState(0)
+  const [activeTab, setActiveTab] = useState('staff')
   const { staff, shifts, addStaffMember, updateStaffMember, deleteStaffMember, addShift, updateShift, deleteShift, loading } = useStaff()
   
   const [openDialog, setOpenDialog] = useState(false)
@@ -130,290 +99,259 @@ function StaffManagement() {
     }
   }
 
-  const TabPanel = ({ children, value, index }) => (
-    <div hidden={value !== index}>
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  )
-
   return (
-    <Box>
-      <Typography 
-        variant="h4" 
-        gutterBottom
-        sx={{ 
-          fontSize: { xs: '1.5rem', md: '2rem' },
-          textTransform: 'capitalize'
-        }}
-      >
-        Staff Management
-      </Typography>
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold">Staff Management</h1>
+      </div>
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={(e, newValue) => setTabValue(newValue)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            '& .MuiTab-root': {
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              minHeight: { xs: 40, md: 48 },
-              textTransform: 'capitalize'
-            }
-          }}
-        >
-          <Tab icon={<PersonIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="All Staff" />
-          <Tab icon={<ScheduleIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Shifts" />
-          <Tab icon={<AssessmentIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Performance" />
-        </Tabs>
-      </Paper>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="staff" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            All Staff
+          </TabsTrigger>
+          <TabsTrigger value="shifts" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Shifts
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Staff Members Tab */}
-      <TabPanel value={tabValue} index={0}>
-        <Box sx={{ 
-          mb: 3, 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          flexDirection: { xs: 'column', sm: 'row' },
-          gap: { xs: 2, sm: 0 }
-        }}>
-          <Typography 
-            variant="h6"
-            sx={{ 
-              fontSize: { xs: '1rem', md: '1.25rem' },
-              textTransform: 'capitalize'
-            }}
-          >
-            Staff Members ({staff.length})
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
-            onClick={handleAddStaff}
-            sx={{
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              py: { xs: 1, md: 0.75 },
-              minHeight: { xs: 40, md: 36 },
-              width: { xs: '100%', sm: 'auto' },
-              textTransform: 'capitalize'
-            }}
-          >
-            Add Staff Member
-          </Button>
-        </Box>
+        {/* Staff Members Tab */}
+        <TabsContent value="staff" className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h2 className="text-lg font-semibold">Staff Members ({staff.length})</h2>
+            <Button onClick={handleAddStaff} className="w-full sm:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Staff Member
+            </Button>
+          </div>
 
-        <Grid container spacing={3}>
-          {staff.map((member) => (
-            <Grid item xs={12} md={6} lg={4} key={member.id}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Typography variant="h6">{member.name}</Typography>
-                    <Chip 
-                      label={member.status} 
-                      color={member.status === 'Active' ? 'success' : 'default'}
-                      size="small"
-                    />
-                  </Box>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {staff.map((member) => (
+              <Card key={member.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <CardTitle className="text-lg">{member.name}</CardTitle>
+                    <Badge variant={member.status === 'Active' ? 'default' : 'secondary'}>
+                      {member.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>{member.email}</p>
+                    <p>{member.phone}</p>
+                  </div>
                   
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {member.email}
-                  </Typography>
-                  
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {member.phone}
-                  </Typography>
-                  
-                  <Box sx={{ mt: 2, mb: 2 }}>
-                    <Chip label={member.role} color="primary" size="small" sx={{ mr: 1 }} />
-                    <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                  <div className="space-y-2">
+                    <Badge variant="outline">{member.role}</Badge>
+                    <p className="text-xs text-muted-foreground">
                       Permissions: {permissions[member.role]?.join(', ')}
-                    </Typography>
-                  </Box>
+                    </p>
+                  </div>
                   
-                  <Divider sx={{ my: 2 }} />
+                  <Separator />
                   
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Total Sales:</strong> ₹{member.totalSales.toLocaleString()}
-                  </Typography>
+                  <div className="space-y-1 text-sm">
+                    <p><strong>Total Sales:</strong> ₹{member.totalSales.toLocaleString()}</p>
+                    <p><strong>Shifts This Week:</strong> {member.shiftsThisWeek}</p>
+                    <p><strong>Current Shift:</strong> {member.currentShift}</p>
+                  </div>
                   
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Shifts This Week:</strong> {member.shiftsThisWeek}
-                  </Typography>
-                  
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Current Shift:</strong> {member.currentShift}
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                    <Box>
-                      <IconButton onClick={() => handleEditStaff(member)} size="small">
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteStaff(member.id)} size="small" color="error">
-                        <DeleteIcon />
-                      </IconButton>
-                    </Box>
-                    <Switch
-                      checked={member.status === 'Active'}
-                      onChange={() => toggleStaffStatus(member.id)}
-                      size="small"
-                    />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </TabPanel>
-
-      {/* Shift Management Tab */}
-      <TabPanel value={tabValue} index={1}>
-        <Typography variant="h6" gutterBottom>Shift Management</Typography>
-        
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Staff Member</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Start Time</TableCell>
-                <TableCell>End Time</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Sales</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {shifts.map((shift) => (
-                <TableRow key={shift.id}>
-                  <TableCell>{shift.staffName}</TableCell>
-                  <TableCell>{format(new Date(shift.date), 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>{shift.startTime}</TableCell>
-                  <TableCell>{shift.endTime}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={shift.status} 
-                      color={shift.status === 'Active' ? 'success' : 'default'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>₹{shift.sales.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <IconButton size="small">
-                      <EditIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </TabPanel>
-
-      {/* Performance Tab */}
-      <TabPanel value={tabValue} index={2}>
-        <Typography variant="h6" gutterBottom>Staff Performance</Typography>
-        
-        <Grid container spacing={3}>
-          {staff.map((member) => (
-            <Grid item xs={12} md={6} key={member.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>{member.name}</Typography>
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" gutterBottom>
-                      <strong>Total Sales:</strong> ₹{member.totalSales.toLocaleString()}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                      <strong>Average per Shift:</strong> ₹{Math.round(member.totalSales / Math.max(member.shiftsThisWeek, 1)).toLocaleString()}
-                    </Typography>
-                    <Typography variant="body2" gutterBottom>
-                      <strong>Shifts Completed:</strong> {member.shiftsThisWeek}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Performance Rating:</strong> 
-                      <Chip 
-                        label={member.totalSales > 30000 ? 'Excellent' : member.totalSales > 20000 ? 'Good' : 'Average'}
-                        color={member.totalSales > 30000 ? 'success' : member.totalSales > 20000 ? 'primary' : 'default'}
-                        size="small"
-                        sx={{ ml: 1 }}
+                  <div className="flex justify-between items-center pt-2">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditStaff(member)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteStaff(member.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={`status-${member.id}`} className="text-xs">
+                        Active
+                      </Label>
+                      <Switch
+                        id={`status-${member.id}`}
+                        checked={member.status === 'Active'}
+                        onCheckedChange={() => toggleStaffStatus(member.id)}
                       />
-                    </Typography>
-                  </Box>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </TabPanel>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Shift Management Tab */}
+        <TabsContent value="shifts" className="space-y-6">
+          <h2 className="text-lg font-semibold">Shift Management</h2>
+          
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Staff Member</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Sales</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shifts.map((shift) => (
+                  <TableRow key={shift.id}>
+                    <TableCell>{shift.staffName}</TableCell>
+                    <TableCell>{format(new Date(shift.date), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell>{shift.startTime}</TableCell>
+                    <TableCell>{shift.endTime}</TableCell>
+                    <TableCell>
+                      <Badge variant={shift.status === 'Active' ? 'default' : 'secondary'}>
+                        {shift.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>₹{shift.sales.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        {/* Performance Tab */}
+        <TabsContent value="performance" className="space-y-6">
+          <h2 className="text-lg font-semibold">Staff Performance</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {staff.map((member) => (
+              <Card key={member.id}>
+                <CardHeader>
+                  <CardTitle>{member.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Total Sales:</strong> ₹{member.totalSales.toLocaleString()}</p>
+                    <p><strong>Average per Shift:</strong> ₹{Math.round(member.totalSales / Math.max(member.shiftsThisWeek, 1)).toLocaleString()}</p>
+                    <p><strong>Shifts Completed:</strong> {member.shiftsThisWeek}</p>
+                    <div className="flex items-center gap-2">
+                      <strong>Performance Rating:</strong>
+                      <Badge 
+                        variant={member.totalSales > 30000 ? 'default' : member.totalSales > 20000 ? 'secondary' : 'outline'}
+                      >
+                        {member.totalSales > 30000 ? 'Excellent' : member.totalSales > 20000 ? 'Good' : 'Average'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Add/Edit Staff Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Phone"
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            margin="normal"
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Role</InputLabel>
-            <Select
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-            >
-              {roles.map((role) => (
-                <MenuItem key={role} value={role}>{role}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+      <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingStaff ? 'Update staff member information and permissions.' : 'Add a new staff member to your team with appropriate access levels.'}
+            </DialogDescription>
+          </DialogHeader>
           
-          {formData.role && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Role Permissions:
-              </Typography>
-              <List dense>
-                {permissions[formData.role]?.map((permission) => (
-                  <ListItem key={permission}>
-                    <ListItemText primary={permission} />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          )}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter staff member name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="Enter email address"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="Enter phone number"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {formData.role && (
+              <div className="space-y-2">
+                <Label>Role Permissions:</Label>
+                <div className="space-y-1">
+                  {permissions[formData.role]?.map((permission) => (
+                    <p key={permission} className="text-sm text-muted-foreground">• {permission}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveStaff}>
+              {editingStaff ? 'Update' : 'Add'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveStaff} variant="contained">
-            {editingStaff ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   )
 }
 

@@ -1,46 +1,45 @@
 import React, { useState } from 'react'
 import {
-  Box,
-  Typography,
-  Paper,
-  Grid,
   Button,
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  TextField,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
+  TableHeader,
   TableRow,
-  Chip,
-  IconButton,
+  Badge,
   Card,
   CardContent,
+  CardHeader,
   Tabs,
-  Tab,
-  List,
-  ListItem,
-  ListItemText,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Avatar,
-  Divider,
-  InputAdornment
-} from '@mui/material'
+  AvatarFallback
+} from '@/components/ui'
 import {
-  Add as AddIcon,
+  Plus as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
-  Person as PersonIcon,
+  Trash2 as DeleteIcon,
+  User as PersonIcon,
   History as HistoryIcon,
   Star as StarIcon,
   Search as SearchIcon,
   Phone as PhoneIcon,
-  Email as EmailIcon,
-  LocationOn as LocationIcon
-} from '@mui/icons-material'
+  Mail as EmailIcon,
+  MapPin as LocationIcon,
+  Save,
+  X
+} from 'lucide-react'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useCustomers } from '../../contexts/CustomerContext'
@@ -58,6 +57,34 @@ function CustomerManagement() {
     phone: '',
     address: ''
   })
+
+  // Sample purchase history data - in a real app, this would come from an API or context
+  const [purchaseHistory] = useState([
+    {
+      id: 1,
+      customerName: 'John Doe',
+      date: '2024-01-15',
+      items: ['Mango Juice', 'Orange Juice'],
+      total: 250,
+      pointsEarned: 25
+    },
+    {
+      id: 2,
+      customerName: 'Jane Smith',
+      date: '2024-01-14',
+      items: ['Apple Juice', 'Grape Juice', 'Lemon Juice'],
+      total: 375,
+      pointsEarned: 37
+    },
+    {
+      id: 3,
+      customerName: 'Mike Johnson',
+      date: '2024-01-13',
+      items: ['Pineapple Juice'],
+      total: 150,
+      pointsEarned: 15
+    }
+  ])
 
   const getTierColor = (tier) => {
     switch (tier) {
@@ -130,348 +157,329 @@ function CustomerManagement() {
     }
   }
 
-  const TabPanel = ({ children, value, index }) => (
-    <div hidden={value !== index}>
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  )
-
   return (
-    <Box>
-      <Typography 
-        variant="h4" 
-        gutterBottom
-        sx={{ 
-          fontSize: { xs: '1.5rem', md: '2rem' },
-          textTransform: 'capitalize'
-        }}
-      >
+    <div className="p-6">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 capitalize">
         Customer Management
-      </Typography>
+      </h1>
 
-      <Paper sx={{ mb: 3 }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={(e, newValue) => setTabValue(newValue)}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            '& .MuiTab-root': {
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              minHeight: { xs: 40, md: 48 },
-              textTransform: 'capitalize'
-            }
-          }}
-        >
-          <Tab icon={<PersonIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="All Customers" />
-          <Tab icon={<HistoryIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Purchase History" />
-          <Tab icon={<StarIcon sx={{ fontSize: { xs: 18, md: 24 } }} />} label="Loyalty Program" />
-        </Tabs>
-      </Paper>
+      <Tabs value={tabValue.toString()} onValueChange={(value) => setTabValue(parseInt(value))} className="mb-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="0" className="flex items-center gap-2">
+            <PersonIcon className="w-4 h-4" />
+            All Customers
+          </TabsTrigger>
+          <TabsTrigger value="1" className="flex items-center gap-2">
+            <HistoryIcon className="w-4 h-4" />
+            Purchase History
+          </TabsTrigger>
+          <TabsTrigger value="2" className="flex items-center gap-2">
+            <StarIcon className="w-4 h-4" />
+            Loyalty Program
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Customers Tab */}
-      <TabPanel value={tabValue} index={0}>
-        <Box sx={{ 
-          mb: 3, 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: { xs: 1, md: 2 },
-          flexDirection: { xs: 'column', sm: 'row' }
-        }}>
-          <TextField
-            placeholder="Search customers..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: { xs: 18, md: 20 } }} />
-                </InputAdornment>
-              ),
-            }}
-            size="small"
-            sx={{ 
-              flexGrow: 1,
-              width: { xs: '100%', sm: 'auto' },
-              '& .MuiInputBase-input': {
-                fontSize: { xs: '0.875rem', md: '1rem' }
-              }
-            }}
-          />
-          <Button
-            variant="contained"
-            startIcon={<AddIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
-            onClick={handleAddCustomer}
-            sx={{
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              py: { xs: 1, md: 0.75 },
-              minHeight: { xs: 40, md: 36 },
-              width: { xs: '100%', sm: 'auto' },
-              textTransform: 'capitalize'
-            }}
-          >
-            Add Customer
-          </Button>
-        </Box>
+        {/* Customers Tab */}
+        <TabsContent value="0" className="mt-6">
+          <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
+            <div className="relative flex-1 w-full sm:w-auto">
+              <SearchIcon className="absolute left-3 top-3 w-4 h-4 text-gray-500" />
+              <Input
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button
+              onClick={handleAddCustomer}
+              className="w-full sm:w-auto"
+            >
+              <AddIcon className="w-4 h-4 mr-2" />
+              Add Customer
+            </Button>
+          </div>
 
-        <Grid container spacing={{ xs: 2, md: 3 }}>
-          {filteredCustomers.map((customer) => (
-            <Grid item xs={12} md={6} lg={4} key={customer.id}>
-              <Card sx={{ height: '100%' }}>
-                <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ 
-                      mr: 2, 
-                      bgcolor: 'primary.main',
-                      width: { xs: 40, md: 48 },
-                      height: { xs: 40, md: 48 },
-                      fontSize: { xs: '1rem', md: '1.25rem' }
-                    }}>
-                      {customer.name.charAt(0)}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCustomers.map((customer) => (
+              <Card key={customer.id} className="h-full">
+                <CardContent className="p-4">
+                  <div className="flex items-center mb-4">
+                    <Avatar className="mr-3">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {customer.name.charAt(0)}
+                      </AvatarFallback>
                     </Avatar>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography 
-                        variant="h6"
-                        sx={{ 
-                          fontSize: { xs: '1rem', md: '1.25rem' },
-                          textTransform: 'capitalize'
-                        }}
-                      >
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg capitalize">
                         {customer.name}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      </h3>
+                      <div className="flex items-center gap-2">
                         {getTierIcon(customer.tier)}
-                        <Chip 
-                          label={customer.tier} 
-                          color={getTierColor(customer.tier)}
-                          size="small"
-                          sx={{
-                            fontSize: { xs: '0.625rem', md: '0.75rem' },
-                            height: { xs: 24, md: 28 }
-                          }}
-                        />
-                      </Box>
-                    </Box>
-                  </Box>
+                        <Badge 
+                          variant={getTierColor(customer.tier) === 'primary' ? 'default' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {customer.tier}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
                   
-                  <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <EmailIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center">
+                      <EmailIcon className="w-4 h-4 mr-2 text-gray-500" />
+                      <span className="text-sm text-gray-600">
                         {customer.email}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <PhoneIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
+                      </span>
+                    </div>
+                    <div className="flex items-center">
+                      <PhoneIcon className="w-4 h-4 mr-2 text-gray-500" />
+                      <span className="text-sm text-gray-600">
                         {customer.phone}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <LocationIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {customer.address}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Total Purchases:</strong> ₹{customer.totalPurchases.toLocaleString()}
-                  </Typography>
-                  
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Visits:</strong> {customer.visitCount}
-                  </Typography>
-                  
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Loyalty Points:</strong> {customer.loyaltyPoints}
-                  </Typography>
-                  
-                  <Typography variant="body2" gutterBottom>
-                    <strong>Last Visit:</strong> {customer.lastVisit ? format(new Date(customer.lastVisit), 'MMM dd, yyyy') : 'Never'}
-                  </Typography>
-                  
-                  {customer.favoriteItems.length > 0 && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="body2" gutterBottom>
-                        <strong>Favorite Items:</strong>
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {customer.favoriteItems.slice(0, 2).map((item, index) => (
-                          <Chip key={index} label={item} size="small" variant="outlined" />
-                        ))}
-                        {customer.favoriteItems.length > 2 && (
-                          <Chip label={`+${customer.favoriteItems.length - 2} more`} size="small" variant="outlined" />
-                        )}
-                      </Box>
-                    </Box>
-                  )}
-                  
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                    <IconButton onClick={() => handleEditCustomer(customer)} size="small">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => handleDeleteCustomer(customer.id)} size="small" color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
+                      </span>
+                    </div>
+                     <div className="flex items-center">
+                       <LocationIcon className="w-4 h-4 mr-2 text-gray-500" />
+                       <span className="text-sm text-gray-600">
+                         {customer.address}
+                       </span>
+                     </div>
+                   </div>
+                   
+                   <hr className="my-4" />
+                   
+                   <div className="space-y-2 text-sm">
+                     <div>
+                       <strong>Total Purchases:</strong> ₹{customer.totalPurchases.toLocaleString()}
+                     </div>
+                     
+                     <div>
+                       <strong>Visits:</strong> {customer.visitCount}
+                     </div>
+                     
+                     <div>
+                       <strong>Loyalty Points:</strong> {customer.loyaltyPoints}
+                     </div>
+                     
+                     <div>
+                       <strong>Last Visit:</strong> {customer.lastVisit ? format(new Date(customer.lastVisit), 'MMM dd, yyyy') : 'Never'}
+                     </div>
+                   </div>
+                   
+                   {customer.favoriteItems.length > 0 && (
+                     <div className="mt-4">
+                       <div className="text-sm font-medium mb-2">
+                         Favorite Items:
+                       </div>
+                       <div className="flex flex-wrap gap-1">
+                         {customer.favoriteItems.slice(0, 2).map((item, index) => (
+                           <Badge key={index} variant="outline" className="text-xs">
+                             {item}
+                           </Badge>
+                         ))}
+                         {customer.favoriteItems.length > 2 && (
+                           <Badge variant="outline" className="text-xs">
+                             +{customer.favoriteItems.length - 2} more
+                           </Badge>
+                         )}
+                       </div>
+                     </div>
+                   )}
+                   
+                   <div className="flex justify-end gap-2 mt-4">
+                     <Button variant="outline" size="sm" onClick={() => handleEditCustomer(customer)}>
+                       <EditIcon className="w-4 h-4" />
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={() => handleDeleteCustomer(customer.id)} className="text-red-600 hover:text-red-700">
+                      <DeleteIcon className="w-4 h-4" />
+                     </Button>
+                   </div>
+                 </CardContent>
+               </Card>
+             ))}
+         </div>
+       </TabsContent>
+
+       {/* Purchase History Tab */}
+       <TabsContent value="1">
+         <h2 className="text-xl font-semibold mb-4">Purchase History</h2>
+         
+         <div className="bg-white rounded-lg shadow">
+           <Table>
+             <TableHeader>
+               <TableRow>
+                 <TableHead>Customer</TableHead>
+                 <TableHead>Date</TableHead>
+                 <TableHead>Items</TableHead>
+                 <TableHead>Total</TableHead>
+                 <TableHead>Points Earned</TableHead>
+               </TableRow>
+             </TableHeader>
+             <TableBody>
+               {purchaseHistory.map((purchase) => (
+                 <TableRow key={purchase.id}>
+                   <TableCell>{purchase.customerName}</TableCell>
+                   <TableCell>{format(new Date(purchase.date), 'MMM dd, yyyy')}</TableCell>
+                   <TableCell>
+                     <div className="flex flex-wrap gap-1">
+                       {purchase.items.map((item, index) => (
+                         <Badge key={index} variant="outline" className="text-xs">
+                           {item}
+                         </Badge>
+                       ))}
+                     </div>
+                   </TableCell>
+                   <TableCell>₹{purchase.total}</TableCell>
+                   <TableCell>{purchase.pointsEarned} pts</TableCell>
+                 </TableRow>
+               ))}
+             </TableBody>
+           </Table>
+         </div>
+       </TabsContent>
+
+        {/* Loyalty Program Tab */}
+        <TabsContent value="2">
+          <h2 className="text-xl font-semibold mb-4">Loyalty Program Overview</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1">
+              <Card>
+                <CardContent>
+                  <h3 className="text-lg font-semibold mb-4">Tier Distribution</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Platinum Members</div>
+                        <div className="text-sm text-gray-600">
+                          {customers.filter(c => c.tier === 'Platinum').length} customers
+                        </div>
+                      </div>
+                      <StarIcon className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Gold Members</div>
+                        <div className="text-sm text-gray-600">
+                          {customers.filter(c => c.tier === 'Gold').length} customers
+                        </div>
+                      </div>
+                      <StarIcon className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Silver Members</div>
+                        <div className="text-sm text-gray-600">
+                          {customers.filter(c => c.tier === 'Silver').length} customers
+                        </div>
+                      </div>
+                      <StarIcon className="w-5 h-5 text-cyan-600" />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </TabPanel>
+            </div>
+            
+            <div className="md:col-span-2">
+              <Card>
+                <CardContent>
+                  <h3 className="text-lg font-semibold mb-4">Top Customers by Points</h3>
+                  <div className="space-y-3">
+                    {customers
+                      .sort((a, b) => b.loyaltyPoints - a.loyaltyPoints)
+                      .slice(0, 5)
+                      .map((customer) => (
+                        <div key={customer.id} className="flex items-center space-x-3">
+                          <Avatar>
+                            <AvatarFallback className="bg-blue-600 text-white">
+                              {customer.name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="font-medium">{customer.name}</div>
+                            <div className="text-sm text-gray-600">
+                              {customer.loyaltyPoints} points • {customer.tier} tier
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            ₹{customer.totalPurchases.toLocaleString()}
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
 
-      {/* Purchase History Tab */}
-      <TabPanel value={tabValue} index={1}>
-        <Typography variant="h6" gutterBottom>Purchase History</Typography>
-        
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Customer</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Items</TableCell>
-                <TableCell>Total</TableCell>
-                <TableCell>Points Earned</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {purchaseHistory.map((purchase) => (
-                <TableRow key={purchase.id}>
-                  <TableCell>{purchase.customerName}</TableCell>
-                  <TableCell>{format(new Date(purchase.date), 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {purchase.items.map((item, index) => (
-                        <Chip key={index} label={item} size="small" variant="outlined" />
-                      ))}
-                    </Box>
-                  </TableCell>
-                  <TableCell>₹{purchase.total}</TableCell>
-                  <TableCell>{purchase.pointsEarned} pts</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </TabPanel>
-
-      {/* Loyalty Program Tab */}
-      <TabPanel value={tabValue} index={2}>
-        <Typography variant="h6" gutterBottom>Loyalty Program Overview</Typography>
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Tier Distribution</Typography>
-                <List>
-                  <ListItem>
-                    <ListItemText 
-                      primary="Platinum Members" 
-                      secondary={`${customers.filter(c => c.tier === 'Platinum').length} customers`}
-                    />
-                    <StarIcon sx={{ color: '#1976d2' }} />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="Gold Members" 
-                      secondary={`${customers.filter(c => c.tier === 'Gold').length} customers`}
-                    />
-                    <StarIcon sx={{ color: '#ed6c02' }} />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText 
-                      primary="Silver Members" 
-                      secondary={`${customers.filter(c => c.tier === 'Silver').length} customers`}
-                    />
-                    <StarIcon sx={{ color: '#0288d1' }} />
-                  </ListItem>
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} md={8}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Top Customers by Points</Typography>
-                <List>
-                  {customers
-                    .sort((a, b) => b.loyaltyPoints - a.loyaltyPoints)
-                    .slice(0, 5)
-                    .map((customer) => (
-                      <ListItem key={customer.id}>
-                        <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                          {customer.name.charAt(0)}
-                        </Avatar>
-                        <ListItemText 
-                          primary={customer.name}
-                          secondary={`${customer.loyaltyPoints} points • ${customer.tier} tier`}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          ₹{customer.totalPurchases.toLocaleString()}
-                        </Typography>
-                      </ListItem>
-                    ))
-                  }
-                </List>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
-
-      {/* Add/Edit Customer Dialog */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            fullWidth
-            label="Name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Phone"
-            value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Address"
-            multiline
-            rows={3}
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-            margin="normal"
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-          <Button onClick={handleSaveCustomer} variant="contained">
-            {editingCustomer ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        {/* Add/Edit Customer Dialog */}
+        <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+            <DialogTitle>
+              {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingCustomer ? 'Update customer information and contact details.' : 'Add a new customer to your database with their contact information.'}
+            </DialogDescription>
+          </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="address">Address</Label>
+                <textarea
+                  id="address"
+                  rows={3}
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpenDialog(false)}>
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSaveCustomer}>
+                <Save className="w-4 h-4 mr-2" />
+                {editingCustomer ? 'Update' : 'Add'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </Tabs>
+    </div>
   )
 }
 

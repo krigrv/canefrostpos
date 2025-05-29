@@ -1,106 +1,67 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { Button } from '../ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Badge } from '../ui/badge'
+import { Separator } from '../ui/separator'
+import { Checkbox } from '../ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group'
+import { Alert, AlertDescription } from '../ui/alert'
+import { Progress } from '../ui/progress'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet'
+import { Avatar, AvatarFallback } from '../ui/avatar'
 import {
-  Grid,
-  Paper,
-  Typography,
-  Box,
-  TextField,
-  InputAdornment,
-  Chip,
-  Card,
-  CardContent,
-  CardActions,
-  Button,
-  IconButton,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
-  ToggleButtonGroup,
-  ToggleButton,
-  FormControlLabel,
-  Checkbox,
-  Fab,
-  Badge,
-  Drawer,
-  Avatar,
-  Stack,
-  Alert,
-  LinearProgress,
-  Radio,
-  RadioGroup,
-  FormControl,
-  FormLabel,
-  MenuItem,
-  Select,
-  InputLabel,
-  Autocomplete,
-  ButtonGroup
-} from '@mui/material'
-import {
-  Search as SearchIcon,
-  Add as AddIcon,
-  Remove as RemoveIcon,
-  Delete as DeleteIcon,
-  ShoppingCart as CartIcon,
-  Receipt as ReceiptIcon,
-  Close as CloseIcon,
-  Store as StoreIcon,
-  TrendingUp as TrendingUpIcon,
-  AttachMoney as AttachMoneyIcon,
-  Inventory as InventoryIcon,
-  People as PeopleIcon,
-  Today as TodayIcon,
-  FilterList as FilterListIcon,
-  Clear as ClearIcon,
-  AccountBalance as UpiIcon,
-
-  Person as PersonIcon,
-  Phone as PhoneIcon,
-  Money as CashIcon,
-  History as HistoryIcon,
-  Dashboard as DashboardIcon,
-  Settings as SettingsIcon,
-  Logout as LogoutIcon,
-  FilterList as FilterIcon,
-  Category as CategoryIcon,
-  LocalOffer as OfferIcon,
-  TrendingUp as TrendingIcon,
-  Assessment as ReportIcon,
-  Notifications as NotificationIcon,
-  Help as HelpIcon,
-  Info as InfoIcon,
-  Warning as WarningIcon,
-  CheckCircle as SuccessIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  Sync as SyncIcon,
-  SyncProblem as SyncProblemIcon,
-  CloudDone as CloudDoneIcon,
-  CloudOff as CloudOffIcon,
-  Wifi as WifiIcon,
-  WifiOff as WifiOffIcon,
-  Storage as StorageIcon,
-  Speed as SpeedIcon,
-  Timeline as TimelineIcon,
-  TrendingDown as TrendingDownIcon,
-  AttachMoney as MoneyIcon,
-  LocalAtm as AtmIcon,
-  Payment as PaymentIcon,
-  QrCode as QrCodeIcon,
-  Print as PrintIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  Share as ShareIcon,
-   Email as EmailIcon,
-   Sms as SmsIcon
-} from '@mui/icons-material'
+  Search,
+  Plus,
+  Minus,
+  Trash2,
+  ShoppingCart,
+  Receipt,
+  X,
+  Store,
+  TrendingUp,
+  DollarSign,
+  Package,
+  Users,
+  Calendar,
+  Filter,
+  User,
+  Phone,
+  Banknote,
+  History,
+  LayoutDashboard,
+  Settings,
+  LogOut,
+  Tag,
+  Percent,
+  BarChart3,
+  Bell,
+  HelpCircle,
+  Info,
+  AlertTriangle,
+  CheckCircle,
+  AlertCircle,
+  RefreshCw,
+  RotateCcw,
+  Cloud,
+  CloudOff,
+  Wifi,
+  WifiOff,
+  Database,
+  Gauge,
+  TrendingDown,
+  CreditCard,
+  QrCode,
+  Printer,
+  Download,
+  Upload,
+  Share,
+  Mail,
+  MessageSquare
+} from 'lucide-react'
 import { useInventory } from '../../hooks/useInventory'
 import { useCustomers } from '../../contexts/CustomerContext'
 import { useSettings } from '../../contexts/SettingsContext'
@@ -108,8 +69,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { v4 as uuidv4 } from 'uuid'
+import { render, Printer as ThermalPrinter, Text, Row, Br, Line, Cut } from 'react-thermal-printer'
 import { useReactToPrint } from 'react-to-print'
-import { useRef } from 'react'
 
 // Import SVG icons
 import CitrusIcon from '../../../svg/citrus.svg'
@@ -131,17 +92,15 @@ function Dashboard() {
     getCartSubtotal,
     getCategoryGroup,
     sales,
-    addSale,
-    cleanupDuplicates
+    addSale
   } = useInventory()
   
   const { customers } = useCustomers()
   const { settings } = useSettings()
   const { currentUser } = useAuth()
-  const thermalReceiptRef = useRef()
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('All')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [checkoutDialog, setCheckoutDialog] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
   const [receiptDialog, setReceiptDialog] = useState(false)
@@ -151,51 +110,135 @@ function Dashboard() {
   const [cashAmount, setCashAmount] = useState(0)
   const [upiAmount, setUpiAmount] = useState(0)
   const [receivedAmount, setReceivedAmount] = useState(0)
+  const [discount, setDiscount] = useState(0)
+
+  // Thermal receipt ref for browser printing fallback
+  const thermalReceiptRef = useRef()
+
+  // Browser print function using react-to-print
+  const handleBrowserPrint = useReactToPrint({
+    content: () => thermalReceiptRef.current,
+    documentTitle: 'Thermal Receipt'
+  })
 
   // Print function for thermal receipt
-  const handlePrint = useReactToPrint({
-    content: () => thermalReceiptRef.current,
-    documentTitle: 'Thermal Receipt',
-    pageStyle: `
-      @page {
-        size: 80mm auto;
-        margin: 0;
-        padding: 0;
+  const handlePrint = async () => {
+    if (!lastSale) return;
+    
+    // First attempt: Try thermal printing
+    try {
+      const width = settings?.printerWidth === '58mm' ? 32 : settings?.printerWidth === 'A4' ? 48 : 42;
+      
+      const receipt = (
+        <ThermalPrinter type="epson" width={width}>
+          {/* Header */}
+          {settings?.showBusinessName && (
+            <>
+              <Text align="center" size={{ width: 2, height: 2 }} bold={true}>
+                {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
+              </Text>
+              {settings?.thermalHeaderText && (
+                <Text align="center">{settings.thermalHeaderText}</Text>
+              )}
+            </>
+          )}
+          
+          {settings?.showBusinessAddress && settings?.businessAddress && (
+            <Text align="center">{settings.businessAddress}</Text>
+          )}
+          
+          {settings?.showGstNumber && settings?.gstNumber && (
+            <Text align="center">GST: {settings.gstNumber}</Text>
+          )}
+          
+          {settings?.showDividers && <Line />}
+          
+          {/* Transaction Details */}
+          {settings?.showReceiptNumber && (
+            <Text>Receipt #: {lastSale.transactionId}</Text>
+          )}
+          {settings?.showDateTime && (
+            <>
+              <Text>Date: {format(new Date(), 'dd/MM/yyyy')}</Text>
+              <Text>Time: {format(new Date(), 'HH:mm:ss')}</Text>
+            </>
+          )}
+          <Text>Cashier: {currentUser?.displayName || 'Staff'}</Text>
+          
+          {settings?.showDividers && <Line />}
+          
+          {/* Items */}
+          {lastSale.items.map((item, index) => (
+            <div key={index}>
+              <Row 
+                left={item.name} 
+                right={`₹${(item.price * item.quantity).toFixed(2)}`} 
+              />
+              <Text>  {item.quantity} x ₹{item.price.toFixed(2)}</Text>
+            </div>
+          ))}
+          
+          {settings?.showDividers && <Line />}
+          
+          {/* Totals */}
+          <Row left="Subtotal:" right={`₹${lastSale.subtotal.toFixed(2)}`} />
+          
+          {settings?.showTaxBreakdown && (
+            <Row left="GST (12%):" right={`₹${lastSale.tax.toFixed(2)}`} />
+          )}
+          
+          <Line />
+          <Row left={<Text bold={true}>TOTAL:</Text>} right={<Text bold={true}>₹{lastSale.total.toFixed(2)}</Text>} />
+          
+          {/* Payment Details */}
+          {settings?.showPaymentMethod && (
+            <>
+              <Br />
+              <Text>Payment: {lastSale.paymentMethod}</Text>
+              {lastSale.changeAmount > 0 && (
+                <Text>Change: ₹{lastSale.changeAmount.toFixed(2)}</Text>
+              )}
+            </>
+          )}
+          
+          {settings?.showDividers && <Line />}
+          
+          {/* Footer */}
+          <Text align="center">
+            {settings?.thermalFooterText || 'Thank you for your business!'}
+          </Text>
+          
+          <Br />
+          <Br />
+          <Cut />
+        </ThermalPrinter>
+      );
+      
+      // Render and print
+      const data = await render(receipt);
+      
+      // For web browsers, we'll need to use a different approach
+      // This is a placeholder - actual printing would require additional setup
+      console.log('Thermal receipt data generated:', data);
+      toast.success('Receipt generated successfully!');
+      
+      // Fall back to browser printing immediately since thermal printing 
+      // requires additional setup for web browsers
+      handleBrowserPrint();
+      
+    } catch (thermalError) {
+      console.warn('Thermal printing failed, falling back to browser print:', thermalError);
+      
+      // Second attempt: Fall back to browser printing
+      try {
+        handleBrowserPrint();
+        toast.success('Receipt sent to browser printer!');
+      } catch (browserError) {
+        console.error('Browser printing also failed:', browserError);
+        toast.error('Failed to print receipt. Please check your printer connection.');
       }
-      @media print {
-        body {
-          margin: 0;
-          padding: 0;
-          font-family: 'Courier New', monospace;
-          font-size: 12px;
-          line-height: 1.2;
-        }
-        .thermal-receipt {
-          width: 80mm;
-          max-width: 80mm;
-          margin: 0;
-          padding: 2mm;
-          background: white;
-          color: black;
-        }
-        .thermal-header {
-          text-align: center;
-          border-bottom: 1px dashed black;
-          padding-bottom: 2mm;
-          margin-bottom: 2mm;
-        }
-        .thermal-footer {
-          text-align: center;
-          border-top: 1px dashed black;
-          padding-top: 2mm;
-          margin-top: 2mm;
-        }
-        * {
-          visibility: visible;
-        }
-      }
-    `
-  })
+    }
+  }
 
   const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [customerName, setCustomerName] = useState('')
@@ -204,7 +247,6 @@ function Dashboard() {
   const [showReceipt, setShowReceipt] = useState(false)
   const [includePackaging, setIncludePackaging] = useState(true)
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false)
-  const [cleaningDuplicates, setCleaningDuplicates] = useState(false)
   
   // Standard tax rate (12%)
   const taxRate = 0.12
@@ -222,37 +264,36 @@ function Dashboard() {
     return null
   }
 
-  // Calculate dynamic packaging charge based on 500ml bottles (excluding water bottles)
+  // Calculate packaging charge for 500ml bottles in cane fusion or cane blend
   const getPackagingCharge = () => {
     if (cart.length === 0) return 0;
     
     const bottleCount = cart.reduce((count, item) => {
-      const size = getProductSize(item.name)
-      const isWaterBottle = item.name.toLowerCase().includes('water')
+      // Use the size field from the product data, fallback to parsing name
+      const size = item.size || getProductSize(item.name)
+      const isCaneCategory = item.category && (
+        item.category.toLowerCase().includes('cane fusion') ||
+        item.category.toLowerCase().includes('cane blend')
+      )
       
-      if (size === '500ml' && !isWaterBottle) {
+      if (size === '500ml' && isCaneCategory) {
         return count + item.quantity
       }
       return count
     }, 0)
     
-    return bottleCount * 10
+    return bottleCount * 10 // ₹10 per 500ml bottle in cane fusion/blend
   }
   
   const packagingCharge = getPackagingCharge()
 
-  // Get unique category-size combinations from products
+  // Get unique categories from products
   const categoryFilters = useMemo(() => {
     const filterSet = new Set()
     products.forEach(product => {
-      const size = getProductSize(product.name)
-      if (size) {
-        filterSet.add(`${product.category} - ${size}`)
-      } else {
-        filterSet.add(product.category)
-      }
+      filterSet.add(product.category)
     })
-    return ['All', ...Array.from(filterSet).sort()]
+    return Array.from(filterSet).sort()
   }, [products])
 
   // Filter and sort products
@@ -260,16 +301,8 @@ function Dashboard() {
     return products
       .filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-        
-        if (selectedCategory === 'All') {
-          return matchesSearch
-        }
-        
-        const size = getProductSize(product.name)
-        const productFilter = size ? `${product.category} - ${size}` : product.category
-        const matchesFilter = productFilter === selectedCategory
-        
-        return matchesSearch && matchesFilter
+        const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory
+        return matchesSearch && matchesCategory
       })
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [products, searchTerm, selectedCategory])
@@ -282,7 +315,7 @@ function Dashboard() {
 
   // Calculate final total
   const getFinalTotal = () => {
-    return getCartTotalWithPackaging()
+    return getCartTotalWithPackaging() - discount
   }
 
   // Calculate change to be given
@@ -307,20 +340,6 @@ function Dashboard() {
     return baseTax
   }
 
-  // Handle cleanup of duplicate sales
-  const handleCleanupDuplicates = async () => {
-    if (cleaningDuplicates) return // Prevent multiple clicks
-    
-    setCleaningDuplicates(true)
-    try {
-      await cleanupDuplicates()
-    } catch (error) {
-      console.error('Error during cleanup:', error)
-    } finally {
-      setCleaningDuplicates(false)
-    }
-  }
-
   const handlePlaceOrder = async () => {
     if (cart.length === 0) {
       toast.error('Cart is empty')
@@ -329,7 +348,7 @@ function Dashboard() {
 
     if (processingPayment) {
       toast.warning('Order is already being processed')
-      return // Prevent double-clicking
+      return
     }
 
     // Validation for payment methods
@@ -362,7 +381,14 @@ function Dashboard() {
         })
       }
       
-      const transactionId = uuidv4()
+      // Generate order ID with INVCFN format
+      const generateOrderId = () => {
+        const timestamp = Date.now().toString().slice(-6)
+        const randomNum = Math.floor(Math.random() * 100).toString().padStart(2, '0')
+        return `INVCFN${timestamp}${randomNum}`
+      }
+      
+      const transactionId = generateOrderId()
       const sale = {
         id: uuidv4(),
         transactionId,
@@ -371,6 +397,7 @@ function Dashboard() {
         tax: getCartTaxWithPackaging(),
         total: getFinalTotal(),
         originalTotal: getCartTotalWithPackaging(),
+        discount: discount,
         timestamp: new Date(),
         paymentMethod,
         cashAmount: paymentMethod === 'CASH' ? receivedAmount : (paymentMethod === 'BOTH' ? cashAmount : 0),
@@ -423,1233 +450,753 @@ function Dashboard() {
   const lowStockItems = products.filter(p => p.stock < 10).length
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Enhanced Header with Business Branding */}
-      <Paper 
-        elevation={1} 
-        sx={{ 
-          p: 3, 
-          mb: 2, 
-          background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-          color: 'white',
-          borderRadius: 2
-        }}
-      >
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={8}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar 
-                sx={{ 
-                  width: 56, 
-                  height: 56, 
-                  bgcolor: 'rgba(255,255,255,0.2)',
-                  border: '2px solid rgba(255,255,255,0.3)'
-                }}
-              >
-                <StoreIcon sx={{ fontSize: 32 }} />
-              </Avatar>
-              <Box>
-                <Typography variant="h4" fontWeight="bold" sx={{ mb: 0.5 }}>
-                  Welcome, {currentUser?.displayName || currentUser?.email || 'Username'}
-                </Typography>
-                <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Point of Sale System • {format(new Date(), 'EEEE, MMMM do, yyyy')}
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={3}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" fontWeight="bold">
-                    ₹{todaysSales.toLocaleString()}
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    Today's Sales
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" fontWeight="bold">
-                    {totalProducts}
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    Products
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h6" fontWeight="bold" color={lowStockItems > 0 ? 'warning.light' : 'inherit'}>
-                    {lowStockItems}
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                    Low Stock
-                  </Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={3}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={handleCleanupDuplicates}
-                    disabled={cleaningDuplicates}
-                    startIcon={cleaningDuplicates ? <CircularProgress size={16} /> : <RefreshIcon />}
-                    sx={{ 
-                      color: 'white', 
-                      borderColor: 'rgba(255,255,255,0.5)',
-                      '&:hover': {
-                        borderColor: 'white',
-                        backgroundColor: 'rgba(255,255,255,0.1)'
-                      }
-                    }}
-                  >
-                    {cleaningDuplicates ? 'Cleaning...' : 'Clean Duplicates'}
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-          </Grid>
-        </Grid>
-      </Paper>
+    <div className="h-full flex flex-col">
+      {/* Simplified Header */}
+      <Card className="bg-black text-white border-0 rounded-none m-0">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <Avatar className="w-10 h-10 bg-white/20 border-2 border-white/30">
+              <AvatarFallback className="bg-transparent">
+                <Store className="h-5 w-5" />
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-lg font-bold mb-1">
+                Welcome, {currentUser?.displayName || 'Guest'}
+              </h1>
+              <p className="text-gray-300 text-sm">
+                Point of Sale System • {format(new Date(), 'EEEE, MMMM do, yyyy')}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main POS Interface */}
-      <Grid container spacing={2} sx={{ flexGrow: 1 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-1 p-1 flex-1">
         {/* Product Selection Area */}
-        <Grid item xs={12} lg={8}>
-          <Paper elevation={1} sx={{ p: 2, height: '100%', borderRadius: 2 }}>
-            {/* Search and Filter Controls */}
-            <Box sx={{ mb: 3 }}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    placeholder="Search products..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon color="action" />
-                        </InputAdornment>
-                      ),
-                      endAdornment: searchTerm && (
-                        <InputAdornment position="end">
-                          <IconButton size="small" onClick={() => setSearchTerm('')}>
-                            <ClearIcon />
-                          </IconButton>
-                        </InputAdornment>
-                      )
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 2
-                      }
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {categoryFilters.map((category) => (
-                      <Chip
-                        key={category}
-                        label={category}
-                        onClick={() => setSelectedCategory(category)}
-                        color={selectedCategory === category ? 'primary' : 'default'}
-                        variant={selectedCategory === category ? 'filled' : 'outlined'}
-                        size="small"
-                        sx={{ 
-                          borderRadius: 1,
-                          textTransform: 'none',
-                          fontSize: '0.875rem',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            backgroundColor: selectedCategory === category ? 'primary.dark' : 'action.hover'
-                          }
-                        }}
-                      />
-                    ))}
-                  </Box>
-                </Grid>
-              </Grid>
-            </Box>
+        <div className="lg:col-span-2 xl:col-span-3 space-y-2">
+          <Card>
+            <CardContent className="p-3 flex flex-col">
+              {/* Search and Filter Controls */}
+              <div className="mb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search products..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {categoryFilters.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-            {/* Product Grid */}
-            <Box sx={{ height: 'calc(100% - 120px)', overflowY: 'auto' }}>
-              {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
-                  <CircularProgress />
-                </Box>
-              ) : filteredProducts.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 8 }}>
-                  <InventoryIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                  <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No products found
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Try adjusting your search or filter criteria
-                  </Typography>
-                </Box>
-              ) : (
-                <Grid container spacing={2}>
-                  {filteredProducts.map((product) => {
-                    const cartItem = cart.find(item => item.id === product.id)
-                    const inCart = !!cartItem
-                    const quantity = cartItem?.quantity || 0
-                    
-                    return (
-                      <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+              {/* Product Grid */}
+              <div className="flex-1 overflow-auto max-h-[calc(100vh-280px)] p-2">
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-2"></div>
+                      <p className="text-muted-foreground">Loading products...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 auto-rows-max p-2">
+                    {filteredProducts.map((product) => {
+                      const isInCart = cart.some(item => item.id === product.id)
+                      return (
                         <Card 
-                          elevation={inCart ? 3 : 1}
-                          sx={{ 
-                            height: '100%',
-                            borderRadius: 2,
-                            border: inCart ? '2px solid #1976d2' : '1px solid #e0e0e0',
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              elevation: 3,
-                              transform: 'translateY(-2px)'
-                            }
-                          }}
-                        >
-                          <CardContent sx={{ pb: 1 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                              <Chip 
-                                label={product.category} 
-                                size="small" 
-                                sx={{ 
-                                  fontSize: '0.7rem',
-                                  height: 20,
-                                  backgroundColor: '#E3F2FD',
-                                  color: '#1976d2'
-                                }} 
-                              />
-                              {product.stock < 10 && (
-                                <Chip 
-                                  label="Low Stock" 
-                                  size="small" 
-                                  color="warning"
-                                  sx={{ fontSize: '0.7rem', height: 20 }}
-                                />
-                              )}
-                            </Box>
-                            <Typography 
-                              variant="subtitle2" 
-                              fontWeight="bold" 
-                              sx={{ 
-                                mb: 1,
-                                lineHeight: 1.3,
-                                height: '2.6em',
-                                overflow: 'hidden',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical'
-                              }}
-                            >
-                              {product.name}
-                            </Typography>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                              <Typography variant="h6" color="primary" fontWeight="bold">
-                                ₹{product.price}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Stock: {product.stock}
-                              </Typography>
-                            </Box>
+          key={product.id} 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+            isInCart ? 'ring-2 ring-black bg-gray-50 relative z-10' : 'hover:bg-gray-50'
+          }`}
+          onClick={() => addToCart(product)}
+        >
+                          <CardContent className="p-3">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start gap-1">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-medium text-sm leading-tight">{product.name}</h3>
+                                  {product.size && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-3 mt-1 bg-blue-50 text-blue-700 border-blue-200">
+                                      {product.size}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <Badge variant={product.stock > 10 ? 'default' : 'destructive'} className="text-[10px] px-1 py-0 h-4 shrink-0 min-w-fit">
+                                  {product.stock}
+                                </Badge>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-base">₹{product.price}</span>
+                                {isInCart && (
+                                  <div className="flex items-center justify-center">
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </CardContent>
-                          <CardActions sx={{ pt: 0, px: 2, pb: 2 }}>
-                            {!inCart ? (
-                              <Button
-                                fullWidth
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => addToCart(product)}
-                                disabled={product.stock === 0}
-                                sx={{ borderRadius: 1.5 }}
-                              >
-                                Add to Cart
-                              </Button>
-                            ) : (
-                              <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: 1 }}>
-                                <IconButton 
-                                  size="small" 
-                                  onClick={() => removeFromCart(product.id)}
-                                  sx={{ 
-                                    backgroundColor: '#f5f5f5',
-                                    '&:hover': { backgroundColor: '#e0e0e0' }
-                                  }}
-                                >
-                                  <RemoveIcon fontSize="small" />
-                                </IconButton>
-                                <Typography 
-                                  variant="h6" 
-                                  sx={{ 
-                                    flexGrow: 1, 
-                                    textAlign: 'center',
-                                    fontWeight: 'bold',
-                                    color: 'primary.main'
-                                  }}
-                                >
-                                  {quantity}
-                                </Typography>
-                                <IconButton 
-                                  size="small" 
-                                  onClick={() => addToCart(product)}
-                                  disabled={quantity >= product.stock}
-                                  sx={{ 
-                                    backgroundColor: '#1976d2',
-                                    color: 'white',
-                                    '&:hover': { backgroundColor: '#1565c0' },
-                                    '&:disabled': { backgroundColor: '#e0e0e0', color: '#9e9e9e' }
-                                  }}
-                                >
-                                  <AddIcon fontSize="small" />
-                                </IconButton>
-                              </Box>
-                            )}
-                          </CardActions>
                         </Card>
-                      </Grid>
-                    )
-                  })}
-                </Grid>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Enhanced Cart Sidebar */}
-        <Grid item xs={12} lg={4}>
-          <Paper elevation={2} sx={{ p: 2, height: { xs: 'auto', lg: '100%' }, minHeight: { xs: '500px', lg: 'auto' }, borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6" fontWeight="bold">
-                Shopping Cart
-              </Typography>
-              <Badge badgeContent={cart.length} color="primary">
-                <CartIcon />
-              </Badge>
-            </Box>
-            
-            {cart.length === 0 ? (
-              <Box sx={{ textAlign: 'center', py: 8 }}>
-                <CartIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                <Typography variant="h6" color="text.secondary" gutterBottom>
-                  Cart is empty
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Add products to get started
-                </Typography>
-              </Box>
-            ) : (
-              <>
-                <Box sx={{ 
-                  height: { xs: '250px', lg: 'calc(100% - 250px)' }, 
-                  maxHeight: '350px',
-                  overflowY: 'auto', 
-                  mb: 2 
-                }}>
-                  <List>
+        {/* Cart Area */}
+        <div className="xl:col-span-1">
+          <Card className="max-h-[calc(100vh-200px)]">
+            <CardHeader className="pb-2 px-3 pt-3">
+              <div className="flex justify-between items-center">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <ShoppingCart className="h-4 w-4" />
+                  Cart ({cart.length})
+                </CardTitle>
+                {cart.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={clearCart}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col px-3 pb-3 max-h-[calc(100vh-280px)]">
+              {cart.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <ShoppingCart className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>Your cart is empty</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Cart Items */}
+                  <div className="flex-1 overflow-auto space-y-1 mb-3">
                     {cart.map((item) => (
-                      <ListItem key={item.id} sx={{ px: 0, py: 1 }}>
-                        <Box sx={{ width: '100%' }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                            <Typography variant="subtitle2" fontWeight="bold" sx={{ flexGrow: 1, pr: 1 }}>
-                              {item.name}
-                            </Typography>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => removeFromCart(item.id, true)}
-                              sx={{ color: 'error.main' }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => removeFromCart(item.id)}
-                                sx={{ backgroundColor: '#f5f5f5' }}
-                              >
-                                <RemoveIcon fontSize="small" />
-                              </IconButton>
-                              <Typography variant="body2" fontWeight="bold">
-                                {item.quantity}
-                              </Typography>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => addToCart(item)}
-                                sx={{ backgroundColor: '#1976d2', color: 'white' }}
-                              >
-                                <AddIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                            <Typography variant="subtitle2" fontWeight="bold" color="primary">
-                              ₹{(item.price * item.quantity).toFixed(2)}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </ListItem>
+                      <div key={item.id} className="flex items-center justify-between p-1.5 border rounded text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-xs truncate">{item.name}</p>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <p className="text-xs text-muted-foreground">₹{item.price}</p>
+                            {item.category && (
+                              <span className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded">
+                                {item.category}
+                              </span>
+                            )}
+                            {item.size && (
+                              <span className="text-[9px] px-1 py-0.5 bg-blue-50 text-blue-600 rounded">
+                                {item.size}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => removeFromCart(item.id)}
+                            className="h-5 w-5 p-0"
+                          >
+                            <Minus className="h-2 w-2" />
+                          </Button>
+                          <span className="w-6 text-center text-xs">{item.quantity}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => addToCart(item)}
+                            className="h-5 w-5 p-0"
+                          >
+                            <Plus className="h-2 w-2" />
+                          </Button>
+                        </div>
+                      </div>
                     ))}
-                  </List>
-                </Box>
-                
-                {/* Cart Summary */}
-                <Box sx={{ 
-                  borderTop: '1px solid #e0e0e0', 
-                  pt: 2,
-                  backgroundColor: 'white',
-                  position: 'sticky',
-                  bottom: 0,
-                  zIndex: 1,
-                  mt: 'auto'
-                }}>
-                  {includePackaging && packagingCharge > 0 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography variant="body2">Packaging Charge:</Typography>
-                      <Typography variant="body2" fontWeight="bold">₹{packagingCharge}</Typography>
-                    </Box>
-                  )}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">Subtotal:</Typography>
-                    <Typography variant="body2" fontWeight="bold">₹{getCartSubtotal().toFixed(2)}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">Tax (12%):</Typography>
-                    <Typography variant="body2" fontWeight="bold">₹{getCartTaxWithPackaging().toFixed(2)}</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Typography variant="h6" fontWeight="bold">Total:</Typography>
-                    <Typography variant="h6" fontWeight="bold" color="primary">
-                      ₹{getCartTotalWithPackaging().toFixed(2)}
-                    </Typography>
-                  </Box>
-                  
-                  <Stack spacing={1}>
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      size="large"
-                      startIcon={<ReceiptIcon />}
-                      onClick={() => setCheckoutDialog(true)}
-                      sx={{ 
-                        borderRadius: 2,
-                        py: 1.5,
-                        fontSize: '1rem',
-                        fontWeight: 'bold'
-                      }}
-                    >
-                      Checkout
-                    </Button>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      onClick={clearCart}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      Clear Cart
-                    </Button>
-                  </Stack>
-                </Box>
-              </>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
+                  </div>
 
-      {/* Enhanced Checkout Dialog */}
-      <Dialog 
-        open={checkoutDialog} 
-        onClose={() => setCheckoutDialog(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-          }
+                  {/* Packaging Option */}
+                  <div className="space-y-1 mb-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="packaging"
+                        checked={includePackaging}
+                        onCheckedChange={setIncludePackaging}
+                      />
+                      <Label htmlFor="packaging" className="text-sm">
+                        Include Packaging (₹{packagingCharge})
+                      </Label>
+                    </div>
+                  </div>
+
+                  {/* Cart Summary */}
+                  <div className="space-y-1 pt-2 border-t">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>₹{getCartSubtotal().toLocaleString()}</span>
+                    </div>
+                    {includePackaging && packagingCharge > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>Packaging:</span>
+                        <span>₹{packagingCharge}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span>GST (12%):</span>
+                      <span>₹{getCartTaxWithPackaging().toLocaleString()}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-bold">
+                      <span>Total:</span>
+                      <span>₹{getCartTotalWithPackaging().toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {/* Checkout Button */}
+                  <Button
+                    className="w-full mt-3 bg-black hover:bg-gray-800 text-white font-semibold py-3"
+                    onClick={() => setCheckoutDialog(true)}
+                    disabled={cart.length === 0}
+                    size="lg"
+                  >
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Proceed to Checkout
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Checkout Dialog */}
+      <Dialog open={checkoutDialog} onOpenChange={setCheckoutDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Checkout</DialogTitle>
+            <DialogDescription>
+              Review your order details and complete the payment.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Order Summary */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Order Summary</h4>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>₹{getCartSubtotal().toLocaleString()}</span>
+                </div>
+                {includePackaging && packagingCharge > 0 && (
+                  <div className="flex justify-between">
+                    <span>Packaging:</span>
+                    <span>₹{packagingCharge}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span>GST (12%):</span>
+                  <span>₹{getCartTaxWithPackaging().toLocaleString()}</span>
+                </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Discount:</span>
+                    <span>-₹{discount.toLocaleString()}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between font-bold">
+                  <span>Total:</span>
+                  <span>₹{getFinalTotal().toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Discount Section */}
+            <div className="space-y-3">
+              <Label>Discount</Label>
+              <div className="space-y-2">
+                <div className="flex space-x-2">
+                  <Input
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                    placeholder="Enter discount amount"
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscount(0)}
+                    disabled={discount === 0}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscount(50)}
+                    className="flex-1"
+                  >
+                    ₹50
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscount(100)}
+                    className="flex-1"
+                  >
+                    ₹100
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscount(Math.round(getCartTotalWithPackaging() * 0.1))}
+                    className="flex-1"
+                  >
+                    10%
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscount(Math.round(getCartTotalWithPackaging() * 0.2))}
+                    className="flex-1"
+                  >
+                    20%
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div className="space-y-3">
+              <Label>Payment Method</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <Card 
+                  className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    paymentMethod === 'CASH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setPaymentMethod('CASH')}
+                >
+                  <CardContent className="p-3 text-center">
+                    <div className="space-y-1">
+                      <div className="text-lg">💵</div>
+                      <div className="text-sm font-medium">Cash</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card 
+                  className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    paymentMethod === 'UPI' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setPaymentMethod('UPI')}
+                >
+                  <CardContent className="p-3 text-center">
+                    <div className="space-y-1">
+                      <div className="text-lg">📱</div>
+                      <div className="text-sm font-medium">UPI</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card 
+                  className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    paymentMethod === 'BOTH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setPaymentMethod('BOTH')}
+                >
+                  <CardContent className="p-3 text-center">
+                    <div className="space-y-1">
+                      <div className="text-lg">💳</div>
+                      <div className="text-sm font-medium">Both</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Payment Amount Fields */}
+            {paymentMethod === 'CASH' && (
+              <div className="space-y-2">
+                <Label htmlFor="received">Amount Received</Label>
+                <Input
+                  id="received"
+                  type="number"
+                  value={receivedAmount}
+                  onChange={(e) => setReceivedAmount(Number(e.target.value))}
+                  placeholder="Enter received amount"
+                />
+                {receivedAmount > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Change: ₹{getChangeAmount().toLocaleString()}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {paymentMethod === 'BOTH' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cash-amount">Cash Amount</Label>
+                  <Input
+                    id="cash-amount"
+                    type="number"
+                    value={cashAmount}
+                    onChange={(e) => setCashAmount(Number(e.target.value))}
+                    placeholder="Cash amount"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="upi-amount">UPI Amount</Label>
+                  <Input
+                    id="upi-amount"
+                    type="number"
+                    value={upiAmount}
+                    onChange={(e) => setUpiAmount(Number(e.target.value))}
+                    placeholder="UPI amount"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckoutDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePlaceOrder} disabled={processingPayment}>
+              {processingPayment ? 'Processing...' : 'Place Order'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptDialog} onOpenChange={setReceiptDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Order Completed</DialogTitle>
+            <DialogDescription>
+              Your order has been successfully processed and completed.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {lastSale && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                <p className="text-lg font-medium">Order Successful!</p>
+                <p className="text-sm text-muted-foreground">
+                  Transaction ID: {lastSale.transactionId}
+                </p>
+              </div>
+              
+              {/* Thermal Receipt Preview */}
+              <div className="border rounded-lg p-3 bg-gray-50 max-h-64 overflow-y-auto">
+                <div className="text-xs font-mono leading-tight" style={{ width: '80mm', maxWidth: '100%' }}>
+                  {/* Header */}
+                  {settings?.showBusinessName && (
+                    <div className="text-center font-bold text-sm mb-1">
+                      {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
+                    </div>
+                  )}
+                  
+                  {settings?.thermalHeaderText && (
+                    <div className="text-center mb-1">
+                      {settings.thermalHeaderText}
+                    </div>
+                  )}
+                  
+                  {settings?.showBusinessAddress && settings?.businessAddress && (
+                    <div className="text-center mb-1">
+                      {settings.businessAddress}
+                    </div>
+                  )}
+                  
+                  {settings?.showGstNumber && settings?.gstNumber && (
+                    <div className="text-center mb-1">
+                      GST: {settings.gstNumber}
+                    </div>
+                  )}
+                  
+                  {settings?.showDividers && <div className="border-t border-dashed border-gray-400 my-1" />}
+                  
+                  {/* Transaction Details */}
+                  <div className="text-left">
+                    {settings?.showReceiptNumber && (
+                      <div>Receipt #: {lastSale.transactionId}</div>
+                    )}
+                    {settings?.showDateTime && (
+                      <>
+                        <div>Date: {format(new Date(), 'dd/MM/yyyy')}</div>
+                        <div>Time: {format(new Date(), 'HH:mm:ss')}</div>
+                      </>
+                    )}
+                  </div>
+                  
+                  {settings?.showDividers && <div className="border-t border-dashed border-gray-400 my-1" />}
+                  
+                  {/* Items */}
+                  <div className="space-y-1">
+                    {(lastSale.items || []).map((item, index) => (
+                      <div key={index}>
+                        <div className="flex justify-between">
+                          <span className="truncate flex-1 mr-2">{item.name || 'Unknown Item'}</span>
+                          <span>₹{(item.price || 0).toLocaleString()}</span>
+                        </div>
+                        {(item.quantity || 1) > 1 && (
+                          <div className="flex justify-between text-xs text-gray-600">
+                            <span>{item.quantity || 1} x ₹{(item.price || 0).toLocaleString()}</span>
+                            <span>₹{((item.quantity || 1) * (item.price || 0)).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {settings?.showDividers && <div className="border-t border-dashed border-gray-400 my-1" />}
+                  
+                  {/* Totals */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>₹{(lastSale.subtotal || 0).toLocaleString()}</span>
+                    </div>
+                    {(lastSale.packagingCharge || 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span>Packaging:</span>
+                        <span>₹{(lastSale.packagingCharge || 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {(lastSale.tax || 0) > 0 && (
+                      <div className="flex justify-between">
+                        <span>Tax:</span>
+                        <span>₹{(lastSale.tax || 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold border-t border-gray-400 pt-1">
+                      <span>TOTAL:</span>
+                      <span>₹{(lastSale.total || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Payment ({lastSale.paymentMethod || 'Cash'}):</span>
+                      <span>₹{(lastSale.amountPaid || 0).toLocaleString()}</span>
+                    </div>
+                    {(lastSale.changeAmount || 0) > 0 && (
+                      <div className="flex justify-between font-bold">
+                        <span>Change:</span>
+                        <span>₹{(lastSale.changeAmount || 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {settings?.showDividers && <div className="border-t border-dashed border-gray-400 my-1" />}
+                  
+                  {settings?.thermalFooterText && (
+                    <div className="text-center mt-2">
+                      {settings.thermalFooterText}
+                    </div>
+                  )}
+                  
+                  <div className="text-center mt-2 text-xs">
+                    Thank you for your business!
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Total Amount:</span>
+                  <span>₹{lastSale.total.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Payment Method:</span>
+                  <span>{lastSale.paymentMethod}</span>
+                </div>
+                {lastSale.changeAmount > 0 && (
+                  <div className="flex justify-between font-medium">
+                    <span>Change Given:</span>
+                    <span>₹{lastSale.changeAmount.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiptDialog(false)}>
+              Close
+            </Button>
+            <Button onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Receipt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden Thermal Receipt for Browser Printing */}
+      <div 
+        ref={thermalReceiptRef}
+        style={{
+          display: 'none',
+          fontFamily: settings?.thermalFontFamily || 'monospace',
+          fontSize: settings?.thermalFontSize || '12px',
+          lineHeight: settings?.thermalLineHeight || '1.2',
+          width: settings?.printerWidth === '58mm' ? '58mm' : settings?.printerWidth === 'A4' ? '210mm' : '80mm'
         }}
       >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <Typography variant="h5" fontWeight="600" sx={{ color: '#1a1a1a' }}>
-              Order Summary
-            </Typography>
-            <IconButton 
-              onClick={() => setCheckoutDialog(false)}
-              sx={{ 
-                position: 'absolute', 
-                right: 0,
-                color: '#666'
-              }}
-            >
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
+        <style>{`
+          @media print {
+            @page {
+              size: ${settings?.printerWidth === '58mm' ? '58mm auto' : settings?.printerWidth === 'A4' ? 'A4' : '80mm auto'};
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 8px;
+              font-family: ${settings?.thermalFontFamily || 'monospace'};
+              font-size: ${settings?.thermalFontSize || '12px'};
+              line-height: ${settings?.thermalLineHeight || '1.2'};
+            }
+            .thermal-receipt {
+              width: 100%;
+              max-width: none;
+            }
+            .center { text-align: center; }
+            .left { text-align: left; }
+            .right { text-align: right; }
+            .bold { font-weight: bold; }
+            .divider { border-top: 1px dashed #000; margin: 4px 0; }
+            .item-row { display: flex; justify-content: space-between; }
+          }
+        `}</style>
         
-        <DialogContent sx={{ px: 3, py: 2 }}>
-          {/* Items Section */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="600" sx={{ mb: 2, color: '#1a1a1a' }}>
-              Items
-            </Typography>
-            <Box sx={{ bgcolor: '#f8f9fa', borderRadius: 2, p: 2 }}>
-              {cart.map((item, index) => (
-                <Box key={item.id} sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'flex-start',
-                  mb: index < cart.length - 1 ? 2 : 0
-                }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body1" fontWeight="500" sx={{ color: '#1a1a1a', mb: 0.5 }}>
-                      {item.name}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#888', fontSize: '0.75rem', mb: 0.5 }}>
-                      {item.category}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      ₹{item.price} × {item.quantity}
-                    </Typography>
-                  </Box>
-                  <Typography variant="body1" fontWeight="600" sx={{ color: '#1a1a1a' }}>
-                    ₹{(item.price * item.quantity).toFixed(2)}
-                  </Typography>
-                </Box>
+        {lastSale && (
+          <div className="thermal-receipt">
+            {/* Header */}
+            {settings?.showBusinessName && (
+              <div className="center bold" style={{ fontSize: '16px', marginBottom: '4px' }}>
+                {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
+              </div>
+            )}
+            
+            {settings?.thermalHeaderText && (
+              <div className="center" style={{ marginBottom: '4px' }}>
+                {settings.thermalHeaderText}
+              </div>
+            )}
+            
+            {settings?.showBusinessAddress && settings?.businessAddress && (
+              <div className="center" style={{ marginBottom: '4px' }}>
+                {settings.businessAddress}
+              </div>
+            )}
+            
+            {settings?.showGstNumber && settings?.gstNumber && (
+              <div className="center" style={{ marginBottom: '4px' }}>
+                GST: {settings.gstNumber}
+              </div>
+            )}
+            
+            {settings?.showDividers && <div className="divider" />}
+            
+            {/* Transaction Details */}
+            <div className="left">
+              {settings?.showReceiptNumber && (
+                <div>Receipt #: {lastSale.transactionId}</div>
+              )}
+              {settings?.showDateTime && (
+                <>
+                  <div>Date: {format(new Date(), 'dd/MM/yyyy')}</div>
+                  <div>Time: {format(new Date(), 'HH:mm:ss')}</div>
+                </>
+              )}
+              <div>Cashier: {currentUser?.displayName || 'Staff'}</div>
+            </div>
+            
+            {settings?.showDividers && <div className="divider" />}
+            
+            {/* Items */}
+            <div>
+              {lastSale.items.map((item, index) => (
+                <div key={index}>
+                  <div className="item-row">
+                    <span>{item.name}</span>
+                    <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                  <div style={{ paddingLeft: '8px', fontSize: '11px' }}>
+                    {item.quantity} x ₹{item.price.toFixed(2)}
+                  </div>
+                </div>
               ))}
+            </div>
+            
+            {settings?.showDividers && <div className="divider" />}
+            
+            {/* Totals */}
+            <div>
+              <div className="item-row">
+                <span>Subtotal:</span>
+                <span>₹{lastSale.subtotal.toFixed(2)}</span>
+              </div>
               
-              {includePackaging && packagingCharge > 0 && (
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'flex-start',
-                  mt: 2
-                }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body1" fontWeight="500" sx={{ color: '#1a1a1a', mb: 0.5 }}>
-                      Packaging Charge
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#888', fontSize: '0.75rem', mb: 0.5 }}>
-                      Eco-friendly packaging
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#666' }}>
-                      ₹10 × {packagingCharge / 10} bottles
-                    </Typography>
-                  </Box>
-                  <Typography variant="body1" fontWeight="600" sx={{ color: '#1a1a1a' }}>
-                    ₹{packagingCharge.toFixed(2)}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Box>
-
-
-
-          {/* Payment Method Section */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" fontWeight="600" sx={{ mb: 2, color: '#1a1a1a' }}>
-              Payment Method
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant={paymentMethod === 'CASH' ? 'contained' : 'outlined'}
-                onClick={() => setPaymentMethod('CASH')}
-                sx={{ 
-                  flex: 1,
-                  py: 1.5,
-                  fontWeight: '600',
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  ...(paymentMethod === 'CASH' ? {
-                    bgcolor: '#000',
-                    color: '#fff',
-                    '&:hover': { bgcolor: '#333' }
-                  } : {
-                    borderColor: '#e0e0e0',
-                    color: '#666',
-                    '&:hover': { borderColor: '#000', color: '#000' }
-                  })
-                }}
-              >
-                CASH
-              </Button>
-              <Button
-                variant={paymentMethod === 'UPI' ? 'contained' : 'outlined'}
-                onClick={() => setPaymentMethod('UPI')}
-                sx={{ 
-                  flex: 1,
-                  py: 1.5,
-                  fontWeight: '600',
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  ...(paymentMethod === 'UPI' ? {
-                    bgcolor: '#000',
-                    color: '#fff',
-                    '&:hover': { bgcolor: '#333' }
-                  } : {
-                    borderColor: '#e0e0e0',
-                    color: '#666',
-                    '&:hover': { borderColor: '#000', color: '#000' }
-                  })
-                }}
-              >
-                UPI
-              </Button>
-              <Button
-                variant={paymentMethod === 'BOTH' ? 'contained' : 'outlined'}
-                onClick={() => setPaymentMethod('BOTH')}
-                sx={{ 
-                  flex: 1,
-                  py: 1.5,
-                  fontWeight: '600',
-                  textTransform: 'none',
-                  borderRadius: 2,
-                  ...(paymentMethod === 'BOTH' ? {
-                    bgcolor: '#000',
-                    color: '#fff',
-                    '&:hover': { bgcolor: '#333' }
-                  } : {
-                    borderColor: '#e0e0e0',
-                    color: '#666',
-                    '&:hover': { borderColor: '#000', color: '#000' }
-                  })
-                }}
-              >
-                BOTH
-              </Button>
-            </Box>
-          </Box>
-
-          {/* Bill Summary */}
-           <Box sx={{ mb: 3 }}>
-             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-               <Typography variant="body1" sx={{ color: '#666' }}>Subtotal (excl. GST):</Typography>
-               <Typography variant="body1" fontWeight="600">₹{getCartSubtotal().toFixed(2)}</Typography>
-             </Box>
-             
-             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-               <Typography variant="body2" sx={{ color: '#666' }}>• Packaging Charge:</Typography>
-               <Typography variant="body2" sx={{ color: '#666' }}>₹{includePackaging ? packagingCharge.toFixed(2) : '0.00'}</Typography>
-             </Box>
-             
-             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-               <Typography variant="body2" sx={{ color: '#666' }}>GST (12%):</Typography>
-               <Typography variant="body2" sx={{ color: '#666' }}>₹{getCartTaxWithPackaging().toFixed(2)}</Typography>
-             </Box>
-             
-             <Divider sx={{ my: 2 }} />
-             
-             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <Typography variant="h6" fontWeight="700" sx={{ color: '#1a1a1a' }}>Total:</Typography>
-               <Typography variant="h6" fontWeight="700" sx={{ color: '#1a1a1a' }}>₹{getFinalTotal().toFixed(2)}</Typography>
-             </Box>
-           </Box>
-
-          {/* Payment Fields */}
-          {paymentMethod === 'CASH' && (
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                fullWidth
-                label="Received Amount"
-                type="number"
-                value={receivedAmount}
-                onChange={(e) => setReceivedAmount(parseFloat(e.target.value) || 0)}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">₹</InputAdornment>
-                }}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-              {receivedAmount > 0 && (
-                <Box sx={{ p: 2, bgcolor: receivedAmount >= getFinalTotal() ? 'success.light' : 'error.light', borderRadius: 2 }}>
-                  <Typography variant="body2" fontWeight="bold">
-                    Change to Return: ₹{getChangeAmount().toFixed(2)}
-                  </Typography>
-                  {receivedAmount < getFinalTotal() && (
-                    <Typography variant="body2" color="error">
-                      Insufficient amount! Need ₹{(getFinalTotal() - receivedAmount).toFixed(2)} more
-                    </Typography>
-                  )}
-                </Box>
-              )}
-            </Box>
-          )}
-          
-          {paymentMethod === 'BOTH' && (
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                fullWidth
-                label="Cash Amount"
-                type="number"
-                value={cashAmount}
-                onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">₹</InputAdornment>
-                }}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-              <TextField
-                fullWidth
-                label="UPI Amount"
-                type="number"
-                value={upiAmount}
-                onChange={(e) => setUpiAmount(parseFloat(e.target.value) || 0)}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">₹</InputAdornment>
-                }}
-                sx={{ 
-                  mb: 2,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2
-                  }
-                }}
-              />
-              <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 2 }}>
-                <Typography variant="body2">
-                  Total Paid: ₹{(cashAmount + upiAmount).toFixed(2)}
-                </Typography>
-                <Typography variant="body2">
-                  Remaining: ₹{Math.max(0, getFinalTotal() - (cashAmount + upiAmount)).toFixed(2)}
-                </Typography>
-                {(cashAmount + upiAmount) > getFinalTotal() && (
-                  <Typography variant="body2" color="success.main">
-                    Change: ₹{getChangeAmount().toFixed(2)}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-          )}
-          
-          {paymentMethod === 'UPI' && (
-            <Box sx={{ p: 2, bgcolor: 'info.light', borderRadius: 2, mb: 2 }}>
-              <Typography variant="body2">
-                UPI Payment: ₹{getFinalTotal().toFixed(2)}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Please confirm UPI payment before placing order
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        
-        <DialogActions sx={{ p: 3, pt: 1, gap: 2 }}>
-          <Button
-            onClick={() => setCheckoutDialog(false)}
-            variant="outlined"
-            fullWidth
-            sx={{ 
-              py: 1.5,
-              fontWeight: '600',
-              textTransform: 'none',
-              borderRadius: 2,
-              borderColor: '#e0e0e0',
-              color: '#666',
-              '&:hover': { borderColor: '#000', color: '#000' }
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handlePlaceOrder}
-            variant="contained"
-            fullWidth
-            disabled={processingPayment}
-            startIcon={processingPayment ? <CircularProgress size={20} /> : <ReceiptIcon />}
-            sx={{ 
-              py: 1.5,
-              fontWeight: '600',
-              textTransform: 'none',
-              borderRadius: 2,
-              bgcolor: '#000',
-              color: '#fff',
-              '&:hover': { bgcolor: '#333' },
-              '&:disabled': { bgcolor: '#ccc' }
-            }}
-          >
-            {processingPayment ? 'Processing...' : 'Print Receipt'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Order Success Dialog */}
-      <Dialog open={orderSuccessDialog} onClose={() => setOrderSuccessDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6" fontWeight="bold" color="success.main">
-              Order Placed Successfully!
-            </Typography>
-            <IconButton onClick={() => setOrderSuccessDialog(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {lastSale && (
-            <Box>
-              {/* Success Header */}
-              <Box sx={{ textAlign: 'center', py: 2, mb: 3 }}>
-                <Typography variant="h4" color="success.main" sx={{ mb: 2 }}>
-                  ✓
-                </Typography>
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                  Order Placed Successfully!
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Order #{lastSale.id.slice(-8).toUpperCase()}
-                </Typography>
-              </Box>
-
-              {/* Print Summary Card */}
-              <Card sx={{ mb: 2, border: '1px solid #e0e0e0' }}>
-                <CardContent sx={{ p: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2, textAlign: 'center', fontWeight: 'bold' }}>
-                    {settings.businessName || 'CANEFROST JUICE SHOP'}
-                  </Typography>
-                  
-                  {/* Order Details */}
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Receipt No:</span>
-                      <span>{lastSale.id.slice(-8).toUpperCase()}</span>
-                    </Typography>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Date:</span>
-                      <span>{format(lastSale.timestamp, 'dd/MM/yyyy HH:mm:ss')}</span>
-                    </Typography>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Payment:</span>
-                      <span>{lastSale.paymentMethod}</span>
-                    </Typography>
-                    {lastSale.customer && (
-                      <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Customer:</span>
-                        <span>{lastSale.customer.name}</span>
-                      </Typography>
-                    )}
-                  </Box>
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Items */}
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    ITEMS
-                  </Typography>
-                  {lastSale.items.map((item, index) => (
-                    <Box key={index} sx={{ mb: 1 }}>
-                      <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{item.name}</span>
-                        <span>{item.quantity} × ₹{item.price.toFixed(2)}</span>
-                      </Typography>
-                      <Typography variant="body2" sx={{ textAlign: 'right', color: 'text.secondary' }}>
-                        ₹{(item.price * item.quantity).toFixed(2)}
-                      </Typography>
-                    </Box>
-                  ))}
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Totals */}
-                  <Box>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Subtotal:</span>
-                      <span>₹{lastSale.subtotal.toFixed(2)}</span>
-                    </Typography>
-                    <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Tax (12%):</span>
-                      <span>₹{lastSale.tax.toFixed(2)}</span>
-                    </Typography>
-                    <Typography variant="subtitle1" sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', mt: 1, pt: 1, borderTop: '1px solid #e0e0e0' }}>
-                      <span>TOTAL:</span>
-                      <span>₹{lastSale.total.toFixed(2)}</span>
-                    </Typography>
-                  </Box>
-
-                  {/* Payment Details */}
-                  <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #ccc' }}>
-                    {lastSale.paymentMethod === 'CASH' && (
-                      <>
-                        <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Cash Received:</span>
-                          <span>₹{lastSale.receivedAmount.toFixed(2)}</span>
-                        </Typography>
-                        <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Change:</span>
-                          <span>₹{lastSale.changeAmount.toFixed(2)}</span>
-                        </Typography>
-                      </>
-                    )}
-                    {lastSale.paymentMethod === 'BOTH' && (
-                      <>
-                        <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Cash:</span>
-                          <span>₹{lastSale.cashAmount.toFixed(2)}</span>
-                        </Typography>
-                        <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>UPI:</span>
-                          <span>₹{lastSale.upiAmount.toFixed(2)}</span>
-                        </Typography>
-                        {lastSale.changeAmount > 0 && (
-                          <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Change:</span>
-                            <span>₹{lastSale.changeAmount.toFixed(2)}</span>
-                          </Typography>
-                        )}
-                      </>
-                    )}
-                    {lastSale.paymentMethod === 'UPI' && (
-                      <Typography variant="body2" sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>UPI Payment:</span>
-                        <span>₹{lastSale.total.toFixed(2)}</span>
-                      </Typography>
-                    )}
-
-                  </Box>
-
-                  {/* Footer */}
-                  <Box sx={{ textAlign: 'center', mt: 2, pt: 2, borderTop: '1px dashed #ccc' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Thank you for visiting!
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Powered by CaneFrost POS
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3, justifyContent: 'center' }}>
-          <Button
-            onClick={() => window.print()}
-            variant="contained"
-            startIcon={<ReceiptIcon />}
-            sx={{ mr: 1 }}
-          >
-            Print
-          </Button>
-          <Button
-            onClick={() => {
-              setOrderSuccessDialog(false)
-              setReceiptDialog(true)
-            }}
-            variant="contained"
-            startIcon={<ReceiptIcon />}
-            sx={{ mr: 1, bgcolor: '#2e7d32', '&:hover': { bgcolor: '#1b5e20' } }}
-          >
-            Thermal Print
-          </Button>
-          <Button
-            onClick={() => setOrderSuccessDialog(false)}
-            variant="outlined"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Thermal Receipt Dialog */}
-      <Dialog open={receiptDialog} onClose={() => setReceiptDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6" fontWeight="bold">
-              80mm Thermal Receipt
-            </Typography>
-            <IconButton onClick={() => setReceiptDialog(false)}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {lastSale && (
-            <Box 
-              ref={thermalReceiptRef}
-              className="thermal-receipt"
-              sx={{ 
-                fontFamily: 'Courier New, monospace', 
-                fontSize: settings.fontSize || '12px', 
-                lineHeight: settings.lineSpacing || 1.2,
-                width: '80mm',
-                maxWidth: '80mm',
-                margin: '0 auto',
-                backgroundColor: '#fff',
-                color: '#000',
-                padding: '8px',
-                '@media print': {
-                  width: '80mm',
-                  maxWidth: '80mm',
-                  margin: 0,
-                  padding: '2mm',
-                  fontSize: '12px',
-                  lineHeight: 1.2,
-                  backgroundColor: 'white',
-                  color: 'black'
-                }
-              }}>
-              {/* Custom Header Text */}
-              {settings.thermalHeaderText && (
-                <Box sx={{ 
-                  textAlign: settings.headerAlignment || 'center', 
-                  mb: 1, 
-                  fontSize: '11px', 
-                  fontStyle: 'italic',
-                  fontFamily: 'monospace'
-                }}>
-                  {settings.thermalHeaderText}
-                </Box>
+              {settings?.showTaxBreakdown && (
+                <div className="item-row">
+                  <span>GST (12%):</span>
+                  <span>₹{lastSale.tax.toFixed(2)}</span>
+                </div>
               )}
               
-              {/* Header */}
-              <Box className="thermal-header" sx={{ textAlign: 'center', mb: 1, borderBottom: settings.showDividers !== false ? '1px dashed #000' : 'none', pb: 1 }}>
-                {settings.showBusinessName !== false && (
-                  <Typography sx={{ 
-                    fontFamily: 'monospace', 
-                    fontSize: '14px', 
-                    fontWeight: 'bold',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px'
-                  }}>
-                    {settings.businessName || 'CANEFROST JUICE SHOP'}
-                  </Typography>
+              <div className="divider" />
+              <div className="item-row bold" style={{ fontSize: '14px' }}>
+                <span>TOTAL:</span>
+                <span>₹{lastSale.total.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            {/* Payment Details */}
+            {settings?.showPaymentMethod && (
+              <div style={{ marginTop: '8px' }}>
+                <div>Payment: {lastSale.paymentMethod}</div>
+                {lastSale.changeAmount > 0 && (
+                  <div>Change: ₹{lastSale.changeAmount.toFixed(2)}</div>
                 )}
-                {settings.showBusinessAddress !== false && (
-                  <Box sx={{ fontFamily: 'monospace', mt: 0.5 }}>
-                    {(settings.businessAddress || 'Fresh Juices & Beverages\nPhone: +91 9876543210').split('\n').map((line, index) => (
-                      <Typography key={index} sx={{ 
-                        fontFamily: 'monospace', 
-                        fontSize: '10px',
-                        lineHeight: 1.1
-                      }}>
-                        {line}
-                      </Typography>
-                    ))}
-                  </Box>
-                )}
-                {settings.showGSTNumber !== false && (
-                  <Typography sx={{ 
-                    fontFamily: 'monospace', 
-                    fontSize: '10px',
-                    mt: 0.5
-                  }}>
-                    GST: {settings.gstNumber || '29XXXXX1234X1ZX'}
-                  </Typography>
-                )}
-              </Box>
+              </div>
+            )}
+            
+            {settings?.showDividers && <div className="divider" />}
+            
+            {/* Footer */}
+            <div className="center" style={{ marginTop: '8px' }}>
+              {settings?.thermalFooterText || 'Thank you for your business!'}
+            </div>
+            
+            <div style={{ marginTop: '16px' }}></div>
+          </div>
+        )}
+      </div>
 
-              {/* Sale Info */}
-              <Box sx={{ mb: 1, borderBottom: settings.showDividers !== false ? '1px dashed #000' : 'none', pb: 1 }}>
-                {settings.showReceiptNumber !== false && (
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '10px' }}>
-                    Receipt: {lastSale.id.slice(-8).toUpperCase()}
-                  </Typography>
-                )}
-                {settings.showDateTime !== false && (
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '10px' }}>
-                    Date: {format(lastSale.timestamp, 'dd/MM/yy HH:mm')}
-                  </Typography>
-                )}
-                {settings.showPaymentMethod !== false && (
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '10px' }}>
-                    Payment: {lastSale.paymentMethod}
-                  </Typography>
-                )}
-                {lastSale.customer && settings.showCustomerInfo !== false && (
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '10px' }}>
-                    Customer: {lastSale.customer.name}
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Items */}
-              <Box sx={{ mb: 1 }}>
-                <Typography sx={{ 
-                  fontFamily: 'monospace', 
-                  fontWeight: 'bold', 
-                  borderBottom: settings.showDividers !== false ? '1px solid #000' : 'none', 
-                  pb: 0.5,
-                  fontSize: '10px'
-                }}>
-                  ITEM            QTY  RATE  AMT
-                </Typography>
-                {lastSale.items.map((item, index) => (
-                  <Box key={index} sx={{ py: 0.2 }}>
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '9px' }}>
-                      {item.name.substring(0, 14).padEnd(14)} {item.quantity.toString().padStart(2)} {item.price.toFixed(0).padStart(4)} {(item.price * item.quantity).toFixed(0).padStart(4)}
-                    </Typography>
-                    {settings.showItemCodes && item.code && (
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '8px', color: '#666', ml: 1 }}>
-                        Code: {item.code}
-                      </Typography>
-                    )}
-                  </Box>
-                ))}
-              </Box>
-
-              {/* Totals */}
-              <Box sx={{ borderTop: settings.showDividers !== false ? '1px dashed #000' : 'none', pt: 1 }}>
-                <Typography sx={{ 
-                  fontFamily: 'monospace', 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  fontSize: '10px'
-                }}>
-                  <span>Subtotal:</span>
-                  <span>₹{lastSale.subtotal.toFixed(2)}</span>
-                </Typography>
-                {settings.showTaxBreakdown !== false && (
-                  <Typography sx={{ 
-                    fontFamily: 'monospace', 
-                    display: 'flex', 
-                    justifyContent: 'space-between',
-                    fontSize: '10px'
-                  }}>
-                    <span>Tax (12%):</span>
-                    <span>₹{lastSale.tax.toFixed(2)}</span>
-                  </Typography>
-                )}
-                <Typography sx={{ 
-                  fontFamily: 'monospace', 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  fontWeight: 'bold', 
-                  borderTop: settings.showDividers !== false ? '1px solid #000' : 'none', 
-                  pt: 0.5, 
-                  mt: 0.5,
-                  fontSize: '12px'
-                }}>
-                  <span>TOTAL:</span>
-                  <span>₹{lastSale.total.toFixed(2)}</span>
-                </Typography>
-              </Box>
-
-              {/* Payment Details */}
-              <Box sx={{ mt: 1, borderTop: settings.showDividers !== false ? '1px dashed #000' : 'none', pt: 1 }}>
-                {lastSale.paymentMethod === 'CASH' && (
-                  <>
-                    <Typography sx={{ 
-                      fontFamily: 'monospace', 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      fontSize: '10px'
-                    }}>
-                      <span>Cash Received:</span>
-                      <span>₹{lastSale.receivedAmount.toFixed(2)}</span>
-                    </Typography>
-                    <Typography sx={{ 
-                      fontFamily: 'monospace', 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      fontSize: '10px'
-                    }}>
-                      <span>Change:</span>
-                      <span>₹{lastSale.changeAmount.toFixed(2)}</span>
-                    </Typography>
-                  </>
-                )}
-                {lastSale.paymentMethod === 'BOTH' && (
-                  <>
-                    <Typography sx={{ 
-                      fontFamily: 'monospace', 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      fontSize: '10px'
-                    }}>
-                      <span>Cash:</span>
-                      <span>₹{lastSale.cashAmount.toFixed(2)}</span>
-                    </Typography>
-                    <Typography sx={{ 
-                      fontFamily: 'monospace', 
-                      display: 'flex', 
-                      justifyContent: 'space-between',
-                      fontSize: '10px'
-                    }}>
-                      <span>UPI:</span>
-                      <span>₹{lastSale.upiAmount.toFixed(2)}</span>
-                    </Typography>
-                    {lastSale.changeAmount > 0 && (
-                      <Typography sx={{ 
-                        fontFamily: 'monospace', 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        fontSize: '10px'
-                      }}>
-                        <span>Change:</span>
-                        <span>₹{lastSale.changeAmount.toFixed(2)}</span>
-                      </Typography>
-                    )}
-                  </>
-                )}
-                {lastSale.paymentMethod === 'UPI' && (
-                  <Typography sx={{ 
-                    fontFamily: 'monospace', 
-                    display: 'flex', 
-                    justifyContent: 'space-between',
-                    fontSize: '10px'
-                  }}>
-                    <span>UPI Payment:</span>
-                    <span>₹{lastSale.total.toFixed(2)}</span>
-                  </Typography>
-                )}
-
-              </Box>
-
-              {/* Footer */}
-              <Box className="thermal-footer" sx={{ textAlign: settings.footerAlignment || 'center', mt: 1, borderTop: settings.showDividers !== false ? '1px dashed #000' : 'none', pt: 1 }}>
-                {settings.thermalFooterText ? (
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '9px' }}>
-                    {settings.thermalFooterText}
-                  </Typography>
-                ) : (
-                  <>
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '9px' }}>
-                      Thank you for visiting!
-                    </Typography>
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '9px' }}>
-                      Visit us again for fresh juices
-                    </Typography>
-                  </>
-                )}
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '8px', mt: 0.5 }}>
-                  Powered by CaneFrost POS
-                </Typography>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button
-            onClick={handlePrint}
-            variant="contained"
-            startIcon={<ReceiptIcon />}
-            sx={{ mr: 1 }}
-          >
-            Print Receipt
-          </Button>
-          <Button
-            onClick={() => setReceiptDialog(false)}
-            variant="outlined"
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-    </Box>
+    </div>
   )
 }
 

@@ -375,8 +375,8 @@ function InventoryProvider({ children }) {
     try {
       setLoading(true)
       
-      // Fetch the inventory JSON data
-      const response = await fetch('/Canefrost_Inventory_Upload.json')
+      // Fetch the inventory JSON data from formatted_inventory.json
+      const response = await fetch('/formatted_inventory.json')
       if (!response.ok) {
         throw new Error('Failed to fetch inventory data')
       }
@@ -395,15 +395,20 @@ function InventoryProvider({ children }) {
       // Transform and upload all inventory data
       const uploadPromises = inventoryData.map(item => {
         const productData = {
-          name: item['Item Name'],
-          category: item['Category'],
-          price: item['MRP'],
-          barcode: item['Barcode'],
-          taxPercentage: item['Tax percentage'],
-          stock: 50, // Default stock quantity
+          name: item.name,
+          category: item.category,
+          price: item.price,
+          taxPercentage: item.taxPercentage,
+          stock: item.stock || 50, // Use existing stock or default
           createdAt: new Date(),
           updatedAt: new Date()
         }
+        
+        // Add size field if it exists
+        if (item.size) {
+          productData.size = item.size
+        }
+        
         return addDoc(collection(db, 'products'), productData)
       })
       
@@ -518,17 +523,14 @@ function InventoryProvider({ children }) {
         const deletePromises = duplicatesToDelete.map(sale => deleteDoc(sale.docRef))
         await Promise.all(deletePromises)
         
-        toast.success(`Removed ${duplicatesToDelete.length} duplicate sales`)
         console.log(`Successfully deleted ${duplicatesToDelete.length} duplicate sales`)
-        return duplicatesToDelete.length
+        return { removedCount: duplicatesToDelete.length }
       } else {
-        toast.info('No duplicate sales found')
         console.log('No duplicate sales found')
-        return 0
+        return { removedCount: 0 }
       }
     } catch (error) {
       console.error('Error cleaning up duplicates:', error)
-      toast.error('Failed to clean up duplicates')
       throw error
     }
   }

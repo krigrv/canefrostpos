@@ -1,24 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Grid,
-  Divider,
-  Alert,
-  CircularProgress
-} from '@mui/material'
-import {
-  Save as SaveIcon,
-  Business as BusinessIcon,
-  Phone as PhoneIcon,
-  Email as EmailIcon,
-  LocationOn as LocationIcon,
-  Assignment as AssignmentIcon,
-  Person as PersonIcon
-} from '@mui/icons-material'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Alert, AlertDescription } from '../ui/alert'
+import { Loader2, Save, Building, Phone, Mail, MapPin, FileText, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { db } from '../../firebase/config'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
@@ -169,240 +155,255 @@ function Profile() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography 
-        variant="h4" 
-        gutterBottom 
-        sx={{ 
-          mb: 3, 
-          fontWeight: 600,
-          fontSize: { xs: '1.5rem', md: '2rem' },
-          textTransform: 'capitalize'
-        }}
-      >
+    <div className="p-6">
+      <h1 className="text-2xl md:text-3xl font-semibold mb-6 capitalize">
         Business Profile
-      </Typography>
+      </h1>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <PersonIcon sx={{ mr: 2, fontSize: 32, color: 'primary.main' }} />
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
-            Profile Settings
-          </Typography>
-        </Box>
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <User className="h-8 w-8 text-blue-600" />
+            <CardTitle className="text-2xl font-bold">Profile Settings</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* User Profile Section */}
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-blue-600 mb-4">User Profile</h2>
+            
+            {profileSuccess && (
+              <Alert className="mb-4">
+                <AlertDescription>
+                  Display name updated successfully!
+                </AlertDescription>
+              </Alert>
+            )}
 
-        {/* User Profile Section */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>
-            User Profile
-          </Typography>
-          
-          {profileSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Display name updated successfully!
-            </Alert>
-          )}
+            {profileError && (
+              <Alert className="mb-4" variant="destructive">
+                <AlertDescription>
+                  {profileError}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {profileError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {profileError}
-            </Alert>
-          )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name *</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="displayName"
+                    value={displayName}
+                    onChange={handleDisplayNameChange}
+                    placeholder="Enter your display name"
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-sm text-gray-500">This name will be shown in the welcome message</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="email"
+                    value={currentUser?.email || ''}
+                    disabled
+                    className="pl-10 bg-gray-50"
+                  />
+                </div>
+                <p className="text-sm text-gray-500">Email address cannot be changed</p>
+              </div>
+            </div>
 
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Display Name *"
-                value={displayName}
-                onChange={handleDisplayNameChange}
-                placeholder="Enter your display name"
-                helperText="This name will be shown in the welcome message"
-                InputProps={{
-                  startAdornment: <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Email Address"
-                value={currentUser?.email || ''}
-                disabled
-                helperText="Email address cannot be changed"
-                InputProps={{
-                  startAdornment: <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-              />
-            </Grid>
-          </Grid>
+            <div className="flex justify-end mt-4">
+              <Button
+                onClick={handleUpdateProfile}
+                disabled={profileLoading || !displayName.trim()}
+                className="px-6"
+              >
+                {profileLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Update Profile
+                  </>
+                )}
+              </Button>
+            </div>
+        </div>
 
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-            <Button
-              variant="contained"
-              onClick={handleUpdateProfile}
-              disabled={profileLoading || !displayName.trim()}
-              startIcon={profileLoading ? <CircularProgress size={20} /> : <SaveIcon />}
-              sx={{
-                px: 3,
-                py: 1
-              }}
-            >
-              {profileLoading ? 'Updating...' : 'Update Profile'}
-            </Button>
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 3 }} />
+        <hr className="my-6" />
 
         {/* Business Details Section */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-blue-600 mb-4 flex items-center">
+            <Building className="w-5 h-5 mr-2" />
             Business Details
-          </Typography>
-        </Box>
+          </h2>
+            {success && (
+              <Alert className="mb-6" variant="default">
+                <AlertDescription>
+                  Business details saved successfully!
+                </AlertDescription>
+              </Alert>
+            )}
 
-        {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            Business details saved successfully!
-          </Alert>
-        )}
+            {error && (
+              <Alert className="mb-6" variant="destructive">
+                <AlertDescription>
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error}
-          </Alert>
-        )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="businessName">Business Name</Label>
+            <div className="relative">
+              <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="businessName"
+                value={businessDetails.businessName}
+                onChange={handleInputChange('businessName')}
+                className="pl-10"
+              />
+            </div>
+          </div>
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Business Name"
-              value={businessDetails.businessName}
-              onChange={handleInputChange('businessName')}
-              InputProps={{
-                startAdornment: <BusinessIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-          </Grid>
+          <div className="space-y-2">
+            <Label htmlFor="phoneNumber">Phone Number *</Label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="phoneNumber"
+                value={businessDetails.phoneNumber}
+                onChange={handleInputChange('phoneNumber')}
+                placeholder="+91 XXXXXXXXXX"
+                className="pl-10"
+              />
+            </div>
+          </div>
 
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Phone Number *"
-              value={businessDetails.phoneNumber}
-              onChange={handleInputChange('phoneNumber')}
-              placeholder="+91 XXXXXXXXXX"
-              InputProps={{
-                startAdornment: <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-          </Grid>
+          <div className="space-y-2">
+            <Label htmlFor="emailId">Email ID *</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="emailId"
+                type="email"
+                value={businessDetails.emailId}
+                onChange={handleInputChange('emailId')}
+                placeholder="business@example.com"
+                className="pl-10"
+              />
+            </div>
+          </div>
 
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Email ID *"
-              type="email"
-              value={businessDetails.emailId}
-              onChange={handleInputChange('emailId')}
-              placeholder="business@example.com"
-              InputProps={{
-                startAdornment: <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-          </Grid>
+          <div className="space-y-2">
+            <Label htmlFor="gstin">GSTIN</Label>
+            <div className="relative">
+              <FileText className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="gstin"
+                value={businessDetails.gstin}
+                onChange={handleInputChange('gstin')}
+                placeholder="22AAAAA0000A1Z5"
+                className="pl-10"
+              />
+            </div>
+            <p className="text-sm text-gray-500">15-character GSTIN number (optional)</p>
+          </div>
 
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="GSTIN"
-              value={businessDetails.gstin}
-              onChange={handleInputChange('gstin')}
-              placeholder="22AAAAA0000A1Z5"
-              helperText="15-character GSTIN number (optional)"
-              InputProps={{
-                startAdornment: <AssignmentIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-          </Grid>
+          <div className="col-span-1 md:col-span-2 space-y-2">
+            <Label htmlFor="businessAddress">Business Address *</Label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <textarea
+                id="businessAddress"
+                rows={3}
+                value={businessDetails.businessAddress}
+                onChange={handleInputChange('businessAddress')}
+                placeholder="Enter complete business address"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              />
+            </div>
+          </div>
 
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Business Address *"
-              multiline
-              rows={3}
-              value={businessDetails.businessAddress}
-              onChange={handleInputChange('businessAddress')}
-              placeholder="Enter complete business address"
-              InputProps={{
-                startAdornment: <LocationIcon sx={{ mr: 1, color: 'text.secondary', alignSelf: 'flex-start', mt: 1 }} />
-              }}
-            />
-          </Grid>
+          <div className="space-y-2">
+              <Label htmlFor="fssaiNumber">FSSAI Certificate Number</Label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="fssaiNumber"
+                  value={businessDetails.fssaiNumber}
+                  onChange={handleInputChange('fssaiNumber')}
+                  placeholder="12345678901234"
+                  className="pl-10"
+                />
+              </div>
+              <p className="text-sm text-gray-500">14-digit FSSAI license number (optional)</p>
+            </div>
+          </div>
 
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="FSSAI Certificate Number"
-              value={businessDetails.fssaiNumber}
-              onChange={handleInputChange('fssaiNumber')}
-              placeholder="12345678901234"
-              helperText="14-digit FSSAI license number (optional)"
-              InputProps={{
-                startAdornment: <AssignmentIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              }}
-            />
-          </Grid>
-        </Grid>
+          <hr className="my-6" />
 
-        <Divider sx={{ my: 3 }} />
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-8 py-2 font-medium"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-            sx={{
-              px: 4,
-              py: 1.5,
-              fontWeight: 500
-            }}
-          >
-            {loading ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </Box>
-      </Paper>
-
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
-          Account Information
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Display Name"
-              value={currentUser?.displayName || ''}
-              disabled
-              helperText="Contact administrator to change display name"
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Email Address"
-              value={currentUser?.email || ''}
-              disabled
-              helperText="Contact administrator to change email address"
-            />
-          </Grid>
-        </Grid>
-      </Paper>
-    </Box>
+        {/* Account Information Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-blue-600 mb-4">Account Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="accountDisplayName">Display Name</Label>
+              <Input
+                id="accountDisplayName"
+                value={currentUser?.displayName || ''}
+                disabled
+                className="bg-gray-50"
+              />
+              <p className="text-sm text-gray-500">Contact administrator to change display name</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="accountEmail">Email Address</Label>
+              <Input
+                id="accountEmail"
+                value={currentUser?.email || ''}
+                disabled
+                className="bg-gray-50"
+              />
+              <p className="text-sm text-gray-500">Contact administrator to change email address</p>
+            </div>
+          </div>
+        </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

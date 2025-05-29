@@ -5,15 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import toast from 'react-hot-toast'
 import {
-  Assessment as AssessmentIcon,
+  BarChart3 as AssessmentIcon,
   TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
+  Clock as ScheduleIcon,
   Star as StarIcon,
   Receipt as ReceiptIcon,
-  AccountBalance as TaxIcon,
+  Building2 as TaxIcon,
   Download as DownloadIcon,
-  DateRange as DateRangeIcon
-} from '@mui/icons-material'
+  Calendar as DateRangeIcon
+} from 'lucide-react'
 
 function Reports() {
   const [tabValue, setTabValue] = useState(0)
@@ -80,7 +80,7 @@ function Reports() {
             { icon: TrendingUpIcon, label: 'Trends', index: 1 },
             { icon: ScheduleIcon, label: 'Peak Hours', index: 2 },
             { icon: StarIcon, label: 'Popular Items', index: 3 },
-            { icon: TaxIcon, label: 'Tax & Audit', index: 4 }
+            { icon: TaxIcon, label: 'GST & Audit', index: 4 }
           ].map(({ icon: Icon, label, index }) => (
             <button
               key={index}
@@ -385,7 +385,7 @@ function Reports() {
           {/* Tax Summary Cards */}
           <Card>
             <CardHeader>
-              <CardTitle>Total Tax Collected</CardTitle>
+              <CardTitle>Total GST Collected</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-600">
@@ -406,14 +406,14 @@ function Reports() {
                 ₹{taxData.taxableAmount.toLocaleString()}
               </div>
               <p className="text-sm text-gray-600 mt-1">
-                Before tax
+                Before GST
               </p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader>
-              <CardTitle>Tax Rate</CardTitle>
+              <CardTitle>GST Rate</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-yellow-600">
@@ -454,7 +454,7 @@ function Reports() {
           <div className="md:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle>Monthly Tax Summary</CardTitle>
+                <CardTitle>Monthly GST Summary</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -463,7 +463,7 @@ function Reports() {
                       <tr className="border-b">
                         <th className="text-left py-2">Month</th>
                         <th className="text-right py-2">Sales</th>
-                        <th className="text-right py-2">Tax</th>
+                        <th className="text-right py-2">GST</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -485,7 +485,7 @@ function Reports() {
           <div className="col-span-full">
             <Card>
               <CardHeader>
-                <CardTitle>Tax Compliance & Audit Tools</CardTitle>
+                <CardTitle>GST Compliance & Audit Tools</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -501,7 +501,7 @@ function Reports() {
                     onClick={handleGenerateTaxReport}
                   >
                     <TaxIcon className="w-4 h-4" />
-                    Tax Filing Report
+                    GST Filing Report
                   </button>
                   <button
                     className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors"
@@ -521,7 +521,7 @@ function Reports() {
                 
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
                   <strong className="text-blue-800">Compliance Status:</strong>
-                  <span className="text-blue-700 ml-2">All tax records are up to date. Next GST filing due: 20th January 2025</span>
+                  <span className="text-blue-700 ml-2">All GST records are up to date. Next GST filing due: 20th January 2025</span>
                 </div>
               </CardContent>
             </Card>

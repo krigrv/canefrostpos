@@ -16,7 +16,9 @@ import CustomerManagement from './components/Customer/CustomerManagement'
 import Reports from './components/Reports/Reports'
 import Settings from './components/Settings/Settings'
 import Layout from './components/Layout/Layout'
-import { CircularProgress, Box } from '@mui/material'
+import ShadcnDemo from './components/Demo/ShadcnDemo'
+import { Loader2 } from 'lucide-react'
+import { Toaster } from './components/ui/toaster'
 
 function ProtectedRoute({ children }) {
   const { currentUser } = useAuth()
@@ -28,9 +30,9 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     )
   }
 
@@ -101,15 +103,25 @@ function AppRoutes() {
         } 
       />
       <Route 
-        path="/settings" 
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Settings />
-            </Layout>
-          </ProtectedRoute>
-        } 
-      />
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Settings />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/demo" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ShadcnDemo />
+                </Layout>
+              </ProtectedRoute>
+            } 
+          />
       <Route 
         path="/profile" 
         element={
@@ -145,6 +157,7 @@ function App() {
                 <CustomerProvider>
                   <div className="app">
                     <AppRoutes />
+                    <Toaster />
                   </div>
                 </CustomerProvider>
               </StaffProvider>

@@ -1,21 +1,16 @@
 import React from 'react';
-import {
-  Box,
-  Paper,
-  Typography,
-  Chip,
-  LinearProgress,
-  IconButton,
-  Tooltip
-} from '@mui/material';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { Progress } from '../ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import './SyncStatus.css';
 import {
-  CloudDone as CloudDoneIcon,
+  CloudCheck as CloudDoneIcon,
   CloudOff as CloudOffIcon,
-  Sync as SyncIcon,
-  Warning as WarningIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+  RotateCw as SyncIcon,
+  AlertTriangle as WarningIcon,
+  RefreshCw as RefreshIcon
+} from 'lucide-react';
 import { useSync } from '../../contexts/SyncContext';
 
 const SyncStatus = () => {
@@ -66,93 +61,73 @@ const SyncStatus = () => {
   };
 
   return (
-    <Paper
-      elevation={1}
-      sx={{
-        p: 2,
-        mb: 1,
-        background: '#FFFFFF',
-        border: '1px solid #E5E7EB',
-        borderRadius: 2,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Typography variant="subtitle2" sx={{ color: '#374151', fontWeight: 600 }}>
+    <div className="p-4 mb-2 bg-white border border-gray-200 rounded-lg shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-700">
           Sync Status
-        </Typography>
+        </h3>
         
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Chip
-            icon={getSyncIcon()}
-            label={getSyncStatusText()}
-            size="small"
-            sx={{
-              backgroundColor: getSyncStatusColor(),
-              color: 'white',
-              fontWeight: 500,
-              '& .MuiChip-icon': {
-                color: 'white'
-              }
-            }}
-          />
+        <div className="flex items-center gap-2">
+          <Badge 
+            className="text-white font-medium"
+            style={{ backgroundColor: getSyncStatusColor() }}
+          >
+            <span className="mr-1">{getSyncIcon()}</span>
+            {getSyncStatusText()}
+          </Badge>
           
           {(queueCount > 0 || syncError) && (
-            <Tooltip title="Force sync all data">
-              <IconButton
-                size="small"
-                onClick={forceSyncAll}
-                disabled={isSyncing}
-                sx={{
-                  color: '#6B7280',
-                  '&:hover': {
-                    backgroundColor: '#F3F4F6',
-                    color: '#374151'
-                  }
-                }}
-              >
-                <RefreshIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={forceSyncAll}
+                    disabled={isSyncing}
+                    className="h-8 w-8 p-0 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                  >
+                    <RefreshIcon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Force sync all data</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {/* Progress bar for syncing */}
       {isSyncing && (
-        <LinearProgress
-          sx={{
-            mb: 1,
-            backgroundColor: '#E5E7EB',
-            '& .MuiLinearProgress-bar': {
-              backgroundColor: '#3B82F6'
-            }
-          }}
-        />
+        <div className="mb-2">
+          <Progress value={undefined} className="h-1" />
+        </div>
       )}
 
       {/* Additional info */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="caption" sx={{ color: '#6B7280' }}>
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-gray-500">
           Last sync: {formatLastSyncTime()}
-        </Typography>
+        </span>
         
         {!isOnline && (
-          <Typography variant="caption" sx={{ color: '#DC2626', fontWeight: 500 }}>
+          <span className="text-xs text-red-600 font-medium">
             Working offline
-          </Typography>
+          </span>
         )}
-      </Box>
+      </div>
 
       {/* Error message */}
       {syncError && (
-        <Box sx={{ mt: 1, p: 1, backgroundColor: '#FEF2F2', borderRadius: 1, border: '1px solid #FECACA' }}>
-          <Typography variant="caption" sx={{ color: '#DC2626', display: 'block' }}>
+        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+          <span className="text-xs text-red-600 block">
             {syncError}
-          </Typography>
-        </Box>
+          </span>
+        </div>
       )}
-    </Paper>
+    </div>
   );
 };
 

@@ -4,27 +4,19 @@
  * Used for debugging blank screen issue
  */
 import React from 'react'
-import { Box, Typography } from '@mui/material'
 
 function TestApp() {
   console.log('TestApp component rendering')
   
   return (
-    <Box 
-      display="flex" 
-      flexDirection="column" 
-      alignItems="center" 
-      justifyContent="center" 
-      minHeight="100vh"
-      bgcolor="#f5f5f5"
-    >
-      <Typography variant="h3" color="primary" gutterBottom>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <h1 className="text-4xl font-bold text-primary mb-4">
         Test App Loading Successfully
-      </Typography>
-      <Typography variant="body1" color="textSecondary">
+      </h1>
+      <p className="text-lg text-muted-foreground">
         If you can see this, React is working properly.
-      </Typography>
-    </Box>
+      </p>
+    </div>
   )
 }
 

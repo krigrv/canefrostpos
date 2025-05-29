@@ -1,46 +1,41 @@
 import React, { useState } from 'react'
 import {
-  Box,
-  Typography,
   Button,
-  Paper,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
+  TableHeader,
   TableRow,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Grid,
-  Chip,
-  InputAdornment,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Select,
-  useTheme,
-  useMediaQuery
-} from '@mui/material'
+  Badge
+} from '@/components/ui'
 import {
-  Add as AddIcon,
+  Plus as AddIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon,
+  Trash2 as DeleteIcon,
   Search as SearchIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon
-} from '@mui/icons-material'
+  Save,
+  X
+} from 'lucide-react'
 import { useInventory } from '../../hooks/useInventory'
 import toast from 'react-hot-toast'
 
 function ProductManagement() {
-  const { products, addProduct, updateProduct, deleteProduct, uploadAllInventoryToFirebase } = useInventory()
-  const theme = useTheme()
-  const isXsScreen = useMediaQuery(theme.breakpoints.down('sm'))
+  const { products, addProduct, updateProduct, deleteProduct } = useInventory()
   
   // Dynamically get unique categories from products
   const categories = React.useMemo(() => {
@@ -48,23 +43,22 @@ function ProductManagement() {
     return uniqueCategories.sort()
   }, [products])
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('All')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     category: '',
     price: '',
-    barcode: '',
     taxPercentage: 12,
-    stock: 0
+    stock: 0,
+    size: ''
   })
 
   // Filter products
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.barcode.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory
     return matchesSearch && matchesCategory
   })
 
@@ -75,9 +69,9 @@ function ProductManagement() {
         name: product.name,
         category: product.category,
         price: product.price,
-        barcode: product.barcode,
         taxPercentage: product.taxPercentage || 12,
-        stock: product.stock || 0
+        stock: product.stock || 0,
+        size: product.size || ''
       })
     } else {
       setEditingProduct(null)
@@ -85,9 +79,9 @@ function ProductManagement() {
         name: '',
         category: '',
         price: '',
-        barcode: '',
         taxPercentage: 12,
-        stock: 0
+        stock: 0,
+        size: ''
       })
     }
     setDialogOpen(true)
@@ -100,9 +94,9 @@ function ProductManagement() {
       name: '',
       category: '',
       price: '',
-      barcode: '',
       taxPercentage: 12,
-      stock: 0
+      stock: 0,
+      size: ''
     })
   }
 
@@ -114,7 +108,7 @@ function ProductManagement() {
   }
 
   const handleSave = async () => {
-    if (!formData.name || !formData.category || !formData.price || !formData.barcode) {
+    if (!formData.name || !formData.category || !formData.price) {
       toast.error('Please fill in all required fields')
       return
     }
@@ -123,9 +117,9 @@ function ProductManagement() {
       name: formData.name,
       category: formData.category,
       price: parseFloat(formData.price),
-      barcode: formData.barcode,
       taxPercentage: parseFloat(formData.taxPercentage),
-      stock: parseInt(formData.stock)
+      stock: parseInt(formData.stock),
+      size: formData.size
     }
 
     try {
@@ -156,483 +150,216 @@ function ProductManagement() {
   }
 
   return (
-    <Box>
-      <Box sx={{ 
-        display: 'flex', 
-        flexDirection: { xs: 'column', md: 'row' },
-        justifyContent: 'space-between', 
-        alignItems: { xs: 'stretch', md: 'center' }, 
-        mb: 3,
-        gap: { xs: 2, md: 0 }
-      }}>
-        <Typography 
-          variant="h4" 
-          sx={{ 
-            fontSize: { xs: '1.5rem', md: '2rem' },
-            fontWeight: 600,
-            color: '#1F2937',
-            mb: { xs: 1, md: 0 }
-          }}
-        >
+    <div className="p-6">
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center mb-6 gap-4 md:gap-0">
+        <h1 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-2 md:mb-0">
           Product Management
-        </Typography>
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' },
-          gap: { xs: 1, sm: 2 },
-          width: { xs: '100%', md: 'auto' }
-        }}>
-
+        </h1>
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <Button
-            variant="outlined"
-            color="primary"
-            onClick={uploadAllInventoryToFirebase}
-            sx={{
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              py: { xs: 1, md: 0.75 },
-              minHeight: { xs: 40, md: 36 }
-            }}
-          >
-            Upload All Inventory
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
             onClick={() => handleOpenDialog()}
-            sx={{
-              fontSize: { xs: '0.75rem', md: '0.875rem' },
-              py: { xs: 1, md: 0.75 },
-              minHeight: { xs: 40, md: 36 },
-              fontWeight: 600
-            }}
+            className="text-sm py-2 min-h-10"
           >
+            <AddIcon className="w-4 h-4 mr-2" />
             Add Product
           </Button>
-        </Box>
-      </Box>
+        </div>
+       </div>
 
       {/* Search and Filter */}
-      <Paper sx={{ 
-        p: { xs: 2, md: 3 }, 
-        mb: 3,
-        borderRadius: 2,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <Grid container spacing={{ xs: 2, md: 3 }} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              placeholder="Search by name or barcode..."
+      <div className="bg-white p-4 md:p-6 mb-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-center">
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              placeholder="Search by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                  fontSize: { xs: '0.875rem', md: '1rem' },
-                  '& fieldset': {
-                    borderColor: '#E5E7EB'
-                  },
-                  '&:hover fieldset': {
-                    borderColor: '#9CA3AF'
-                  },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#3B82F6'
-                  }
-                }
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ 
-                      color: '#6B7280',
-                      fontSize: { xs: 20, md: 24 }
-                    }} />
-                  </InputAdornment>
-                ),
-              }}
+              className="pl-10 text-sm md:text-base"
             />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth>
-              <InputLabel sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>Category</InputLabel>
-              <Select
-                value={selectedCategory}
-                label="Category"
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                sx={{
-                  borderRadius: 2,
-                  fontSize: { xs: '0.875rem', md: '1rem' },
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#E5E7EB'
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#9CA3AF'
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#3B82F6'
-                  }
-                }}
-              >
-                <MenuItem value="All">All Categories</MenuItem>
-                {categories.map(category => (
-                  <MenuItem key={category} value={category}>{category}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-      </Paper>
+          </div>
+          <div>
+             <Label htmlFor="category-select" className="text-sm md:text-base">Category</Label>
+             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+               <SelectTrigger className="text-sm md:text-base">
+                 <SelectValue placeholder="Select category" />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="all">All Categories</SelectItem>
+                 {categories.map(category => (
+                   <SelectItem key={category} value={category}>{category}</SelectItem>
+                 ))}
+               </SelectContent>
+             </Select>
+           </div>
+         </div>
+       </div>
 
       {/* Products Table */}
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          borderRadius: 2,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          overflowX: 'auto',
-          '&::-webkit-scrollbar': {
-            height: 8
-          },
-          '&::-webkit-scrollbar-track': {
-            backgroundColor: '#F3F4F6'
-          },
-          '&::-webkit-scrollbar-thumb': {
-            backgroundColor: '#D1D5DB',
-            borderRadius: 4
-          }
-        }}
-      >
-        <Table sx={{ minWidth: { xs: 700, md: 'auto' } }}>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: '#F9FAFB' }}>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Name</TableCell>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Category</TableCell>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Price (₹)</TableCell>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Barcode</TableCell>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Tax (%)</TableCell>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Stock</TableCell>
-              <TableCell sx={{ 
-                fontWeight: 600,
-                fontSize: { xs: '0.75rem', md: '0.875rem' },
-                color: '#374151',
-                py: { xs: 1.5, md: 2 }
-              }}>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow 
-                key={product.id}
-                sx={{
-                  '&:hover': {
-                    backgroundColor: '#F9FAFB'
-                  },
-                  '&:last-child td, &:last-child th': {
-                    border: 0
-                  }
-                }}
-              >
-                <TableCell sx={{ 
-                  fontSize: { xs: '0.75rem', md: '0.875rem' },
-                  py: { xs: 1.5, md: 2 },
-                  fontWeight: 500,
-                  color: '#111827'
-                }}>{product.name}</TableCell>
-                <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
-                  <Chip 
-                    label={product.category} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                    sx={{
-                      fontSize: { xs: '0.625rem', md: '0.75rem' },
-                      height: { xs: 24, md: 28 }
-                    }}
-                  />
-                </TableCell>
-                <TableCell sx={{ 
-                  fontSize: { xs: '0.75rem', md: '0.875rem' },
-                  py: { xs: 1.5, md: 2 },
-                  fontWeight: 600,
-                  color: '#059669'
-                }}>₹{product.price}</TableCell>
-                <TableCell sx={{ 
-                  fontSize: { xs: '0.75rem', md: '0.875rem' },
-                  py: { xs: 1.5, md: 2 },
-                  fontFamily: 'monospace',
-                  color: '#6B7280'
-                }}>{product.barcode}</TableCell>
-                <TableCell sx={{ 
-                  fontSize: { xs: '0.75rem', md: '0.875rem' },
-                  py: { xs: 1.5, md: 2 },
-                  color: '#6B7280'
-                }}>{product.taxPercentage || 12}%</TableCell>
-                <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
-                  <Chip 
-                    label={product.stock || 0} 
-                    size="small" 
-                    color={product.stock > 10 ? 'success' : product.stock > 0 ? 'warning' : 'error'}
-                    sx={{
-                      fontSize: { xs: '0.625rem', md: '0.75rem' },
-                      height: { xs: 24, md: 28 },
-                      fontWeight: 600
-                    }}
-                  />
-                </TableCell>
-                <TableCell sx={{ py: { xs: 1.5, md: 2 } }}>
-                  <Box sx={{ display: 'flex', gap: 0.5 }}>
-                    <IconButton
-                      color="primary"
-                      onClick={() => handleOpenDialog(product)}
-                      size="small"
-                      sx={{
-                        p: { xs: 0.5, md: 1 },
-                        '&:hover': {
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)'
-                        }
-                      }}
-                    >
-                      <EditIcon sx={{ fontSize: { xs: 16, md: 20 } }} />
-                    </IconButton>
-                    <IconButton
-                      color="error"
-                      onClick={() => handleDelete(product.id)}
-                      size="small"
-                      sx={{
-                        p: { xs: 0.5, md: 1 },
-                        '&:hover': {
-                          backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                        }
-                      }}
-                    >
-                      <DeleteIcon sx={{ fontSize: { xs: 16, md: 20 } }} />
-                    </IconButton>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Add/Edit Product Dialog */}
-      <Dialog 
-        open={dialogOpen} 
-        onClose={handleCloseDialog} 
-        maxWidth="md" 
-        fullWidth
-        fullScreen={isXsScreen}
-        sx={{
-          '& .MuiDialog-paper': {
-            borderRadius: { xs: 0, sm: 2 },
-            margin: { xs: 0, sm: 2 },
-            maxHeight: { xs: '100vh', sm: '90vh' }
-          }
-        }}
-      >
-        <DialogTitle sx={{
-          fontSize: { xs: '1.25rem', md: '1.5rem' },
-          fontWeight: 600,
-          color: '#1F2937',
-          borderBottom: '1px solid #E5E7EB',
-          pb: 2
-        }}>
-          {editingProduct ? 'Edit Product' : 'Add New Product'}
-        </DialogTitle>
-        <DialogContent sx={{ 
-          p: { xs: 2, md: 3 },
-          '&.MuiDialogContent-root': {
-            paddingTop: { xs: 2, md: 3 }
-          }
-        }}>
-          <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mt: 0 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Product Name"
-                value={formData.name}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                required
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth required>
-                <InputLabel sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>Category</InputLabel>
-                <Select
-                  value={formData.category}
-                  label="Category"
-                  onChange={(e) => handleInputChange('category', e.target.value)}
-                  sx={{
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  }}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
+        <Table>
+          <TableHeader>
+             <TableRow className="bg-gray-50">
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Name</TableHead>
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Category</TableHead>
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Size</TableHead>
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Price (₹)</TableHead>
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">GST (%)</TableHead>
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Stock</TableHead>
+               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Actions</TableHead>
+             </TableRow>
+           </TableHeader>
+           <TableBody>
+             {filteredProducts.map((product) => (
+               <TableRow 
+                 key={product.id}
+                 className="hover:bg-gray-50 transition-colors"
                 >
-                  {categories.map(category => (
-                    <MenuItem key={category} value={category}>{category}</MenuItem>
-                  ))}
+                  <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
+                  <TableCell className="py-3 md:py-4">
+                    <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
+                      {product.category}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 md:py-4">
+                    {product.size ? (
+                      <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7 bg-blue-50 text-blue-700 border-blue-200">
+                        {product.size}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs md:text-sm text-gray-400">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
+                  <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
+                  <TableCell className="py-3 md:py-4">
+                    <Badge 
+                      variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
+                      className="text-xs md:text-sm h-6 md:h-7 font-semibold"
+                    >
+                      {product.stock || 0}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 md:py-4">
+                    <div className="flex gap-1 md:gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleOpenDialog(product)}
+                        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(product.id)}
+                        className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                      >
+                        <DeleteIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Add/Edit Product Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+              <DialogDescription>
+                {editingProduct ? 'Update the product information below.' : 'Fill in the details to add a new product.'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Product Name</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="Enter product name"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="category">Category</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Price"
-                type="number"
-                value={formData.price}
-                onChange={(e) => handleInputChange('price', e.target.value)}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                }}
-                required
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Barcode"
-                value={formData.barcode}
-                onChange={(e) => handleInputChange('barcode', e.target.value)}
-                required
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Tax Percentage"
-                type="number"
-                value={formData.taxPercentage}
-                onChange={(e) => handleInputChange('taxPercentage', e.target.value)}
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">%</InputAdornment>,
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Stock Quantity"
-                type="number"
-                value={formData.stock}
-                onChange={(e) => handleInputChange('stock', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  },
-                  '& .MuiInputLabel-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' }
-                  }
-                }}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions sx={{ 
-          p: { xs: 2, md: 3 },
-          borderTop: '1px solid #E5E7EB',
-          gap: { xs: 1, md: 2 },
-          flexDirection: { xs: 'column', sm: 'row' }
-        }}>
-          <Button 
-            onClick={handleCloseDialog} 
-            startIcon={<CancelIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
-            sx={{
-              fontSize: { xs: '0.875rem', md: '1rem' },
-              py: { xs: 1.5, md: 1 },
-              px: { xs: 3, md: 2 },
-              minHeight: { xs: 44, md: 40 },
-              width: { xs: '100%', sm: 'auto' },
-              order: { xs: 2, sm: 1 }
-            }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSave} 
-            variant="contained" 
-            startIcon={<SaveIcon sx={{ fontSize: { xs: 18, md: 20 } }} />}
-            sx={{
-              fontSize: { xs: '0.875rem', md: '1rem' },
-              py: { xs: 1.5, md: 1 },
-              px: { xs: 3, md: 2 },
-              minHeight: { xs: 44, md: 40 },
-              width: { xs: '100%', sm: 'auto' },
-              order: { xs: 1, sm: 2 },
-              fontWeight: 600
-            }}
-          >
-            {editingProduct ? 'Update' : 'Add'} Product
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  )
-}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="price">Price (₹)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({...formData, price: e.target.value})}
+                  placeholder="Enter price"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="size">Size</Label>
+                <Input
+                  id="size"
+                  value={formData.size}
+                  onChange={(e) => setFormData({...formData, size: e.target.value})}
+                  placeholder="Enter size (e.g., 250ml, 1kg, Large)"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="gst">GST</Label>
+                <Select value={formData.taxPercentage.toString()} onValueChange={(value) => setFormData({...formData, taxPercentage: parseFloat(value)})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select GST rate" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">No GST</SelectItem>
+                    <SelectItem value="5">GST 5%</SelectItem>
+                    <SelectItem value="12">GST 12%</SelectItem>
+                    <SelectItem value="18">GST 18%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="stock">Stock</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                  placeholder="Enter stock quantity"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCloseDialog}>
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSave}>
+                <Save className="w-4 h-4 mr-2" />
+                {editingProduct ? 'Update' : 'Add'} Product
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
 export default ProductManagement
