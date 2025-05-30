@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Button,
   Dialog,
@@ -36,6 +36,17 @@ import toast from 'react-hot-toast'
 
 function ProductManagement() {
   const { products, addProduct, updateProduct, deleteProduct } = useInventory()
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   
   // Dynamically get unique categories from products
   const categories = React.useMemo(() => {
@@ -52,7 +63,8 @@ function ProductManagement() {
     price: '',
     taxPercentage: 12,
     stock: 0,
-    size: ''
+    size: '',
+    type: ''
   })
 
   // Filter products
@@ -71,7 +83,8 @@ function ProductManagement() {
         price: product.price,
         taxPercentage: product.taxPercentage || 12,
         stock: product.stock || 0,
-        size: product.size || ''
+        size: product.size || '',
+        type: product.type || ''
       })
     } else {
       setEditingProduct(null)
@@ -81,7 +94,8 @@ function ProductManagement() {
         price: '',
         taxPercentage: 12,
         stock: 0,
-        size: ''
+        size: '',
+        type: ''
       })
     }
     setDialogOpen(true)
@@ -96,7 +110,8 @@ function ProductManagement() {
       price: '',
       taxPercentage: 12,
       stock: 0,
-      size: ''
+      size: '',
+      type: ''
     })
   }
 
@@ -119,11 +134,13 @@ function ProductManagement() {
       price: parseFloat(formData.price),
       taxPercentage: parseFloat(formData.taxPercentage),
       stock: parseInt(formData.stock),
-      size: formData.size
+      size: formData.size,
+      type: formData.type
     }
 
     try {
       if (editingProduct) {
+        // Pass the ID correctly to updateProduct
         await updateProduct(editingProduct.id, productData)
         toast.success('Product updated successfully')
       } else {
@@ -149,16 +166,68 @@ function ProductManagement() {
     }
   }
 
+  // Mobile card view for products
+  const MobileProductCard = ({ product }) => (
+    <div className="bg-white p-3 mb-3 rounded-lg shadow-sm border border-gray-200">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 className="font-medium text-gray-900">{product.name}</h3>
+          <div className="flex flex-wrap gap-1 mt-1">
+            <Badge variant="outline" className="text-xs h-6">
+              {product.category}
+            </Badge>
+            {product.size && (
+              <Badge variant="outline" className="text-xs h-6 bg-blue-50 text-blue-700 border-blue-200">
+                {product.size}
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="font-semibold text-green-600">₹{product.price}</div>
+      </div>
+      
+      <div className="flex justify-between items-center mt-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">GST: {product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</span>
+          <Badge 
+            variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
+            className="text-xs h-6 font-semibold"
+          >
+            {product.stock || 0}
+          </Badge>
+        </div>
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenDialog(product)}
+            className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+          >
+            <EditIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDelete(product.id)}
+            className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+          >
+            <DeleteIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="p-6">
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center mb-6 gap-4 md:gap-0">
-        <h1 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-2 md:mb-0">
+    <div className="p-3 md:p-6">
+      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center mb-4 md:mb-6 gap-3 md:gap-0">
+        <h1 className="text-xl md:text-3xl font-semibold text-gray-800 mb-2 md:mb-0">
           Product Management
         </h1>
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <Button
             onClick={() => handleOpenDialog()}
-            className="text-sm py-2 min-h-10"
+            className="text-sm py-2 min-h-10 w-full md:w-auto"
           >
             <AddIcon className="w-4 h-4 mr-2" />
             Add Product
@@ -167,8 +236,8 @@ function ProductManagement() {
        </div>
 
       {/* Search and Filter */}
-      <div className="bg-white p-4 md:p-6 mb-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-center">
+      <div className="bg-white p-3 md:p-6 mb-4 md:mb-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 items-center">
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <Input
@@ -179,7 +248,7 @@ function ProductManagement() {
             />
           </div>
           <div>
-             <Label htmlFor="category-select" className="text-sm md:text-base">Category</Label>
+             <Label htmlFor="category-select" className="text-sm md:text-base block mb-1">Category</Label>
              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                <SelectTrigger className="text-sm md:text-base">
                  <SelectValue placeholder="Select category" />
@@ -195,80 +264,98 @@ function ProductManagement() {
          </div>
        </div>
 
-      {/* Products Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-        <Table>
-          <TableHeader>
-             <TableRow className="bg-gray-50">
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Name</TableHead>
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Category</TableHead>
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Size</TableHead>
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Price (₹)</TableHead>
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">GST (%)</TableHead>
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Stock</TableHead>
-               <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Actions</TableHead>
-             </TableRow>
-           </TableHeader>
-           <TableBody>
-             {filteredProducts.map((product) => (
-               <TableRow 
-                 key={product.id}
-                 className="hover:bg-gray-50 transition-colors"
-                >
-                  <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
-                  <TableCell className="py-3 md:py-4">
-                    <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
-                      {product.category}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 md:py-4">
-                    {product.size ? (
-                      <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7 bg-blue-50 text-blue-700 border-blue-200">
-                        {product.size}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs md:text-sm text-gray-400">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
-                  <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
-                  <TableCell className="py-3 md:py-4">
-                    <Badge 
-                      variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
-                      className="text-xs md:text-sm h-6 md:h-7 font-semibold"
-                    >
-                      {product.stock || 0}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-3 md:py-4">
-                    <div className="flex gap-1 md:gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDialog(product)}
-                        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
-                      >
-                        <EditIcon className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(product.id)}
-                        className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
-                      >
-                        <DeleteIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      {/* Conditional rendering based on screen size */}
+      {isMobile ? (
+        // Mobile card view
+        <div className="space-y-3">
+          {filteredProducts.map((product) => (
+            <MobileProductCard key={product.id} product={product} />
+          ))}
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-8 text-gray-500">No products found</div>
+          )}
         </div>
+      ) : (
+        // Desktop table view
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
+          <Table>
+            <TableHeader>
+               <TableRow className="bg-gray-50">
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Name</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Category</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Size</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Price (₹)</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">GST (%)</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Stock</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Actions</TableHead>
+               </TableRow>
+             </TableHeader>
+             <TableBody>
+               {filteredProducts.map((product) => (
+                 <TableRow 
+                   key={product.id}
+                   className="hover:bg-gray-50 transition-colors"
+                  >
+                    <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
+                    <TableCell className="py-3 md:py-4">
+                      <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
+                        {product.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 md:py-4">
+                      {product.size ? (
+                        <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7 bg-blue-50 text-blue-700 border-blue-200">
+                          {product.size}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs md:text-sm text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
+                    <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
+                    <TableCell className="py-3 md:py-4">
+                      <Badge 
+                        variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
+                        className="text-xs md:text-sm h-6 md:h-7 font-semibold"
+                      >
+                        {product.stock || 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 md:py-4">
+                      <div className="flex gap-1 md:gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenDialog(product)}
+                          className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                        >
+                          <EditIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(product.id)}
+                          className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                        >
+                          <DeleteIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredProducts.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">No products found</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* Add/Edit Product Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md max-w-[95vw] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
               <DialogDescription>
@@ -321,6 +408,23 @@ function ProductManagement() {
                   placeholder="Enter size (e.g., 250ml, 1kg, Large)"
                 />
               </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="type">Type</Label>
+                <Select value={formData.type} onValueChange={(value) => setFormData({...formData, type: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="citrus">Citrus</SelectItem>
+                    <SelectItem value="berries">Berries</SelectItem>
+                    <SelectItem value="tropical">Tropical</SelectItem>
+                    <SelectItem value="spiced, herbal & others">Spiced/Herbal/Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div className="grid gap-2">
                 <Label htmlFor="gst">GST</Label>
                 <Select value={formData.taxPercentage.toString()} onValueChange={(value) => setFormData({...formData, taxPercentage: parseFloat(value)})}>
@@ -346,12 +450,12 @@ function ProductManagement() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={handleCloseDialog}>
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto">
                 <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
-              <Button onClick={handleSave}>
+              <Button onClick={handleSave} className="w-full sm:w-auto">
                 <Save className="w-4 h-4 mr-2" />
                 {editingProduct ? 'Update' : 'Add'} Product
               </Button>

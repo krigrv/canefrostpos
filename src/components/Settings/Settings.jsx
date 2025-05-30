@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useInventory } from '../../hooks/useInventory'
+import { useAuth } from '../../contexts/AuthContext'
+import { db } from '../../firebase/config'
+import { doc, getDoc } from 'firebase/firestore'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog'
@@ -39,6 +42,7 @@ import toast from 'react-hot-toast'
 function Settings() {
   const { settings: contextSettings, saveSettings } = useSettings()
   const { cleanupDuplicates } = useInventory()
+  const { currentUser } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(0)
   const [settings, setSettings] = useState({
@@ -49,24 +53,67 @@ function Settings() {
     enableSoundEffects: true,
     enableEmailAlerts: false
   })
+  
+  const [businessDetails, setBusinessDetails] = useState({
+    businessName: 'CANEFROST JUICE SHOP',
+    phoneNumber: '',
+    gstin: '',
+    emailId: '',
+    businessAddress: '',
+    fssaiNumber: ''
+  })
 
   const [printSettingsOpen, setPrintSettingsOpen] = useState(false)
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false)
   const [printSettings, setPrintSettings] = useState({
-    businessName: contextSettings.businessName || 'CANEFROST JUICE SHOP',
-    businessAddress: contextSettings.businessAddress || 'Fresh Juices & Beverages\nPhone: +91 9876543210',
-    gstNumber: contextSettings.gstNumber || '29XXXXX1234X1ZX',
+    businessName: contextSettings.businessName || businessDetails.businessName,
+    businessAddress: contextSettings.businessAddress || businessDetails.businessAddress,
+    gstNumber: contextSettings.gstNumber || businessDetails.gstin,
     fontSize: contextSettings.fontSize || 'medium',
     printerWidth: contextSettings.printerWidth || '80mm',
     lineSpacing: contextSettings.lineSpacing || 'normal',
     showBusinessName: contextSettings.showBusinessName !== undefined ? contextSettings.showBusinessName : true,
     showBusinessAddress: contextSettings.showBusinessAddress !== undefined ? contextSettings.showBusinessAddress : true,
     showGSTNumber: contextSettings.showGSTNumber !== undefined ? contextSettings.showGSTNumber : true,
+    showHeaderText: contextSettings.showHeaderText !== undefined ? contextSettings.showHeaderText : true,
+    showFooterText: contextSettings.showFooterText !== undefined ? contextSettings.showFooterText : true,
+    headerText: contextSettings.headerText || 'Thank you for choosing us!',
+    footerText: contextSettings.footerText || 'Visit us again soon!',
+    businessNameAlignment: contextSettings.businessNameAlignment || 'center',
+    addressAlignment: contextSettings.addressAlignment || 'center',
+    headerAlignment: contextSettings.headerAlignment || 'center',
+    footerAlignment: contextSettings.footerAlignment || 'center',
     showLogo: true,
     showAddress: true,
     showTax: true,
     showPackaging: true
   })
+
+  // Load business details from Firebase
+  useEffect(() => {
+    const loadBusinessDetails = async () => {
+      if (currentUser) {
+        try {
+          const userDocRef = doc(db, 'users', currentUser.uid)
+          const userDoc = await getDoc(userDocRef)
+          if (userDoc.exists() && userDoc.data().businessDetails) {
+            const details = userDoc.data().businessDetails
+            setBusinessDetails(details)
+            // Update print settings with loaded business details
+            setPrintSettings(prev => ({
+              ...prev,
+              businessName: prev.businessName || details.businessName,
+              businessAddress: prev.businessAddress || details.businessAddress,
+              gstNumber: prev.gstNumber || details.gstin
+            }))
+          }
+        } catch (error) {
+          console.error('Error loading business details:', error)
+        }
+      }
+    }
+    loadBusinessDetails()
+  }, [currentUser])
 
   const handleSettingChange = (setting) => {
     setSettings(prev => ({
@@ -180,71 +227,74 @@ function Settings() {
       </p>
 
       {/* Management Cards */}
-      <h2 className="text-2xl font-semibold mb-4 mt-8">
+      <h2 className="text-2xl font-semibold mb-6 mt-8">
         Business Management
       </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {managementCards.map((card) => (
-          <Card key={card.title} className="h-full flex flex-col">
-            <CardContent className="flex-grow">
-              <div className="flex items-center mb-4">
-                <div className="text-blue-600">
-                  {React.cloneElement(card.icon, { className: 'w-10 h-10' })}
+          <Card key={card.title} className="h-full flex flex-col hover:shadow-lg transition-shadow duration-200">
+            <CardHeader className="pb-4">
+              <div className="flex items-center mb-3">
+                <div className="text-blue-600 bg-blue-50 p-3 rounded-lg">
+                  {React.cloneElement(card.icon, { className: 'w-8 h-8' })}
                 </div>
-                <h3 className="text-lg font-semibold ml-3 capitalize">
+                <h3 className="text-xl font-semibold ml-4 capitalize">
                   {card.title}
                 </h3>
               </div>
               
-              <p className="text-gray-600 mb-4 capitalize">
+              <p className="text-gray-600 text-sm leading-relaxed">
                 {card.description}
               </p>
-              
-              <div className="space-y-2">
+            </CardHeader>
+            
+            <CardContent className="flex-grow pt-0">
+              <div className="flex flex-wrap gap-2 mb-6">
                 {card.features.map((feature) => (
-                    <Badge
-                      key={feature}
-                      variant="outline"
-                      className="mr-1 mb-1 text-xs capitalize"
-                    >
-                      {feature}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-              
-              <div className="p-6 pt-0">
-                <Button
-                  className="w-full capitalize"
-                  onClick={card.action}
-                >
-                  <SettingsIcon className="w-4 h-4 mr-2" />
-                  Manage
-                </Button>
+                  <Badge
+                    key={feature}
+                    variant="outline"
+                    className="text-xs px-2 py-1"
+                  >
+                    {feature}
+                  </Badge>
+                ))}
               </div>
-            </Card>
+              
+              <Button
+                className="w-full"
+                onClick={card.action}
+              >
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                Manage
+              </Button>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       {/* System Settings */}
-      <h2 className="text-2xl font-semibold mb-4 mt-8">
+      <h2 className="text-2xl font-semibold mb-6 mt-8">
         System Configuration
       </h2>
       
-      <Card>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg">System Settings</CardTitle>
+        </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {systemSettings.map((item, index) => (
               <div key={item.title}>
-                <div className="flex items-center justify-between py-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-gray-600">
+                <div className="flex items-center justify-between py-3">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-gray-600 bg-gray-50 p-2 rounded-lg">
                       {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
                     </div>
                     <div>
-                      <h4 className="font-medium">{item.title}</h4>
-                      <p className="text-sm text-gray-600">{item.description}</p>
+                      <h4 className="font-semibold text-base">{item.title}</h4>
+                      <p className="text-sm text-gray-600 mt-1">{item.description}</p>
                     </div>
                   </div>
                   <Switch
@@ -252,7 +302,7 @@ function Settings() {
                      onCheckedChange={() => handleSettingChange(item.setting)}
                    />
                  </div>
-                 {index < systemSettings.length - 1 && <hr className="my-4" />}
+                 {index < systemSettings.length - 1 && <hr className="border-gray-200" />}
                </div>
              ))}
            </div>
@@ -260,92 +310,106 @@ function Settings() {
        </Card>
 
       {/* Quick Actions */}
-      <h2 className="text-2xl font-semibold mb-4 mt-8">
+      <h2 className="text-2xl font-semibold mb-6 mt-8">
         Quick Actions
       </h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => toast.success('Backup initiated successfully!')}
-        >
-          <BackupIcon className="w-4 h-4 mr-2" />
-          Backup Data
-        </Button>
-        
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => toast.info('System is up to date!')}
-        >
-          <UpdateIcon className="w-4 h-4 mr-2" />
-          Check Updates
-        </Button>
-        
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => toast.success('Security scan completed!')}
-        >
-          <SecurityIcon className="w-4 h-4 mr-2" />
-          Security Scan
-        </Button>
-        
-        <Button
-           variant="outline"
-           className="w-full"
-           onClick={handleCleanupDuplicates}
-           disabled={cleaningDuplicates}
-         >
-           <CleaningServicesIcon className="w-4 h-4 mr-2" />
-           {cleaningDuplicates ? 'Cleaning...' : 'Clean Duplicates'}
-         </Button>
-         
-         <Button
-           variant="outline"
-           className="w-full"
-           onClick={() => toast.success('Test receipt printed!')}
-         >
-           <ReceiptIcon className="w-4 h-4 mr-2" />
-           Test Receipt
-         </Button>
-       </div>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg">Common Tasks</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <Button
+              variant="outline"
+              className="w-full h-12 bg-blue-50 hover:bg-blue-100 border-blue-200"
+              onClick={() => toast.success('Backup initiated successfully!')}
+            >
+              <BackupIcon className="w-4 h-4 mr-2 text-blue-600" />
+              Backup Data
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full h-12 bg-green-50 hover:bg-green-100 border-green-200"
+              onClick={() => toast.info('System is up to date!')}
+            >
+              <UpdateIcon className="w-4 h-4 mr-2 text-green-600" />
+              Check Updates
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full h-12 bg-purple-50 hover:bg-purple-100 border-purple-200"
+              onClick={() => toast.success('Security scan completed!')}
+            >
+              <SecurityIcon className="w-4 h-4 mr-2 text-purple-600" />
+              Security Scan
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full h-12 bg-amber-50 hover:bg-amber-100 border-amber-200"
+              onClick={handleCleanupDuplicates}
+              disabled={cleaningDuplicates}
+            >
+              <CleaningServicesIcon className="w-4 h-4 mr-2 text-amber-600" />
+              {cleaningDuplicates ? 'Cleaning...' : 'Clean Duplicates'}
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full h-12 bg-red-50 hover:bg-red-100 border-red-200"
+              onClick={() => toast.success('Test receipt printed!')}
+            >
+              <ReceiptIcon className="w-4 h-4 mr-2 text-red-600" />
+              Test Receipt
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
        {/* System Status */}
-       <h2 className="text-2xl font-semibold mb-4 mt-8">
+       <h2 className="text-2xl font-semibold mb-6 mt-8">
          System Status
        </h2>
        
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-         <Alert className="border-green-200 bg-green-50">
-           <CheckCircleIcon className="h-4 w-4" />
-           <AlertTitle>System Health</AlertTitle>
-           <AlertDescription>All systems operational</AlertDescription>
-         </Alert>
-         
-         <Alert className="border-blue-200 bg-blue-50">
-           <InfoIcon className="h-4 w-4" />
-           <AlertTitle>Last Backup</AlertTitle>
-           <AlertDescription>Today at 2:00 AM</AlertDescription>
-         </Alert>
-         
-         <Alert className="border-yellow-200 bg-yellow-50">
-           <AlertTriangleIcon className="h-4 w-4" />
-           <AlertTitle>Storage</AlertTitle>
-           <AlertDescription>78% used (22% remaining)</AlertDescription>
-         </Alert>
-         
-         <Alert className="border-blue-200 bg-blue-50">
-           <InfoIcon className="h-4 w-4" />
-           <AlertTitle>Version</AlertTitle>
-           <AlertDescription>POS System v2.1.0</AlertDescription>
-         </Alert>
-       </div>
+       <Card className="mb-8">
+         <CardHeader>
+           <CardTitle className="text-lg">System Health</CardTitle>
+         </CardHeader>
+         <CardContent>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <Alert className="border-green-200 bg-green-50">
+               <CheckCircleIcon className="h-4 w-4 text-green-600" />
+               <AlertTitle className="text-green-800">System Health</AlertTitle>
+               <AlertDescription className="text-green-700">All systems operational</AlertDescription>
+             </Alert>
+             
+             <Alert className="border-blue-200 bg-blue-50">
+               <InfoIcon className="h-4 w-4 text-blue-600" />
+               <AlertTitle className="text-blue-800">Last Backup</AlertTitle>
+               <AlertDescription className="text-blue-700">Today at 2:00 AM</AlertDescription>
+             </Alert>
+             
+             <Alert className="border-amber-200 bg-amber-50">
+               <AlertTriangleIcon className="h-4 w-4 text-amber-600" />
+               <AlertTitle className="text-amber-800">Storage</AlertTitle>
+               <AlertDescription className="text-amber-700">78% used (22% remaining)</AlertDescription>
+             </Alert>
+             
+             <Alert className="border-purple-200 bg-purple-50">
+               <InfoIcon className="h-4 w-4 text-purple-600" />
+               <AlertTitle className="text-purple-800">Version</AlertTitle>
+               <AlertDescription className="text-purple-700">POS System v2.1.0</AlertDescription>
+             </Alert>
+           </div>
+         </CardContent>
+       </Card>
 
       {/* Print Settings Dialog */}
       <Dialog open={printSettingsOpen} onOpenChange={setPrintSettingsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="capitalize">Print Settings - 80mm Thermal Printer</DialogTitle>
             <DialogDescription>
@@ -359,40 +423,92 @@ function Settings() {
               <h3 className="text-lg font-semibold mb-4 capitalize">Business Information</h3>
             </div>
             
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="businessName">Business Name</Label>
-                <Input
-                  id="businessName"
-                  value={printSettings.businessName}
-                  onChange={(e) => setPrintSettings(prev => ({ ...prev, businessName: e.target.value }))}
-                  placeholder="Enter business name"
-                />
-                <p className="text-sm text-gray-600 mt-1">This will appear at the top of receipts</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="businessName">Business Name</Label>
+                  <Input
+                    id="businessName"
+                    value={printSettings.businessName}
+                    onChange={(e) => setPrintSettings(prev => ({ ...prev, businessName: e.target.value }))}
+                    placeholder="Enter business name"
+                  />
+                  <p className="text-sm text-gray-600 mt-1">This will appear at the top of receipts</p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="businessAddress">Business Address</Label>
+                  <textarea
+                    id="businessAddress"
+                    className="w-full p-2 border border-gray-300 rounded-md resize-none"
+                    rows={3}
+                    value={printSettings.businessAddress}
+                    onChange={(e) => setPrintSettings(prev => ({ ...prev, businessAddress: e.target.value }))}
+                    placeholder="Enter business address"
+                  />
+                  <p className="text-sm text-gray-600 mt-1">Use \n for line breaks. Include phone number and other contact details</p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="gstNumber">GST Number</Label>
+                  <Input
+                    id="gstNumber"
+                    value={printSettings.gstNumber}
+                    onChange={(e) => setPrintSettings(prev => ({ ...prev, gstNumber: e.target.value }))}
+                    placeholder="Enter GST number"
+                  />
+                  <p className="text-sm text-gray-600 mt-1">Your GST registration number</p>
+                </div>
               </div>
               
-              <div>
-                <Label htmlFor="businessAddress">Business Address</Label>
-                <textarea
-                  id="businessAddress"
-                  className="w-full p-2 border border-gray-300 rounded-md resize-none"
-                  rows={3}
-                  value={printSettings.businessAddress}
-                  onChange={(e) => setPrintSettings(prev => ({ ...prev, businessAddress: e.target.value }))}
-                  placeholder="Enter business address"
-                />
-                <p className="text-sm text-gray-600 mt-1">Use \n for line breaks. Include phone number and other contact details</p>
-              </div>
-              
-              <div>
-                <Label htmlFor="gstNumber">GST Number</Label>
-                <Input
-                  id="gstNumber"
-                  value={printSettings.gstNumber}
-                  onChange={(e) => setPrintSettings(prev => ({ ...prev, gstNumber: e.target.value }))}
-                  placeholder="Enter GST number"
-                />
-                <p className="text-sm text-gray-600 mt-1">Your GST registration number</p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="businessNameAlignment">Business Name Alignment</Label>
+                  <Select value={printSettings.businessNameAlignment} onValueChange={(value) => setPrintSettings(prev => ({ ...prev, businessNameAlignment: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select alignment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="center">Center</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="addressAlignment">Address Alignment</Label>
+                  <Select value={printSettings.addressAlignment} onValueChange={(value) => setPrintSettings(prev => ({ ...prev, addressAlignment: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select alignment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="center">Center</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="showHeaderText"
+                      checked={printSettings.showHeaderText}
+                      onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showHeaderText: checked }))}
+                    />
+                    <Label htmlFor="showHeaderText">Show Header Text</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="showFooterText"
+                      checked={printSettings.showFooterText}
+                      onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showFooterText: checked }))}
+                    />
+                    <Label htmlFor="showFooterText">Show Footer Text</Label>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -550,57 +666,65 @@ function Settings() {
              </div>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div className="space-y-2">
-                 <Label htmlFor="thermalHeaderText">Header Text</Label>
-                 <Input
-                   id="thermalHeaderText"
-                   value={printSettings.thermalHeaderText || 'Thank you for choosing us!'}
-                   onChange={(e) => setPrintSettings(prev => ({ ...prev, thermalHeaderText: e.target.value }))}
-                   placeholder="Custom message at the top of receipt"
-                 />
-                 <p className="text-sm text-muted-foreground">Custom message at the top of receipt</p>
-               </div>
+               {printSettings.showHeaderText && (
+                 <div className="space-y-2">
+                   <Label htmlFor="headerText">Header Text</Label>
+                   <Input
+                     id="headerText"
+                     value={printSettings.headerText || ''}
+                     onChange={(e) => setPrintSettings(prev => ({ ...prev, headerText: e.target.value }))}
+                     placeholder="Custom message at the top of receipt (can be blank)"
+                   />
+                   <p className="text-sm text-muted-foreground">Custom message at the top of receipt (optional)</p>
+                 </div>
+               )}
                
-               <div className="space-y-2">
-                 <Label htmlFor="thermalFooterText">Footer Text</Label>
-                 <Input
-                   id="thermalFooterText"
-                   value={printSettings.thermalFooterText || 'Visit us again soon!'}
-                   onChange={(e) => setPrintSettings(prev => ({ ...prev, thermalFooterText: e.target.value }))}
-                   placeholder="Custom message at the bottom of receipt"
-                 />
-                 <p className="text-sm text-muted-foreground">Custom message at the bottom of receipt</p>
-               </div>
+               {printSettings.showFooterText && (
+                 <div className="space-y-2">
+                   <Label htmlFor="footerText">Footer Text</Label>
+                   <Input
+                     id="footerText"
+                     value={printSettings.footerText || ''}
+                     onChange={(e) => setPrintSettings(prev => ({ ...prev, footerText: e.target.value }))}
+                     placeholder="Custom message at the bottom of receipt (can be blank)"
+                   />
+                   <p className="text-sm text-muted-foreground">Custom message at the bottom of receipt (optional)</p>
+                 </div>
+               )}
              </div>
              
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-               <div className="space-y-2">
-                 <Label htmlFor="headerAlignment">Header Alignment</Label>
-                 <Select value={printSettings.headerAlignment || 'center'} onValueChange={(value) => setPrintSettings(prev => ({ ...prev, headerAlignment: value }))}>
-                   <SelectTrigger>
-                     <SelectValue placeholder="Select alignment" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="left">Left</SelectItem>
-                     <SelectItem value="center">Center</SelectItem>
-                     <SelectItem value="right">Right</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+               {printSettings.showHeaderText && (
+                 <div className="space-y-2">
+                   <Label htmlFor="headerAlignment">Header Text Alignment</Label>
+                   <Select value={printSettings.headerAlignment || 'center'} onValueChange={(value) => setPrintSettings(prev => ({ ...prev, headerAlignment: value }))}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select alignment" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="left">Left</SelectItem>
+                       <SelectItem value="center">Center</SelectItem>
+                       <SelectItem value="right">Right</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+               )}
                
-               <div className="space-y-2">
-                 <Label htmlFor="footerAlignment">Footer Alignment</Label>
-                 <Select value={printSettings.footerAlignment || 'center'} onValueChange={(value) => setPrintSettings(prev => ({ ...prev, footerAlignment: value }))}>
-                   <SelectTrigger>
-                     <SelectValue placeholder="Select alignment" />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="left">Left</SelectItem>
-                     <SelectItem value="center">Center</SelectItem>
-                     <SelectItem value="right">Right</SelectItem>
-                   </SelectContent>
-                 </Select>
-               </div>
+               {printSettings.showFooterText && (
+                 <div className="space-y-2">
+                   <Label htmlFor="footerAlignment">Footer Text Alignment</Label>
+                   <Select value={printSettings.footerAlignment || 'center'} onValueChange={(value) => setPrintSettings(prev => ({ ...prev, footerAlignment: value }))}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select alignment" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="left">Left</SelectItem>
+                       <SelectItem value="center">Center</SelectItem>
+                       <SelectItem value="right">Right</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+               )}
                
                <div className="space-y-2">
                  <Label htmlFor="printDensity">Print Density</Label>

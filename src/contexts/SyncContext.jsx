@@ -84,13 +84,26 @@ export function SyncProvider({ children }) {
 
   // Add operation to sync queue
   const queueOperation = (operation) => {
+    console.log('Queueing operation:', operation);
+    
+    // Ensure consistent field names
     const queuedOperation = {
       id: Date.now() + Math.random(),
       timestamp: new Date().toISOString(),
       retryCount: 0,
       ...operation
     }
+    
+    // Make sure we have consistent field names
+    if (operation.type && !operation.operation) {
+      queuedOperation.operation = operation.type;
+    }
+    
+    if (operation.docId && !operation.id) {
+      queuedOperation.id = operation.docId;
+    }
 
+    console.log('Formatted operation for queue:', queuedOperation);
     setPendingOperations(prev => [...prev, queuedOperation])
     syncQueueRef.current.push(queuedOperation)
 
@@ -149,12 +162,13 @@ export function SyncProvider({ children }) {
 
   // Execute individual operation
   const executeOperation = async (operation) => {
-    const { type, collection: collectionName, docId, data } = operation
+    const { collection: collectionName, operation: operationType, data, id } = operation
+    console.log('Executing operation:', operationType, 'on collection:', collectionName, 'with ID:', id, 'Data:', data);
 
-    switch (type) {
+    switch (operationType) {
       case 'create':
-        if (docId) {
-          await setDoc(doc(db, collectionName, docId), {
+        if (id) {
+          await setDoc(doc(db, collectionName, id), {
             ...data,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
@@ -169,18 +183,19 @@ export function SyncProvider({ children }) {
         break
 
       case 'update':
-        await updateDoc(doc(db, collectionName, docId), {
+        console.log('Updating document in Firestore:', collectionName, id, data);
+        await updateDoc(doc(db, collectionName, id), {
           ...data,
           updatedAt: serverTimestamp()
         })
         break
 
       case 'delete':
-        await deleteDoc(doc(db, collectionName, docId))
+        await deleteDoc(doc(db, collectionName, id))
         break
 
       case 'upsert':
-        const docRef = doc(db, collectionName, docId)
+        const docRef = doc(db, collectionName, id)
         const docSnap = await getDoc(docRef)
         
         if (docSnap.exists()) {
@@ -198,7 +213,7 @@ export function SyncProvider({ children }) {
         break
 
       default:
-        throw new Error(`Unknown operation type: ${type}`)
+        throw new Error(`Unknown operation type: ${operationType}`)
     }
   }
 

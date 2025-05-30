@@ -24,6 +24,7 @@ function InventoryProvider({ children }) {
   
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
+  const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [pendingUpdates, setPendingUpdates] = useState(new Set())
   const { queueOperation, isOnline, syncCollection } = useSync()
@@ -35,10 +36,19 @@ function InventoryProvider({ children }) {
     const unsubscribe = onSnapshot(
       productsQuery,
       (snapshot) => {
-        const productsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
+        const productsData = snapshot.docs.map(doc => {
+          const productData = {
+            id: doc.id,
+            ...doc.data()
+          }
+          
+          // Add type field based on product name if it doesn't exist
+          if (!productData.type) {
+            productData.type = getCategoryGroup(productData.name)
+          }
+          
+          return productData
+        })
         
         console.log(`InventoryContext: Loaded ${productsData.length} products (real-time)`)
         console.log('Pending updates:', Array.from(pendingUpdates))
@@ -76,6 +86,34 @@ function InventoryProvider({ children }) {
       unsubscribe()
     }
   }, [pendingUpdates])
+
+  // Load sales from Firestore with real-time updates
+  useEffect(() => {
+    console.log('InventoryContext: Setting up sales real-time listener')
+    
+    const salesQuery = query(collection(db, 'sales'), orderBy('createdAt', 'desc'))
+    const unsubscribe = onSnapshot(
+      salesQuery,
+      (snapshot) => {
+        const salesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        
+        console.log(`InventoryContext: Loaded ${salesData.length} sales records (real-time)`)
+        setSales(salesData)
+      },
+      (error) => {
+        console.error('Error loading sales from Firestore:', error)
+        setSales([])
+      }
+    )
+
+    return () => {
+      console.log('InventoryContext: Cleanup - unsubscribing from sales listener')
+      unsubscribe()
+    }
+  }, [])
 
   // Cleanup mechanism for stuck pending updates
   useEffect(() => {
@@ -175,140 +213,39 @@ function InventoryProvider({ children }) {
     const newProduct = {
       ...productData,
       id: Date.now().toString(),
+      type: productData.type || getCategoryGroup(productData.name),
       createdAt: new Date(),
       updatedAt: new Date()
     }
+
+    // Add to local state immediately
+    setProducts(prev => [...prev, newProduct])
+    
+    // Mark as pending update
+    setPendingUpdates(prev => new Set(prev).add(newProduct.id))
     
     try {
-      // Add to local state immediately for optimistic updates
-      setProducts(prev => [...prev, newProduct])
+      // Queue for sync
+      await queueOperation({
+        collection: 'products',
+        operation: 'create',  // Changed from 'type' to 'operation'
+        data: newProduct,
+        id: newProduct.id  // Ensure id is explicitly set
+      })
       
-      // Add to pending updates to prevent real-time listener from overriding
-      setPendingUpdates(prev => new Set([...prev, newProduct.id]))
+      // Clear pending update
+      setPendingUpdates(prev => {
+        const updated = new Set(prev)
+        updated.delete(newProduct.id)
+        return updated
+      })
       
-      if (isOnline) {
-        // Try immediate sync
-        await setDoc(doc(db, 'products', newProduct.id), newProduct)
-        // Remove from pending updates after successful sync
-        setPendingUpdates(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(newProduct.id)
-          return newSet
-        })
-      } else {
-        // Queue for sync when online
-        queueOperation({
-          type: 'create',
-          collection: 'products',
-          id: newProduct.id,
-          data: newProduct
-        })
-        throw new Error('Device is offline - product will sync when online')
-      }
-      
+      toast.success('Product added successfully')
       return newProduct
     } catch (error) {
       console.error('Error adding product:', error)
-      
-      // Remove from pending updates on error
-      setPendingUpdates(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(newProduct.id)
-        return newSet
-      })
-      
-      // Revert optimistic update on error
-      setProducts(prev => prev.filter(p => p.id !== newProduct.id))
-      
-      // Queue for retry if immediate sync failed and we're online
-      if (isOnline) {
-        queueOperation({
-          type: 'create',
-          collection: 'products',
-          id: newProduct.id,
-          data: newProduct
-        })
-      }
-      
-      throw error // Re-throw to let the component handle the error
-    }
-  }
-
-  // Update product with sync support
-  const updateProduct = async (productId, productData) => {
-    try {
-      // Optimistic update
-      setProducts(prev => prev.map(p => 
-        p.id === productId ? { ...p, ...productData, updatedAt: new Date() } : p
-      ))
-      
-      // Add to pending updates to prevent real-time listener conflicts
-      setPendingUpdates(prev => new Set([...prev, productId]))
-      
-      if (isOnline) {
-        // Try immediate sync
-        const productRef = doc(db, 'products', productId)
-        const productDoc = await getDoc(productRef)
-        
-        if (productDoc.exists()) {
-          await updateDoc(productRef, {
-            ...productData,
-            updatedAt: new Date()
-          })
-        } else {
-          await setDoc(productRef, {
-            id: productId,
-            ...productData,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          })
-        }
-        
-        // Remove from pending updates on success
-        setPendingUpdates(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(productId)
-          return newSet
-        })
-      } else {
-        // Queue for later sync
-        queueOperation({
-          type: 'update',
-          collection: 'products',
-          id: productId,
-          data: productData
-        })
-        throw new Error('Device is offline - changes will sync when online')
-      }
-    } catch (error) {
-      console.error('Error updating product:', error)
-      
-      // Remove from pending updates on error to allow real-time listener to work
-      setPendingUpdates(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(productId)
-        return newSet
-      })
-      
-      // Revert optimistic update on error
-      const originalProduct = products.find(p => p.id === productId)
-      if (originalProduct) {
-        setProducts(prev => prev.map(p => 
-          p.id === productId ? originalProduct : p
-        ))
-      }
-      
-      // Queue for retry if immediate sync failed and we're online
-      if (isOnline) {
-        queueOperation({
-          type: 'update',
-          collection: 'products',
-          id: productId,
-          data: productData
-        })
-      }
-      
-      throw error // Re-throw to let the component handle the error
+      toast.error('Failed to add product')
+      throw error
     }
   }
 
@@ -336,9 +273,9 @@ function InventoryProvider({ children }) {
       } else {
         // Queue for sync when online
         queueOperation({
-          type: 'delete',
+          operation: 'delete',  // Changed from 'type' to 'operation'
           collection: 'products',
-          id: productId
+          id: productId  // Ensure id is explicitly set
         })
         throw new Error('Device is offline - deletion will sync when online')
       }
@@ -360,13 +297,58 @@ function InventoryProvider({ children }) {
       // Queue for retry if immediate sync failed and we're online
       if (isOnline) {
         queueOperation({
-          type: 'delete',
+          operation: 'delete',  // Changed from 'type' to 'operation'
           collection: 'products',
-          id: productId
+          id: productId  // Ensure id is explicitly set
         })
       }
       
       throw error // Re-throw to let the component handle the error
+    }
+  }
+
+  // Update product with sync support
+  const updateProduct = async (id, productData) => {
+    console.log('Updating product with ID:', id, 'Data:', productData);
+    
+    const updatedProduct = {
+      ...productData,
+      type: productData.type || getCategoryGroup(productData.name),
+      updatedAt: new Date()
+    }
+    
+    // Update local state immediately
+    setProducts(prev =>
+      prev.map(product =>
+        product.id === id ? { ...product, ...updatedProduct, id } : product
+      )
+    )
+    
+    // Mark as pending update
+    setPendingUpdates(prev => new Set(prev).add(id))
+    
+    try {
+      // Queue for sync
+      await queueOperation({
+        collection: 'products',
+        operation: 'update',  // Changed from 'type' to 'operation'
+        data: updatedProduct,
+        id: id  // Ensure id is explicitly set
+      })
+      
+      // Clear pending update
+      setPendingUpdates(prev => {
+        const updated = new Set(prev)
+        updated.delete(id)
+        return updated
+      })
+      
+      toast.success('Product updated successfully')
+      return { id, ...updatedProduct }
+    } catch (error) {
+      console.error('Error updating product:', error)
+      toast.error('Failed to update product')
+      throw error
     }
   }
 
@@ -570,6 +552,7 @@ function InventoryProvider({ children }) {
   const value = {
     products,
     cart,
+    sales,
     loading,
     addToCart,
     removeFromCart,

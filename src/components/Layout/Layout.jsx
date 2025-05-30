@@ -26,7 +26,8 @@ import {
   Store as StoreIcon,
   BookOpen as BookOnlineIcon,
   TrendingUp as TrendingUpIcon,
-  Palette as PaletteIcon
+  Palette as PaletteIcon,
+  X as CloseIcon
 } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -68,12 +69,7 @@ const menuItems = [
   {
     text: 'Reports',
     icon: <AssessmentIcon />,
-    expandable: true,
-    children: [
-      { text: 'Sales Report', path: '/reports/sales' },
-      { text: 'Payment Report', path: '/reports/payments' },
-      { text: 'DayBook', path: '/reports/daybook' }
-    ]
+    path: '/reports'
   },
   { 
     text: 'UI Demo', 
@@ -104,12 +100,23 @@ function Layout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [expandedSections, setExpandedSections] = useState({})
   const [businessName, setBusinessName] = useState('CANEFROST')
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser, logout } = useAuth()
   const { isOnline, syncStatus, lastSyncTime, forceSyncAll } = useSync()
 
   const currentDrawerWidth = sidebarCollapsed ? collapsedDrawerWidth : drawerWidth
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640)
+    }
+    
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Load business name from Firebase
   useEffect(() => {
@@ -167,42 +174,150 @@ function Layout({ children }) {
     return children?.some(child => location.pathname === child.path)
   }
 
-  const drawer = (
-    <div>
-      {/* Header with logo and collapse button */}
-      <div className={`flex items-center min-h-[64px] px-${sidebarCollapsed ? '2' : '4'} ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-        <div className={`flex items-center ${sidebarCollapsed ? 'gap-0' : 'gap-2'}`}>
+  // Create separate drawer content for mobile and desktop
+  const mobileDrawer = (
+    <div className="h-full bg-white">
+      {/* Header with logo */}
+      <div className="flex items-center min-h-[64px] px-4 justify-between">
+        <div className="flex items-center gap-2">
           <img 
             src="/src/assets/images/logo.jpg" 
             alt="Canefrost Logo" 
-            className={`object-cover rounded-lg transition-all duration-300 ${sidebarCollapsed ? 'w-8 h-8' : 'w-10 h-10'}`}
+            className="object-cover rounded-lg w-10 h-10"
+            onError={(e) => {
+              e.target.style.display = 'none'
+              console.error('Logo image failed to load')
+            }}
           />
+          <h6 className="font-bold text-black text-lg">
+            CANEFROST
+          </h6>
+        </div>
+      </div>
+      <Separator />
+      
+      {/* Navigation Menu */}
+      <div className="pt-2 px-2">
+        {menuItems.map((item) => (
+          <React.Fragment key={item.text}>
+            <div className="mb-2">
+              <button
+                className={`w-full min-h-[48px] rounded-lg transition-all duration-200 flex items-center justify-start px-4 py-3 ${
+                  item.primary 
+                    ? 'bg-black text-white hover:bg-gray-800'
+                    : (item.path ? isPathActive(item.path) : isParentActive(item.children))
+                      ? 'bg-gray-100 text-black hover:bg-gray-200'
+                      : 'text-gray-700 hover:bg-gray-50'
+                }`}
+                onClick={() => {
+                  if (item.expandable) {
+                    handleExpandToggle(item.text)
+                  } else if (item.action === 'logout') {
+                    handleLogout()
+                  } else if (item.path) {
+                    navigate(item.path)
+                    setMobileOpen(false)
+                  }
+                }}
+              >
+                <div className="flex items-center justify-center w-10">
+                  {item.icon}
+                </div>
+                <span className="text-sm font-medium flex-1 text-left ml-3">
+                  {item.text}
+                </span>
+                {item.badge && (
+                  <Badge 
+                    variant="secondary"
+                    className={`h-5 text-xs font-bold text-white ${
+                      item.badge === 'NEW' ? 'bg-green-500' : 'bg-orange-500'
+                    }`}
+                  >
+                    {item.badge}
+                  </Badge>
+                )}
+                {item.expandable && (
+                  <div className="ml-auto">
+                    {expandedSections[item.text] ? <ExpandLess className="w-4 h-4" /> : <ExpandMore className="w-4 h-4" />}
+                  </div>
+                )}
+              </button>
+            </div>
+            
+            {/* Expandable submenu */}
+            {item.expandable && (
+              <Collapsible open={expandedSections[item.text]}>
+                <CollapsibleContent>
+                  <div className="pl-4">
+                    {item.children?.map((child) => (
+                      <div key={child.text} className="mb-1">
+                        <button
+                          className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
+                            isPathActive(child.path)
+                              ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                          onClick={() => {
+                            navigate(child.path)
+                            setMobileOpen(false)
+                          }}
+                        >
+                          <span className={`text-sm ${
+                            isPathActive(child.path) ? 'font-semibold' : 'font-normal'
+                          }`}>
+                            {child.text}
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  )
+
+  const drawer = (
+    <div className="h-full bg-white">
+      {/* Header with logo and collapse button */}
+      <div className={`flex items-center min-h-[64px] ${sidebarCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'}`}>
+        <div className={`flex items-center ${sidebarCollapsed ? 'gap-0' : 'gap-2'}`}>
           {!sidebarCollapsed && (
-            <h6 className="font-bold text-black text-lg">
+            <>
+              <img 
+                src="/src/assets/images/logo.jpg" 
+                alt="Canefrost Logo" 
+                className="object-cover rounded-lg w-10 h-10"
+                onError={(e) => {
+                  e.target.style.display = 'none'
+                  console.error('Logo image failed to load')
+                }}
+              />
+              <h6 className="font-bold text-black text-lg">
                 CANEFROST
               </h6>
+            </>
           )}
         </div>
-        {!sidebarCollapsed && (
-          <Button 
-            variant="outline"
-            size="sm"
-            onClick={handleSidebarToggle}
-            className="text-gray-500 hover:text-gray-700 hover:bg-gray-50 p-2 shadow-sm"
-          >
+        <Button 
+          variant="outline"
+          size="sm"
+          onClick={handleSidebarToggle}
+          className={`text-gray-500 hover:text-gray-700 hover:bg-gray-50 shadow-sm transition-all duration-300 ${
+            sidebarCollapsed 
+              ? 'w-8 h-8 p-1' 
+              : 'p-2'
+          }`}
+        >
+          {sidebarCollapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
             <ChevronLeftIcon className="w-4 h-4" />
-          </Button>
-        )}
-        {sidebarCollapsed && (
-          <Button
-            onClick={handleSidebarToggle}
-            variant="outline"
-            size="icon"
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 z-10"
-          >
-            <ChevronRight className="h-3 w-3" />
-          </Button>
-        )}
+          )}
+        </Button>
       </div>
       <Separator />
       
@@ -355,8 +470,13 @@ function Layout({ children }) {
       <nav>
         {/* Mobile drawer */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="w-64 p-0 bg-white border-r border-gray-200">
-            {drawer}
+          <SheetContent 
+            side="left" 
+            className="w-64 p-0 bg-white border-r border-gray-200 overflow-y-auto"
+          >
+            <div className="h-full">
+              {mobileDrawer}
+            </div>
           </SheetContent>
         </Sheet>
 
@@ -376,10 +496,10 @@ function Layout({ children }) {
       <main
         className="flex-1 bg-gray-50 transition-all duration-300 overflow-auto"
         style={{
-          marginLeft: sidebarCollapsed ? 64 : 256,
+          marginLeft: isMobile ? 0 : (sidebarCollapsed ? 64 : 256),
           marginTop: '56px',
           height: 'calc(100vh - 56px)',
-          width: sidebarCollapsed ? 'calc(100% - 64px)' : 'calc(100% - 256px)'
+          width: isMobile ? '100%' : (sidebarCollapsed ? 'calc(100% - 64px)' : 'calc(100% - 256px)')
         }}
       >
         <div className="w-full h-full">

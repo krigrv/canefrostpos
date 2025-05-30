@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import toast from 'react-hot-toast'
+import { useInventory } from '../../hooks/useInventory'
 import {
   BarChart3 as AssessmentIcon,
   TrendingUp as TrendingUpIcon,
@@ -18,29 +19,176 @@ import {
 function Reports() {
   const [tabValue, setTabValue] = useState(0)
   const [dateRange, setDateRange] = useState('7days')
+  const { sales } = useInventory()
   
-  // Real-time sales data from Firestore - All values in INR
-  const [salesData] = useState({
-    totalSales: 0, // All revenue in INR
-    totalTransactions: 0,
-    averageOrderValue: 0,
-    topSellingItems: [],
-    peakHours: [],
-    dailySales: [],
-    categoryPerformance: []
-  })
+  // Calculate date range for filtering
+  const dateRangeFilter = useMemo(() => {
+    const now = new Date()
+    let startDate
+    
+    switch (dateRange) {
+      case '1day':
+        startDate = startOfDay(now)
+        break
+      case '7days':
+        startDate = startOfDay(subDays(now, 7))
+        break
+      case '30days':
+        startDate = startOfDay(subDays(now, 30))
+        break
+      case '90days':
+        startDate = startOfDay(subDays(now, 90))
+        break
+      default:
+        startDate = startOfDay(subDays(now, 7))
+    }
+    
+    return { startDate, endDate: endOfDay(now) }
+  }, [dateRange])
   
-  const [taxData] = useState({
-    totalTaxCollected: 0, // All tax amounts in INR
-    gstBreakdown: {
-      cgst: 0,
-      sgst: 0,
-      igst: 0
-    },
-    taxableAmount: 0,
-    exemptAmount: 0,
-    monthlyTaxSummary: []
-  })
+  // Filter sales based on date range
+  const filteredSales = useMemo(() => {
+    return sales.filter(sale => {
+      const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
+      return saleDate >= dateRangeFilter.startDate && saleDate <= dateRangeFilter.endDate
+    })
+  }, [sales, dateRangeFilter])
+  
+  // Calculate sales data from real sales
+  const salesData = useMemo(() => {
+    if (!filteredSales.length) {
+      return {
+        totalSales: 0,
+        totalTransactions: 0,
+        averageOrderValue: 0,
+        topSellingItems: [],
+        peakHours: [],
+        dailySales: [],
+        categoryPerformance: []
+      }
+    }
+    
+    const totalSales = filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0)
+    const totalTransactions = filteredSales.length
+    const averageOrderValue = totalTransactions > 0 ? totalSales / totalTransactions : 0
+    
+    // Calculate daily sales
+    const dailySalesMap = {}
+    filteredSales.forEach(sale => {
+      const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
+      const dateKey = format(saleDate, 'yyyy-MM-dd')
+      
+      if (!dailySalesMap[dateKey]) {
+        dailySalesMap[dateKey] = { sales: 0, transactions: 0 }
+      }
+      
+      dailySalesMap[dateKey].sales += sale.total || 0
+      dailySalesMap[dateKey].transactions += 1
+    })
+    
+    const dailySales = Object.entries(dailySalesMap)
+      .map(([date, data]) => ({ date, ...data }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+    
+    // Calculate top selling items
+    const itemsMap = {}
+    filteredSales.forEach(sale => {
+      if (sale.items) {
+        sale.items.forEach(item => {
+          if (!itemsMap[item.name]) {
+            itemsMap[item.name] = { quantity: 0, revenue: 0 }
+          }
+          itemsMap[item.name].quantity += item.quantity || 0
+          itemsMap[item.name].revenue += (item.quantity || 0) * (item.price || 0)
+        })
+      }
+    })
+    
+    const topSellingItems = Object.entries(itemsMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10)
+    
+    // Calculate peak hours
+    const hoursMap = {}
+    filteredSales.forEach(sale => {
+      const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
+      const hour = format(saleDate, 'HH:mm')
+      const hourKey = `${hour.split(':')[0]}:00-${(parseInt(hour.split(':')[0]) + 1).toString().padStart(2, '0')}:00`
+      
+      if (!hoursMap[hourKey]) {
+        hoursMap[hourKey] = { transactions: 0, revenue: 0 }
+      }
+      
+      hoursMap[hourKey].transactions += 1
+      hoursMap[hourKey].revenue += sale.total || 0
+    })
+    
+    const peakHours = Object.entries(hoursMap)
+      .map(([hour, data]) => ({ hour, ...data }))
+      .sort((a, b) => b.transactions - a.transactions)
+    
+    // Calculate category performance
+    const categoryMap = {}
+    filteredSales.forEach(sale => {
+      if (sale.items) {
+        sale.items.forEach(item => {
+          const category = item.type || 'Other'
+          if (!categoryMap[category]) {
+            categoryMap[category] = { sales: 0 }
+          }
+          categoryMap[category].sales += (item.quantity || 0) * (item.price || 0)
+        })
+      }
+    })
+    
+    const categoryPerformance = Object.entries(categoryMap)
+      .map(([category, data]) => ({
+        category,
+        sales: data.sales,
+        percentage: totalSales > 0 ? Math.round((data.sales / totalSales) * 100) : 0
+      }))
+      .sort((a, b) => b.sales - a.sales)
+    
+    return {
+      totalSales,
+      totalTransactions,
+      averageOrderValue,
+      topSellingItems,
+      peakHours,
+      dailySales,
+      categoryPerformance
+    }
+  }, [filteredSales])
+  
+  // Calculate tax data from real sales
+  const taxData = useMemo(() => {
+    if (!filteredSales.length) {
+      return {
+        totalTaxCollected: 0,
+        gstBreakdown: { cgst: 0, sgst: 0, igst: 0 },
+        taxableAmount: 0,
+        exemptAmount: 0,
+        monthlyTaxSummary: []
+      }
+    }
+    
+    const totalTaxCollected = filteredSales.reduce((sum, sale) => sum + (sale.tax || 0), 0)
+    const taxableAmount = filteredSales.reduce((sum, sale) => sum + (sale.subtotal || 0), 0)
+    
+    // Assuming CGST and SGST are half of total tax each for intra-state transactions
+    const cgst = totalTaxCollected / 2
+    const sgst = totalTaxCollected / 2
+    const igst = 0 // For inter-state transactions
+    
+    return {
+      totalTaxCollected,
+      gstBreakdown: { cgst, sgst, igst },
+      taxableAmount,
+      exemptAmount: 0,
+      monthlyTaxSummary: []
+    }
+  }, [filteredSales])
 
   const handleExportReport = (reportType) => {
     // In a real app, this would generate and download the actual report
@@ -107,11 +255,10 @@ function Reports() {
               <SelectValue placeholder="Select date range" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="1day">Today</SelectItem>
               <SelectItem value="7days">Last 7 Days</SelectItem>
               <SelectItem value="30days">Last 30 Days</SelectItem>
               <SelectItem value="90days">Last 90 Days</SelectItem>
-              <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -159,7 +306,7 @@ function Reports() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-orange-600">
-                  ₹{salesData.averageOrderValue}
+                  ₹{Math.round(salesData.averageOrderValue).toLocaleString()}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Per transaction</p>
               </CardContent>
@@ -171,7 +318,7 @@ function Reports() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">
-                  +12.5%
+                  {salesData.totalTransactions > 0 ? '+' : ''}0%
                 </div>
                 <p className="text-xs text-gray-500 mt-1">vs last period</p>
               </CardContent>

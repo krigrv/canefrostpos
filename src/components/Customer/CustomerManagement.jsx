@@ -58,33 +58,8 @@ function CustomerManagement() {
     address: ''
   })
 
-  // Sample purchase history data - in a real app, this would come from an API or context
-  const [purchaseHistory] = useState([
-    {
-      id: 1,
-      customerName: 'John Doe',
-      date: '2024-01-15',
-      items: ['Mango Juice', 'Orange Juice'],
-      total: 250,
-      pointsEarned: 25
-    },
-    {
-      id: 2,
-      customerName: 'Jane Smith',
-      date: '2024-01-14',
-      items: ['Apple Juice', 'Grape Juice', 'Lemon Juice'],
-      total: 375,
-      pointsEarned: 37
-    },
-    {
-      id: 3,
-      customerName: 'Mike Johnson',
-      date: '2024-01-13',
-      items: ['Pineapple Juice'],
-      total: 150,
-      pointsEarned: 15
-    }
-  ])
+  // Purchase history will be loaded from actual transaction data
+  const [purchaseHistory, setPurchaseHistory] = useState([]);
 
   const getTierColor = (tier) => {
     switch (tier) {

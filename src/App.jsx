@@ -103,25 +103,55 @@ function AppRoutes() {
         } 
       />
       <Route 
-            path="/settings" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Settings />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/demo" 
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <ShadcnDemo />
-                </Layout>
-              </ProtectedRoute>
-            } 
-          />
+        path="/reports/sales" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Reports />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/reports/payments" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Reports />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/reports/daybook" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Reports />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/settings" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Settings />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/demo" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ShadcnDemo />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
       <Route 
         path="/profile" 
         element={

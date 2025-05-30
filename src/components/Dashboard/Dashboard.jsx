@@ -60,7 +60,8 @@ import {
   Upload,
   Share,
   Mail,
-  MessageSquare
+  MessageSquare,
+  FileText
 } from 'lucide-react'
 import { useInventory } from '../../hooks/useInventory'
 import { useCustomers } from '../../contexts/CustomerContext'
@@ -71,6 +72,7 @@ import { format } from 'date-fns'
 import { v4 as uuidv4 } from 'uuid'
 import { render, Printer as ThermalPrinter, Text, Row, Br, Line, Cut } from 'react-thermal-printer'
 import { useReactToPrint } from 'react-to-print'
+import { jsPDF } from 'jspdf'
 
 // Import SVG icons
 import CitrusIcon from '../../assets/icons/citrus.svg'
@@ -101,6 +103,7 @@ function Dashboard() {
 
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedType, setSelectedType] = useState('all')
   const [checkoutDialog, setCheckoutDialog] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
   const [receiptDialog, setReceiptDialog] = useState(false)
@@ -120,6 +123,172 @@ function Dashboard() {
     content: () => thermalReceiptRef.current,
     documentTitle: 'Thermal Receipt'
   })
+
+  // PDF generation function
+  const handlePDFGeneration = () => {
+    if (!lastSale) return;
+    
+    try {
+      // Create new PDF document
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Set font
+      doc.setFont('helvetica');
+      
+      let yPosition = 20;
+      const lineHeight = 6;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Header
+      if (settings?.showBusinessName) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        const businessName = settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`;
+        doc.text(businessName, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += lineHeight + 2;
+        
+        if (settings?.thermalHeaderText) {
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'normal');
+          doc.text(settings.thermalHeaderText, pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += lineHeight;
+        }
+      }
+      
+      if (settings?.showBusinessAddress && settings?.businessAddress) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(settings.businessAddress, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += lineHeight;
+      }
+      
+      if (settings?.showGstNumber && settings?.gstNumber) {
+        doc.setFontSize(10);
+        doc.text(`GST: ${settings.gstNumber}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += lineHeight;
+      }
+      
+      // Divider
+      if (settings?.showDividers) {
+        yPosition += 3;
+        doc.line(20, yPosition, pageWidth - 20, yPosition);
+        yPosition += 5;
+      }
+      
+      // Transaction Details
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      if (settings?.showReceiptNumber) {
+        doc.text(`Receipt #: ${lastSale.transactionId}`, 20, yPosition);
+        yPosition += lineHeight;
+      }
+      
+      if (settings?.showDateTime) {
+        doc.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, 20, yPosition);
+        yPosition += lineHeight;
+        doc.text(`Time: ${format(new Date(), 'HH:mm:ss')}`, 20, yPosition);
+        yPosition += lineHeight;
+      }
+      
+      doc.text(`Cashier: ${currentUser?.displayName || 'Staff'}`, 20, yPosition);
+      yPosition += lineHeight + 3;
+      
+      // Divider
+      if (settings?.showDividers) {
+        doc.line(20, yPosition, pageWidth - 20, yPosition);
+        yPosition += 5;
+      }
+      
+      // Items header
+      doc.setFont('helvetica', 'bold');
+      doc.text('Item', 20, yPosition);
+      doc.text('Qty', pageWidth - 80, yPosition);
+      doc.text('Price', pageWidth - 60, yPosition);
+      doc.text('Total', pageWidth - 30, yPosition, { align: 'right' });
+      yPosition += lineHeight;
+      
+      // Items
+      doc.setFont('helvetica', 'normal');
+      lastSale.items.forEach((item) => {
+        doc.text(item.name, 20, yPosition);
+        doc.text(item.quantity.toString(), pageWidth - 80, yPosition);
+        doc.text(`₹${item.price.toFixed(2)}`, pageWidth - 60, yPosition);
+        doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' });
+        yPosition += lineHeight;
+      });
+      
+      yPosition += 3;
+      
+      // Divider
+      if (settings?.showDividers) {
+        doc.line(20, yPosition, pageWidth - 20, yPosition);
+        yPosition += 5;
+      }
+      
+      // Totals
+      doc.text('Subtotal:', pageWidth - 80, yPosition);
+      doc.text(`₹${lastSale.subtotal.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' });
+      yPosition += lineHeight;
+      
+      if (settings?.showTaxBreakdown) {
+        doc.text('GST (12%):', pageWidth - 80, yPosition);
+        doc.text(`₹${lastSale.tax.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' });
+        yPosition += lineHeight;
+      }
+      
+      // Total line
+      doc.line(pageWidth - 90, yPosition, pageWidth - 20, yPosition);
+      yPosition += 3;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('TOTAL:', pageWidth - 80, yPosition);
+      doc.text(`₹${lastSale.total.toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' });
+      yPosition += lineHeight + 3;
+      
+      // Payment Details
+      if (settings?.showPaymentMethod) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Payment: ${lastSale.paymentMethod}`, 20, yPosition);
+        yPosition += lineHeight;
+        
+        if (lastSale.changeAmount > 0) {
+          doc.text(`Change: ₹${lastSale.changeAmount.toFixed(2)}`, 20, yPosition);
+          yPosition += lineHeight;
+        }
+      }
+      
+      yPosition += 5;
+      
+      // Divider
+      if (settings?.showDividers) {
+        doc.line(20, yPosition, pageWidth - 20, yPosition);
+        yPosition += 5;
+      }
+      
+      // Footer
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'italic');
+      const footerText = settings?.thermalFooterText || 'Thank you for your business!';
+      doc.text(footerText, pageWidth / 2, yPosition, { align: 'center' });
+      
+      // Save the PDF
+      const fileName = `receipt-${lastSale.transactionId}-${format(new Date(), 'yyyyMMdd-HHmmss')}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('Receipt PDF generated and downloaded successfully!');
+      
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      toast.error('Failed to generate PDF receipt. Please try again.');
+    }
+  }
 
   // Print function for thermal receipt
   const handlePrint = async () => {
@@ -296,16 +465,30 @@ function Dashboard() {
     return Array.from(filterSet).sort()
   }, [products])
 
+  // Get unique product types for filtering
+  const typeFilters = useMemo(() => {
+    const filterSet = new Set()
+    products.forEach(product => {
+      if (product.type) {
+        filterSet.add(product.type)
+      }
+    })
+    return Array.from(filterSet).sort()
+  }, [products])
+
   // Filter and sort products
   const filteredProducts = useMemo(() => {
     return products
       .filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-        const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory
-        return matchesSearch && matchesCategory
+        const matchesCategory = !selectedCategory || selectedCategory === 'all' || 
+                             product.category === selectedCategory
+        const matchesType = !selectedType || selectedType === 'all' || 
+                           (product.type && product.type.toLowerCase() === selectedType.toLowerCase())
+        return matchesSearch && matchesCategory && matchesType
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [products, searchTerm, selectedCategory])
+  }, [products, searchTerm, selectedCategory, selectedType])
 
   // Calculate total with optional packaging charge
   const getCartTotalWithPackaging = () => {
@@ -490,19 +673,145 @@ function Dashboard() {
                       className="pl-10"
                     />
                   </div>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
+                  {/* Category Dropdown - Only visible on mobile */}
+                  <div className="block sm:hidden">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Filter by category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {categoryFilters.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Select value={selectedType} onValueChange={setSelectedType}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Filter by type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            {typeFilters.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Category Cards - Only visible on desktop */}
+                <div className="hidden sm:flex flex-col gap-3 mt-3">
+                  {/* Category row */}
+                  <div>
+                    <div className="text-sm font-medium mb-2">Categories</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedCategory === 'all' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        onClick={() => setSelectedCategory('all')}
+                      >
+                        <CardContent className="p-3 flex items-center justify-start">
+                          <div className="text-sm font-medium truncate">All Categories</div>
+                        </CardContent>
+                      </Card>
+                      
                       {categoryFilters.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
+                        <Card 
+                          key={category}
+                          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedCategory === category ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                          onClick={() => setSelectedCategory(category)}
+                        >
+                          <CardContent className="p-3 flex items-center justify-start">
+                            <div className="text-sm font-medium truncate">{category}</div>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Type row */}
+                  <div>
+                    <div className="text-sm font-medium mb-2">Types</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'all' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        onClick={() => setSelectedType('all')}
+                      >
+                        <CardContent className="p-3 flex items-center justify-start">
+                          <div className="text-sm font-medium truncate">All Types</div>
+                        </CardContent>
+                      </Card>
+                      
+                      {/* Citrus Category Card */}
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'citrus' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        onClick={() => setSelectedType('citrus')}
+                      >
+                        <CardContent className="p-3 flex items-center justify-start">
+                          <img src={CitrusIcon} alt="Citrus" className="w-6 h-6 mr-2 flex-shrink-0" />
+                          <div className="text-sm font-medium truncate">Citrus</div>
+                        </CardContent>
+                      </Card>
+                      
+                      {/* Berries Category Card */}
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'berries' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        onClick={() => setSelectedType('berries')}
+                      >
+                        <CardContent className="p-3 flex items-center justify-start">
+                          <img src={BerriesIcon} alt="Berries" className="w-6 h-6 mr-2 flex-shrink-0" />
+                          <div className="text-sm font-medium truncate">Berries</div>
+                        </CardContent>
+                      </Card>
+                      
+                      {/* Tropical Category Card */}
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'tropical' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        onClick={() => setSelectedType('tropical')}
+                      >
+                        <CardContent className="p-3 flex items-center justify-start">
+                          <img src={TropicalIcon} alt="Tropical" className="w-6 h-6 mr-2 flex-shrink-0" />
+                          <div className="text-sm font-medium truncate">Tropical</div>
+                        </CardContent>
+                      </Card>
+                      
+                      {/* Spiced/Herbal/Others Category Card */}
+                      <Card 
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'spiced/herbal/others' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        onClick={() => setSelectedType('spiced/herbal/others')}
+                      >
+                        <CardContent className="p-3 flex items-center justify-start">
+                          <img src={SpicedHerbalOthersIcon} alt="Spiced/Herbal/Others" className="w-6 h-6 mr-2 flex-shrink-0" />
+                          <div className="text-sm font-medium truncate">Spiced/Herbal/Others</div>
+                        </CardContent>
+                      </Card>
+                      
+                      {/* Dynamic Type Cards */}
+                      {typeFilters
+                        .filter(type => !['citrus', 'berries', 'tropical', 'spiced/herbal/others', 'spiced, herbal & others'].includes(type.toLowerCase()))
+                        .map((type) => (
+                          <Card 
+                            key={type}
+                            className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === type ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                            onClick={() => setSelectedType(type)}
+                          >
+                            <CardContent className="p-3 flex items-center justify-start">
+                              <div className="text-sm font-medium truncate">{type.charAt(0).toUpperCase() + type.slice(1)}</div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -538,17 +847,20 @@ function Dashboard() {
                                     </Badge>
                                   )}
                                 </div>
-                                <Badge variant={product.stock > 10 ? 'default' : 'destructive'} className="text-[10px] px-1 py-0 h-4 shrink-0 min-w-fit">
-                                  {product.stock}
-                                </Badge>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="font-bold text-base">₹{product.price}</span>
-                                {isInCart && (
-                                  <div className="flex items-center justify-center">
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px]">{product.stock}</span>
+                                  <div 
+                                    className={`h-2 w-2 rounded-full ${product.stock > 15 ? 'bg-green-500' : product.stock > 10 ? 'bg-orange-500' : 'bg-red-500'}`}
+                                  ></div>
+                                  {isInCart && (
+                                    <div className="flex items-center justify-center">
+                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </CardContent>
@@ -612,7 +924,10 @@ function Dashboard() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateCartQuantity(item.id, item.quantity - 1);
+                            }}
                             className="h-5 w-5 p-0"
                           >
                             <Minus className="h-2 w-2" />
@@ -621,7 +936,10 @@ function Dashboard() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => addToCart(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(item);
+                            }}
                             className="h-5 w-5 p-0"
                           >
                             <Plus className="h-2 w-2" />
@@ -1046,10 +1364,16 @@ function Dashboard() {
             <Button variant="outline" onClick={() => setReceiptDialog(false)}>
               Close
             </Button>
-            <Button onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print Receipt
-            </Button>
+            <div className="flex space-x-2">
+              <Button onClick={handlePrint} variant="outline">
+                <Printer className="h-4 w-4 mr-2" />
+                Thermal Print
+              </Button>
+              <Button onClick={handlePDFGeneration}>
+                <FileText className="h-4 w-4 mr-2" />
+                Save as PDF
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
