@@ -55,6 +55,8 @@ function ProductManagement() {
   }, [products])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [stockFilter, setStockFilter] = useState('all')
+  const [visibilityFilter, setVisibilityFilter] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [formData, setFormData] = useState({
@@ -64,14 +66,34 @@ function ProductManagement() {
     taxPercentage: 12,
     stock: 0,
     size: '',
-    type: ''
+    type: '',
+    visibility: 'shown'
   })
 
   // Filter products
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory
-    return matchesSearch && matchesCategory
+    
+    // Stock filter logic
+    let matchesStock = true
+    if (stockFilter === 'in-stock') {
+      matchesStock = product.stock > 0
+    } else if (stockFilter === 'out-of-stock') {
+      matchesStock = product.stock === 0
+    } else if (stockFilter === 'partially-out-of-stock') {
+      matchesStock = product.stock > 0 && product.stock <= 10 // Low stock threshold
+    }
+    
+    // Visibility filter logic
+    let matchesVisibility = true
+    if (visibilityFilter === 'shown') {
+      matchesVisibility = product.visibility === 'shown' || !product.visibility // Default to shown if not set
+    } else if (visibilityFilter === 'hidden') {
+      matchesVisibility = product.visibility === 'hidden'
+    }
+    
+    return matchesSearch && matchesCategory && matchesStock && matchesVisibility
   })
 
   const handleOpenDialog = (product = null) => {
@@ -84,7 +106,8 @@ function ProductManagement() {
         taxPercentage: product.taxPercentage || 12,
         stock: product.stock || 0,
         size: product.size || '',
-        type: product.type || ''
+        type: product.type || '',
+        visibility: product.visibility || 'shown'
       })
     } else {
       setEditingProduct(null)
@@ -95,7 +118,8 @@ function ProductManagement() {
         taxPercentage: 12,
         stock: 0,
         size: '',
-        type: ''
+        type: '',
+        visibility: 'shown'
       })
     }
     setDialogOpen(true)
@@ -111,7 +135,8 @@ function ProductManagement() {
       taxPercentage: 12,
       stock: 0,
       size: '',
-      type: ''
+      type: '',
+      visibility: 'shown'
     })
   }
 
@@ -135,7 +160,8 @@ function ProductManagement() {
       taxPercentage: parseFloat(formData.taxPercentage),
       stock: parseInt(formData.stock),
       size: formData.size,
-      type: formData.type
+      type: formData.type,
+      visibility: formData.visibility
     }
 
     try {
@@ -187,14 +213,27 @@ function ProductManagement() {
       </div>
       
       <div className="flex justify-between items-center mt-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2">
           <span className="text-xs text-gray-500">GST: {product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</span>
-          <Badge 
-            variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
-            className="text-xs h-6 font-semibold"
-          >
-            {product.stock || 0}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                product.stock > 10 ? 'bg-green-500' : 
+                product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
+              }`}></div>
+              <span className="text-xs font-medium text-gray-700">
+                Stock: {product.stock || 0}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                product.visibility === 'shown' ? 'bg-blue-500' : 'bg-gray-400'
+              }`}></div>
+              <span className="text-xs text-gray-600">
+                {product.visibility === 'shown' ? 'Visible' : 'Hidden'}
+              </span>
+            </div>
+          </div>
         </div>
         <div className="flex gap-1">
           <Button
@@ -236,31 +275,61 @@ function ProductManagement() {
        </div>
 
       {/* Search and Filter */}
-      <div className="bg-white p-3 md:p-6 mb-4 md:mb-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 items-center">
+      <div className="bg-white p-4 md:p-6 mb-6 md:mb-8 rounded-lg shadow-sm border border-gray-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 items-end">
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 text-sm md:text-base"
-            />
+            <Label className="text-sm md:text-base block mb-2">Search</Label>
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+              <Input
+                placeholder="Search by name..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 text-sm md:text-base h-10"
+              />
+            </div>
           </div>
           <div>
-             <Label htmlFor="category-select" className="text-sm md:text-base block mb-1">Category</Label>
-             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-               <SelectTrigger className="text-sm md:text-base">
-                 <SelectValue placeholder="Select category" />
-               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="all">All Categories</SelectItem>
-                 {categories.map(category => (
-                   <SelectItem key={category} value={category}>{category}</SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-           </div>
+            <Label htmlFor="category-select" className="text-sm md:text-base block mb-2">Category</Label>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="text-sm md:text-base h-10">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map(category => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="stock-filter" className="text-sm md:text-base block mb-2">Inventory</Label>
+            <Select value={stockFilter} onValueChange={setStockFilter}>
+              <SelectTrigger className="text-sm md:text-base h-10">
+                <SelectValue placeholder="Stock status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="in-stock">In stock</SelectItem>
+                <SelectItem value="out-of-stock">Out of stock</SelectItem>
+                <SelectItem value="partially-out-of-stock">Partially out of stock</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="visibility-filter" className="text-sm md:text-base block mb-2">Visibility</Label>
+            <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+              <SelectTrigger className="text-sm md:text-base h-10">
+                <SelectValue placeholder="Visibility status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="shown">Shown in online store</SelectItem>
+                <SelectItem value="hidden">Hidden from online store</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
          </div>
        </div>
 
@@ -286,7 +355,7 @@ function ProductManagement() {
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Size</TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Price (₹)</TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">GST (%)</TableHead>
-                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Stock</TableHead>
+                 <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Status</TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Actions</TableHead>
                </TableRow>
              </TableHeader>
@@ -314,12 +383,25 @@ function ProductManagement() {
                     <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
                     <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
                     <TableCell className="py-3 md:py-4">
-                      <Badge 
-                        variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
-                        className="text-xs md:text-sm h-6 md:h-7 font-semibold"
-                      >
-                        {product.stock || 0}
-                      </Badge>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            product.stock > 10 ? 'bg-green-500' : 
+                            product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}></div>
+                          <span className="text-xs md:text-sm font-medium text-gray-700">
+                            Stock: {product.stock || 0}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            product.visibility === 'shown' ? 'bg-blue-500' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-xs md:text-sm text-gray-600">
+                            {product.visibility === 'shown' ? 'Visible' : 'Hidden'}
+                          </span>
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell className="py-3 md:py-4">
                       <div className="flex gap-1 md:gap-2">
@@ -421,6 +503,19 @@ function ProductManagement() {
                     <SelectItem value="berries">Berries</SelectItem>
                     <SelectItem value="tropical">Tropical</SelectItem>
                     <SelectItem value="spiced, herbal & others">Spiced/Herbal/Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="visibility">Visibility</Label>
+                <Select value={formData.visibility} onValueChange={(value) => setFormData(prev => ({ ...prev, visibility: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="shown">Shown in online store</SelectItem>
+                    <SelectItem value="hidden">Hidden from online store</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
