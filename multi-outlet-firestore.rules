@@ -1,0 +1,229 @@
+/**
+ * Multi-Outlet Firebase Security Rules for Canefrost POS
+ * Supports centralized operations with outlet-specific data isolation
+ * Main account: canefrostmv@gmail.com has full access
+ * Other users have access only to their assigned outlets
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isMainAccount() {
+      return request.auth.token.email == 'canefrostmv@gmail.com';
+    }
+    
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasOutletAccess(outletId) {
+      return isMainAccount() || 
+             (outletId in getUserData().outlets) ||
+             (getUserData().managerId == outletId);
+    }
+    
+    function isOutletManager(outletId) {
+      return isMainAccount() || 
+             get(/databases/$(database)/documents/outlets/$(outletId)).data.managerId == request.auth.uid;
+    }
+    
+    function isAdmin() {
+      return isMainAccount() || getUserData().role == 'admin';
+    }
+    
+    function isManager() {
+      return isAdmin() || getUserData().role == 'manager';
+    }
+
+    // Users Collection - Users can manage their own data, main account can manage all
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (userId == request.auth.uid || isMainAccount());
+      allow write: if isAuthenticated() && (userId == request.auth.uid || isMainAccount());
+      allow create: if isAuthenticated();
+    }
+    
+    // Outlets Collection - Main account has full access, others read their assigned outlets
+    match /outlets/{outletId} {
+      allow read: if isAuthenticated() && hasOutletAccess(outletId);
+      allow create: if isMainAccount();
+      allow update: if isAuthenticated() && (isMainAccount() || isOutletManager(outletId));
+      allow delete: if isMainAccount();
+    }
+    
+    // Outlet-specific collections
+    match /outlets/{outletId}/{collection}/{docId} {
+      // Products - outlet staff can manage, main account has full access
+      allow read: if isAuthenticated() && hasOutletAccess(outletId);
+      allow write: if isAuthenticated() && hasOutletAccess(outletId) && isEmailVerified();
+      
+      // Nested subcollections
+      match /{document=**} {
+        allow read: if isAuthenticated() && hasOutletAccess(outletId);
+        allow write: if isAuthenticated() && hasOutletAccess(outletId) && isEmailVerified();
+      }
+    }
+    
+    // Centralized collections (main account only)
+    match /centralized/{collection}/{docId} {
+      allow read, write: if isMainAccount();
+      
+      match /{document=**} {
+        allow read, write: if isMainAccount();
+      }
+    }
+    
+    // Global settings (main account only)
+    match /global_settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isMainAccount();
+    }
+    
+    // Audit logs (main account and managers can read, system can write)
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated() && isManager();
+      allow create: if isAuthenticated();
+      allow update, delete: if isMainAccount();
+    }
+    
+    // Backup collections (main account only)
+    match /backups/{backupId} {
+      allow read, write: if isMainAccount();
+      
+      match /{document=**} {
+        allow read, write: if isMainAccount();
+      }
+    }
+    
+    // Analytics collections (outlet-specific access)
+    match /analytics/{outletId}/{collection}/{docId} {
+      allow read: if isAuthenticated() && hasOutletAccess(outletId);
+      allow write: if isAuthenticated() && hasOutletAccess(outletId);
+      
+      match /{document=**} {
+        allow read: if isAuthenticated() && hasOutletAccess(outletId);
+        allow write: if isAuthenticated() && hasOutletAccess(outletId);
+      }
+    }
+    
+    // Global analytics (main account only)
+    match /global_analytics/{collection}/{docId} {
+      allow read, write: if isMainAccount();
+      
+      match /{document=**} {
+        allow read, write: if isMainAccount();
+      }
+    }
+    
+    // Legacy collections for backward compatibility
+    // These will be migrated to outlet-specific collections
+    
+    // Products - Public read, authenticated write (legacy)
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Volume-based product collections (legacy)
+    match /products_240ml/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && isEmailVerified();
+    }
+    
+    match /products_500ml/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && isEmailVerified();
+    }
+    
+    match /products_1litre/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && isEmailVerified();
+    }
+    
+    match /products_others/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Sales - Users can access their own sales, main account can access all (legacy)
+    match /sales/{saleId} {
+      allow read: if isAuthenticated() && 
+                     (isMainAccount() || 
+                      request.auth.uid == resource.data.userId ||
+                      request.auth.uid == resource.data.cashierId);
+      allow create: if isAuthenticated() && isEmailVerified();
+      allow update, delete: if isAuthenticated() && 
+                              (isMainAccount() || 
+                               request.auth.uid == resource.data.userId ||
+                               request.auth.uid == resource.data.cashierId);
+    }
+    
+    // Settings - Users can access their own settings (legacy)
+    match /settings/{userId} {
+      allow read, write: if isAuthenticated() && 
+                           (request.auth.uid == userId || isMainAccount());
+    }
+    
+    // Staff - Authenticated users can read and write (legacy)
+    match /staff/{staffId} {
+      allow read, write: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Shifts - Authenticated users can read and write (legacy)
+    match /shifts/{shiftId} {
+      allow read, write: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Customers - Authenticated users can read and write (legacy)
+    match /customers/{customerId} {
+      allow read, write: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Reports - Authenticated users can read and write (legacy)
+    match /reports/{reportId} {
+      allow read, write: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Inventory transactions - Authenticated users can read and write (legacy)
+    match /inventory_transactions/{transactionId} {
+      allow read, write: if isAuthenticated() && isEmailVerified();
+    }
+    
+    // Business details (legacy)
+    match /businessDetails/{userId} {
+      allow read, write: if isAuthenticated() && 
+                           (request.auth.uid == userId || isMainAccount());
+    }
+    
+    // Admin collection - Main account only
+    match /admin/{document} {
+      allow read, write: if isMainAccount();
+    }
+    
+    // System collections
+    match /system/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isMainAccount();
+    }
+    
+    // Migration status tracking
+    match /migration/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isMainAccount();
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

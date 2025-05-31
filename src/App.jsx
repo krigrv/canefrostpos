@@ -1,6 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { OutletProvider } from './contexts/OutletContext'
 import { InventoryProvider } from './contexts/InventoryContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { StaffProvider } from './contexts/StaffContext'
@@ -17,6 +18,7 @@ import Reports from './components/Reports/Reports'
 import Settings from './components/Settings/Settings'
 import Layout from './components/Layout/Layout'
 import ShadcnDemo from './components/Demo/ShadcnDemo'
+import MultiOutletSystem from './components/MultiOutletSystem/MultiOutletSystem'
 import { Loader2 } from 'lucide-react'
 import { Toaster } from './components/ui/toaster'
 
@@ -162,6 +164,16 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/multi-outlet" 
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <MultiOutletSystem />
+            </Layout>
+          </ProtectedRoute>
+        } 
+      />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )
@@ -180,20 +192,22 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <SyncProvider>
-          <SettingsProvider>
-            <InventoryProvider>
-              <StaffProvider>
-                <CustomerProvider>
+        <OutletProvider>
+          <SyncProvider>
+            <SettingsProvider>
+              <InventoryProvider>
+                <StaffProvider>
+                  <CustomerProvider>
                   <div className="app">
                     <AppRoutes />
                     <Toaster />
                   </div>
-                </CustomerProvider>
-              </StaffProvider>
-            </InventoryProvider>
-          </SettingsProvider>
-        </SyncProvider>
+                  </CustomerProvider>
+                </StaffProvider>
+              </InventoryProvider>
+            </SettingsProvider>
+          </SyncProvider>
+        </OutletProvider>
       </AuthProvider>
     </Router>
   )

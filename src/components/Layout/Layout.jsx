@@ -27,7 +27,8 @@ import {
   BookOpen as BookOnlineIcon,
   TrendingUp as TrendingUpIcon,
   Palette as PaletteIcon,
-  X as CloseIcon
+  X as CloseIcon,
+  Building2 as BuildingIcon
 } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
@@ -70,6 +71,12 @@ const menuItems = [
     text: 'Reports',
     icon: <AssessmentIcon />,
     path: '/reports'
+  },
+  {
+    text: 'Multi-Outlet System',
+    icon: <BuildingIcon />,
+    path: '/multi-outlet',
+    badge: 'ENTERPRISE'
   },
   { 
     text: 'UI Demo', 
