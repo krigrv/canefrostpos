@@ -77,15 +77,21 @@ function Reports() {
     // Calculate daily sales
     const dailySalesMap = {}
     filteredSales.forEach(sale => {
-      const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
-      const dateKey = format(saleDate, 'yyyy-MM-dd')
-      
-      if (!dailySalesMap[dateKey]) {
-        dailySalesMap[dateKey] = { sales: 0, transactions: 0 }
+      try {
+        const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt || sale.timestamp)
+        if (isNaN(saleDate.getTime())) return // Skip invalid dates
+        const dateKey = format(saleDate, 'yyyy-MM-dd')
+        
+        if (!dailySalesMap[dateKey]) {
+          dailySalesMap[dateKey] = { sales: 0, transactions: 0 }
+        }
+        
+        dailySalesMap[dateKey].sales += sale.total || 0
+        dailySalesMap[dateKey].transactions += 1
+      } catch (error) {
+        console.warn('Error processing sale date:', error)
+        // Skip this sale if date processing fails
       }
-      
-      dailySalesMap[dateKey].sales += sale.total || 0
-      dailySalesMap[dateKey].transactions += 1
     })
     
     const dailySales = Object.entries(dailySalesMap)
@@ -114,16 +120,22 @@ function Reports() {
     // Calculate peak hours
     const hoursMap = {}
     filteredSales.forEach(sale => {
-      const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
-      const hour = format(saleDate, 'HH:mm')
-      const hourKey = `${hour.split(':')[0]}:00-${(parseInt(hour.split(':')[0]) + 1).toString().padStart(2, '0')}:00`
+      try {
+        const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt || sale.timestamp)
+        if (isNaN(saleDate.getTime())) return // Skip invalid dates
+        const hour = format(saleDate, 'HH:mm')
+        const hourKey = `${hour.split(':')[0]}:00-${(parseInt(hour.split(':')[0]) + 1).toString().padStart(2, '0')}:00`
       
       if (!hoursMap[hourKey]) {
         hoursMap[hourKey] = { transactions: 0, revenue: 0 }
       }
       
-      hoursMap[hourKey].transactions += 1
-      hoursMap[hourKey].revenue += sale.total || 0
+        hoursMap[hourKey].transactions += 1
+        hoursMap[hourKey].revenue += sale.total || 0
+      } catch (error) {
+        console.warn('Error processing sale date:', error)
+        // Skip this sale if date processing fails
+      }
     })
     
     const peakHours = Object.entries(hoursMap)

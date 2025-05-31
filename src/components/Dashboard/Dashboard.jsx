@@ -74,11 +74,11 @@ import { render, Printer as ThermalPrinter, Text, Row, Br, Line, Cut } from 'rea
 import { useReactToPrint } from 'react-to-print'
 import { jsPDF } from 'jspdf'
 
-// Import SVG icons
-import CitrusIcon from '../../assets/icons/citrus.svg'
-import BerriesIcon from '../../assets/icons/berries.svg'
-import TropicalIcon from '../../assets/icons/tropical.svg'
-import SpicedHerbalOthersIcon from '../../assets/icons/spicedherbalothers.svg'
+// Import SVG icons - using static paths for Vercel deployment
+const CitrusIcon = '/static/citrus.svg'
+const BerriesIcon = '/static/berries.svg'
+const TropicalIcon = '/static/tropical.svg'
+const SpicedHerbalOthersIcon = '/static/spicedherbalothers.svg'
 
 function Dashboard() {
   const {
@@ -114,6 +114,9 @@ function Dashboard() {
   const [upiAmount, setUpiAmount] = useState(0)
   const [receivedAmount, setReceivedAmount] = useState(0)
   const [discount, setDiscount] = useState(0)
+  const [showMobileCart, setShowMobileCart] = useState(false)
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('')
 
   // Thermal receipt ref for browser printing fallback
   const thermalReceiptRef = useRef()
@@ -633,7 +636,7 @@ function Dashboard() {
   const lowStockItems = products.filter(p => p.stock < 10).length
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       {/* Simplified Header */}
       <Card className="bg-black text-white border-0 rounded-none m-0">
         <CardContent className="p-3">
@@ -656,7 +659,7 @@ function Dashboard() {
       </Card>
 
       {/* Main POS Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-1 p-1 flex-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-1 p-1 flex-1 pb-20 lg:pb-1">
         {/* Product Selection Area */}
         <div className="lg:col-span-2 xl:col-span-3 space-y-2">
           <Card>
@@ -875,7 +878,7 @@ function Dashboard() {
         </div>
 
         {/* Cart Area */}
-        <div className="xl:col-span-1">
+        <div className="xl:col-span-1 hidden lg:block">
           <Card className="max-h-[calc(100vh-200px)]">
             <CardHeader className="pb-2 px-3 pt-3">
               <div className="flex justify-between items-center">
@@ -1047,58 +1050,41 @@ function Dashboard() {
             </div>
 
             {/* Discount Section */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Label>Discount</Label>
-              <div className="space-y-2">
-                <div className="flex space-x-2">
-                  <Input
-                    type="number"
-                    value={discount}
-                    onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                    placeholder="Enter discount amount"
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDiscount(0)}
-                    disabled={discount === 0}
-                  >
-                    Clear
-                  </Button>
-                </div>
-                <div className="flex space-x-2">
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                  placeholder="₹0"
+                  className="flex-1 h-8"
+                />
+                <div className="flex space-x-1">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setDiscount(50)}
-                    className="flex-1"
+                    className="h-8 px-2 text-xs"
                   >
                     ₹50
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setDiscount(100)}
-                    className="flex-1"
-                  >
-                    ₹100
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
                     onClick={() => setDiscount(Math.round(getCartTotalWithPackaging() * 0.1))}
-                    className="flex-1"
+                    className="h-8 px-2 text-xs"
                   >
                     10%
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setDiscount(Math.round(getCartTotalWithPackaging() * 0.2))}
-                    className="flex-1"
+                    onClick={() => setDiscount(0)}
+                    disabled={discount === 0}
+                    className="h-8 px-2 text-xs"
                   >
-                    20%
+                    Clear
                   </Button>
                 </div>
               </div>
@@ -1107,7 +1093,7 @@ function Dashboard() {
             {/* Payment Method */}
             <div className="space-y-3">
               <Label>Payment Method</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Card 
                   className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
                     paymentMethod === 'CASH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
@@ -1146,6 +1132,20 @@ function Dashboard() {
                     <div className="space-y-1">
                       <div className="text-lg">💳</div>
                       <div className="text-sm font-medium">Both</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card 
+                  className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    paymentMethod === 'CREDIT' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setPaymentMethod('CREDIT')}
+                >
+                  <CardContent className="p-3 text-center">
+                    <div className="space-y-1">
+                      <div className="text-lg">🏦</div>
+                      <div className="text-sm font-medium">Credit</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1193,6 +1193,54 @@ function Dashboard() {
                     placeholder="UPI amount"
                   />
                 </div>
+              </div>
+            )}
+
+            {paymentMethod === 'CREDIT' && (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Select Customer</Label>
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Search customers..."
+                      value={customerSearchTerm}
+                      onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                      className="h-8"
+                    />
+                    <Select value={selectedCustomer?.id || ''} onValueChange={(value) => {
+                      const customer = customers.find(c => c.id === value)
+                      setSelectedCustomer(customer || null)
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a customer for credit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customers
+                          .filter(customer => 
+                            customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+                            customer.phone.includes(customerSearchTerm)
+                          )
+                          .map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{customer.name}</span>
+                              <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {selectedCustomer && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="text-sm">
+                      <p className="font-medium">{selectedCustomer.name}</p>
+                      <p className="text-muted-foreground">{selectedCustomer.phone}</p>
+                      <p className="text-muted-foreground">Credit Limit: ₹{selectedCustomer.creditLimit || 10000}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1519,6 +1567,152 @@ function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Mobile Cart Button - Fixed Bottom */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg">
+        {cart.length > 0 ? (
+          <div className="p-4">
+            <Button 
+              onClick={() => setShowMobileCart(true)}
+              className="w-full bg-black text-white hover:bg-gray-800 flex items-center justify-between"
+              size="lg"
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                <span>View Cart ({cart.length} items)</span>
+              </div>
+              <span className="font-bold">₹{getCartTotalWithPackaging().toFixed(2)}</span>
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Mobile Cart Modal */}
+      {showMobileCart && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
+          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-lg max-h-[80vh] flex flex-col">
+            {/* Cart Header */}
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Your Cart ({cart.length} items)</h2>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowMobileCart(false)}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Cart Items */}
+            <div className="flex-1 overflow-auto p-4">
+              {cart.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingCart className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+                  <p className="text-gray-500">Your cart is empty</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cart.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-sm">{item.name}</h3>
+                        {item.size && (
+                          <Badge variant="outline" className="text-xs mt-1">{item.size}</Badge>
+                        )}
+                        <p className="text-sm text-gray-600">{item.category}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">₹{(item.price * item.quantity).toFixed(2)}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromCart(item.id)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Packaging Option & Cart Summary */}
+            {cart.length > 0 && (
+              <div className="border-t p-4 space-y-3">
+                {/* Packaging Option */}
+                <div className="flex items-center space-x-2 pb-2">
+                  <Checkbox
+                    id="mobile-packaging"
+                    checked={includePackaging}
+                    onCheckedChange={setIncludePackaging}
+                  />
+                  <Label htmlFor="mobile-packaging" className="text-sm">
+                    Include Packaging (₹{getPackagingCharge()})
+                  </Label>
+                </div>
+                
+                {/* Cart Summary */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>₹{getCartSubtotal().toFixed(2)}</span>
+                  </div>
+                  {includePackaging && getPackagingCharge() > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Packaging:</span>
+                      <span>₹{getPackagingCharge()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span>GST (12%):</span>
+                    <span>₹{getCartTaxWithPackaging().toFixed(2)}</span>
+                  </div>
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between font-bold">
+                      <span>Total:</span>
+                      <span>₹{getCartTotalWithPackaging().toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <Button 
+                  onClick={() => {
+                    setShowMobileCart(false)
+                    setCheckoutDialog(true)
+                  }}
+                  className="w-full bg-black text-white hover:bg-gray-800"
+                  size="lg"
+                >
+                  Proceed to Checkout
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   )

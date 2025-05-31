@@ -19,6 +19,10 @@
       "dest": "/favicon.svg"
     },
     {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
       "src": "/images/(.*)",
       "dest": "/images/$1"
     },

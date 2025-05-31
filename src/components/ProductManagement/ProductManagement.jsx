@@ -21,7 +21,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Badge
+  Badge,
+  Checkbox
 } from '@/components/ui'
 import {
   Plus as AddIcon,
@@ -29,7 +30,11 @@ import {
   Trash2 as DeleteIcon,
   Search as SearchIcon,
   Save,
-  X
+  X,
+  Download as ExportIcon,
+  Eye as VisibilityIcon,
+  EyeOff as HideIcon,
+  DollarSign as PriceIcon
 } from 'lucide-react'
 import { useInventory } from '../../hooks/useInventory'
 import toast from 'react-hot-toast'
@@ -59,6 +64,9 @@ function ProductManagement() {
   const [visibilityFilter, setVisibilityFilter] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
+  const [selectedProducts, setSelectedProducts] = useState(new Set())
+  const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = useState(false)
+  const [bulkPrice, setBulkPrice] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -95,6 +103,103 @@ function ProductManagement() {
     
     return matchesSearch && matchesCategory && matchesStock && matchesVisibility
   })
+
+  // Bulk operations
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedProducts(new Set(filteredProducts.map(p => p.id)))
+    } else {
+      setSelectedProducts(new Set())
+    }
+  }
+
+  const handleSelectProduct = (productId, checked) => {
+    const newSelected = new Set(selectedProducts)
+    if (checked) {
+      newSelected.add(productId)
+    } else {
+      newSelected.delete(productId)
+    }
+    setSelectedProducts(newSelected)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedProducts.size === 0) return
+    if (window.confirm(`Are you sure you want to delete ${selectedProducts.size} products?`)) {
+      try {
+        for (const productId of selectedProducts) {
+          await deleteProduct(productId)
+        }
+        setSelectedProducts(new Set())
+        toast.success(`${selectedProducts.size} products deleted successfully`)
+      } catch (error) {
+        toast.error('Failed to delete some products')
+      }
+    }
+  }
+
+  const handleBulkVisibility = async (visibility) => {
+    if (selectedProducts.size === 0) return
+    try {
+      for (const productId of selectedProducts) {
+        const product = products.find(p => p.id === productId)
+        if (product) {
+          await updateProduct(productId, { ...product, visibility })
+        }
+      }
+      setSelectedProducts(new Set())
+      toast.success(`${selectedProducts.size} products visibility updated`)
+    } catch (error) {
+      toast.error('Failed to update visibility for some products')
+    }
+  }
+
+  const handleBulkPriceUpdate = async () => {
+    if (selectedProducts.size === 0 || !bulkPrice) return
+    try {
+      for (const productId of selectedProducts) {
+        const product = products.find(p => p.id === productId)
+        if (product) {
+          await updateProduct(productId, { ...product, price: parseFloat(bulkPrice) })
+        }
+      }
+      setSelectedProducts(new Set())
+      setBulkPriceDialogOpen(false)
+      setBulkPrice('')
+      toast.success(`${selectedProducts.size} products price updated`)
+    } catch (error) {
+      toast.error('Failed to update price for some products')
+    }
+  }
+
+  const handleBulkExport = () => {
+    if (selectedProducts.size === 0) return
+    const selectedProductsData = products.filter(p => selectedProducts.has(p.id))
+    const csvContent = [
+      ['Name', 'Category', 'Size', 'Price', 'GST %', 'Stock', 'Visibility'].join(','),
+      ...selectedProductsData.map(p => [
+        p.name,
+        p.category,
+        p.size || '',
+        p.price,
+        p.taxPercentage || 12,
+        p.stock || 0,
+        p.visibility || 'shown'
+      ].join(','))
+    ].join('\n')
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `products_export_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success(`${selectedProducts.size} products exported`)
+  }
+
+  const isAllSelected = filteredProducts.length > 0 && selectedProducts.size === filteredProducts.length
+  const isIndeterminate = selectedProducts.size > 0 && selectedProducts.size < filteredProducts.length
 
   const handleOpenDialog = (product = null) => {
     if (product) {
@@ -193,20 +298,27 @@ function ProductManagement() {
   }
 
   // Mobile card view for products
-  const MobileProductCard = ({ product }) => (
+  const MobileProductCard = ({ product, isSelected, onSelect }) => (
     <div className="bg-white p-3 mb-3 rounded-lg shadow-sm border border-gray-200">
       <div className="flex justify-between items-start mb-2">
-        <div>
-          <h3 className="font-medium text-gray-900">{product.name}</h3>
-          <div className="flex flex-wrap gap-1 mt-1">
-            <Badge variant="outline" className="text-xs h-6">
-              {product.category}
-            </Badge>
-            {product.size && (
-              <Badge variant="outline" className="text-xs h-6 bg-blue-50 text-blue-700 border-blue-200">
-                {product.size}
+        <div className="flex items-start gap-3 flex-1">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onSelect}
+            className="mt-1"
+          />
+          <div className="flex-1">
+            <h3 className="font-medium text-gray-900">{product.name}</h3>
+            <div className="flex flex-wrap gap-1 mt-1">
+              <Badge variant="outline" className="text-xs h-6">
+                {product.category}
               </Badge>
-            )}
+              {product.size && (
+                <Badge variant="outline" className="text-xs h-6 bg-blue-50 text-blue-700 border-blue-200">
+                  {product.size}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="font-semibold text-green-600">₹{product.price}</div>
@@ -226,11 +338,13 @@ function ProductManagement() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                product.visibility === 'shown' ? 'bg-blue-500' : 'bg-gray-400'
-              }`}></div>
+              {product.visibility === 'shown' ? (
+                <HideIcon className="h-3 w-3 text-blue-500" />
+              ) : (
+                <VisibilityIcon className="h-3 w-3 text-gray-400" />
+              )}
               <span className="text-xs text-gray-600">
-                {product.visibility === 'shown' ? 'Visible' : 'Hidden'}
+                {product.visibility === 'shown' ? 'Shown' : 'Hidden'}
               </span>
             </div>
           </div>
@@ -333,12 +447,75 @@ function ProductManagement() {
          </div>
        </div>
 
+      {/* Bulk Actions */}
+      {selectedProducts.size > 0 && (
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedProducts.size} product{selectedProducts.size > 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkExport}
+                className="text-green-600 border-green-300 hover:bg-green-50"
+              >
+                <ExportIcon className="w-4 h-4 mr-1" />
+                Export
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleBulkVisibility('shown')}
+                className="text-blue-600 border-blue-300 hover:bg-blue-50"
+              >
+                <VisibilityIcon className="w-4 h-4 mr-1" />
+                Show
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleBulkVisibility('hidden')}
+                className="text-gray-600 border-gray-300 hover:bg-gray-50"
+              >
+                <HideIcon className="w-4 h-4 mr-1" />
+                Hide
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setBulkPriceDialogOpen(true)}
+                className="text-purple-600 border-purple-300 hover:bg-purple-50"
+              >
+                <PriceIcon className="w-4 h-4 mr-1" />
+                Price
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBulkDelete}
+                className="text-red-600 border-red-300 hover:bg-red-50"
+              >
+                <DeleteIcon className="w-4 h-4 mr-1" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Conditional rendering based on screen size */}
       {isMobile ? (
         // Mobile card view
         <div className="space-y-3">
           {filteredProducts.map((product) => (
-            <MobileProductCard key={product.id} product={product} />
+            <MobileProductCard 
+              key={product.id} 
+              product={product} 
+              isSelected={selectedProducts.has(product.id)}
+              onSelect={(checked) => handleSelectProduct(product.id, checked)}
+            />
           ))}
           {filteredProducts.length === 0 && (
             <div className="text-center py-8 text-gray-500">No products found</div>
@@ -350,6 +527,15 @@ function ProductManagement() {
           <Table>
             <TableHeader>
                <TableRow className="bg-gray-50">
+                 <TableHead className="w-12">
+                   <Checkbox
+                     checked={isAllSelected}
+                     onCheckedChange={handleSelectAll}
+                     ref={(el) => {
+                       if (el) el.indeterminate = isIndeterminate
+                     }}
+                   />
+                 </TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Name</TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Category</TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Size</TableHead>
@@ -365,6 +551,12 @@ function ProductManagement() {
                    key={product.id}
                    className="hover:bg-gray-50 transition-colors"
                   >
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedProducts.has(product.id)}
+                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                      />
+                    </TableCell>
                     <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
                     <TableCell className="py-3 md:py-4">
                       <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
@@ -394,11 +586,13 @@ function ProductManagement() {
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            product.visibility === 'shown' ? 'bg-blue-500' : 'bg-gray-400'
-                          }`}></div>
+                          {product.visibility === 'shown' ? (
+                            <HideIcon className="h-4 w-4 text-blue-500" />
+                          ) : (
+                            <VisibilityIcon className="h-4 w-4 text-gray-400" />
+                          )}
                           <span className="text-xs md:text-sm text-gray-600">
-                            {product.visibility === 'shown' ? 'Visible' : 'Hidden'}
+                            {product.visibility === 'shown' ? 'Shown' : 'Hidden'}
                           </span>
                         </div>
                       </div>
@@ -434,6 +628,39 @@ function ProductManagement() {
             </Table>
           </div>
         )}
+
+        {/* Bulk Price Update Dialog */}
+        <Dialog open={bulkPriceDialogOpen} onOpenChange={setBulkPriceDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Update Price for Selected Products</DialogTitle>
+              <DialogDescription>
+                Set a new price for {selectedProducts.size} selected product{selectedProducts.size > 1 ? 's' : ''}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="bulk-price">New Price (₹)</Label>
+                <Input
+                  id="bulk-price"
+                  type="number"
+                  step="0.01"
+                  value={bulkPrice}
+                  onChange={(e) => setBulkPrice(e.target.value)}
+                  placeholder="Enter new price"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkPriceDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleBulkPriceUpdate}>
+                Update Price
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Add/Edit Product Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

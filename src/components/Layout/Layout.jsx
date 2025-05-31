@@ -181,7 +181,7 @@ function Layout({ children }) {
       <div className="flex items-center min-h-[64px] px-4 justify-between">
         <div className="flex items-center gap-2">
           <img 
-            src="/src/assets/images/logo.jpg" 
+            src="/static/logo.jpg" 
             alt="Canefrost Logo" 
             className="object-cover rounded-lg w-10 h-10"
             onError={(e) => {
@@ -288,7 +288,7 @@ function Layout({ children }) {
           {!sidebarCollapsed && (
             <>
               <img 
-                src="/src/assets/images/logo.jpg" 
+                src="/static/logo.jpg" 
                 alt="Canefrost Logo" 
                 className="object-cover rounded-lg w-10 h-10"
                 onError={(e) => {
