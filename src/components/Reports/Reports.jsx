@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
+import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
 import toast from 'react-hot-toast'
 import { useInventory } from '../../hooks/useInventory'
@@ -19,7 +21,7 @@ import {
 } from 'lucide-react'
 
 function Reports() {
-  const [tabValue, setTabValue] = useState(0)
+  const [tabValue, setTabValue] = useState('infographics')
   const [dateRange, setDateRange] = useState('7days')
   const { sales } = useInventory()
   
@@ -214,11 +216,7 @@ function Reports() {
     toast.success('Tax report generated for filing!')
   }
 
-  const TabPanel = ({ children, value, index }) => (
-    <div className={value !== index ? 'hidden' : ''}>
-      {value === index && <div className="p-6 md:p-8">{children}</div>}
-    </div>
-  )
+
 
   const getPerformanceColor = (percentage) => {
     if (percentage >= 20) return 'success'
@@ -277,40 +275,46 @@ function Reports() {
            </div>
          </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <nav className="flex overflow-x-auto" aria-label="Tabs">
-          {[
-            { icon: BarChart3, label: 'Infographics', index: 0 },
-            { icon: ReceiptIcon, label: 'Order Details', index: 1 },
-            { icon: TrendingUpIcon, label: 'Trends', index: 2 },
-            { icon: ScheduleIcon, label: 'Peak Hours', index: 3 },
-            { icon: StarIcon, label: 'Popular Items', index: 4 },
-            { icon: TaxIcon, label: 'GST & Audit', index: 5 }
-          ].map(({ icon: Icon, label, index }) => (
-            <button
-              key={index}
-              onClick={() => setTabValue(index)}
-              className={`${
-                tabValue === index
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
-              } flex-1 min-w-max py-4 px-6 font-medium text-sm flex items-center justify-center gap-2 transition-all duration-200 border-r border-gray-200 last:border-r-0`}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden">{label.split(' ')[0]}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
+      {/* Tab Navigation and Content */}
+      <Tabs value={tabValue} onValueChange={setTabValue} className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+            <TabsTrigger value="infographics" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Infographics</span>
+              <span className="sm:hidden">Info</span>
+            </TabsTrigger>
+            <TabsTrigger value="orders" className="flex items-center gap-2">
+              <ReceiptIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Order Details</span>
+              <span className="sm:hidden">Orders</span>
+            </TabsTrigger>
+            <TabsTrigger value="trends" className="flex items-center gap-2">
+              <TrendingUpIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Trends</span>
+              <span className="sm:hidden">Trends</span>
+            </TabsTrigger>
+            <TabsTrigger value="peak" className="flex items-center gap-2">
+              <ScheduleIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Peak Hours</span>
+              <span className="sm:hidden">Peak</span>
+            </TabsTrigger>
+            <TabsTrigger value="popular" className="flex items-center gap-2">
+              <StarIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Popular Items</span>
+              <span className="sm:hidden">Popular</span>
+            </TabsTrigger>
+            <TabsTrigger value="gst" className="flex items-center gap-2">
+              <TaxIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">GST & Audit</span>
+              <span className="sm:hidden">GST</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-
-
-      {/* Tab Content Container */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {/* Infographics Tab */}
-        <TabPanel value={tabValue} index={0}>
+        <TabsContent value="infographics" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="space-y-8">
           {/* Key Metrics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -455,161 +459,197 @@ function Reports() {
             </Card>
           </div>
         </div>
-      </TabPanel>
+        </div>
+        </TabsContent>
 
-      {/* Order Details Tab */}
-      <TabPanel value={tabValue} index={1}>
-        <div className="space-y-8">
-          {/* Order Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <ReceiptIcon className="w-4 h-4" />
-                  Total Orders
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-blue-600 mb-2">
-                  {filteredSales.length}
-                </div>
-                <p className="text-sm text-gray-500">In selected period</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <TrendingUpIcon className="w-4 h-4" />
-                  Average Items per Order
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-green-600 mb-2">
-                  {filteredSales.length > 0 ? Math.round(filteredSales.reduce((sum, sale) => sum + (sale.items?.length || 0), 0) / filteredSales.length) : 0}
-                </div>
-                <p className="text-sm text-gray-500">Items per transaction</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover:shadow-lg transition-shadow duration-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <AssessmentIcon className="w-4 h-4" />
-                  Payment Methods
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-purple-600 mb-2">
-                  {new Set(filteredSales.map(sale => sale.paymentMethod || 'Cash')).size}
-                </div>
-                <p className="text-sm text-gray-500">Different methods used</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Orders Table */}
-          <Card className="hover:shadow-lg transition-shadow duration-200">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2">
-                <ReceiptIcon className="w-5 h-5 text-blue-600" />
-                Recent Order Details
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-2">
-                Detailed view of recent transactions and order information
-              </p>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b-2 border-gray-200">
-                      <th className="text-left py-4 px-2 font-semibold text-gray-700">Order ID</th>
-                      <th className="text-left py-4 px-2 font-semibold text-gray-700">Date & Time</th>
-                      <th className="text-left py-4 px-2 font-semibold text-gray-700">Items</th>
-                      <th className="text-right py-4 px-2 font-semibold text-gray-700">Quantity</th>
-                      <th className="text-right py-4 px-2 font-semibold text-gray-700">Amount</th>
-                      <th className="text-left py-4 px-2 font-semibold text-gray-700">Payment</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSales.slice(0, 10).map((sale, index) => {
-                      const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
-                      return (
-                        <tr key={sale.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-4 px-2">
-                            <div className="font-medium text-gray-900">
-                              #{sale.transactionId || `ORD-${index + 1}`}
-                            </div>
-                          </td>
-                          <td className="py-4 px-2">
-                            <div className="text-gray-900">{format(saleDate, 'MMM dd, yyyy')}</div>
-                            <div className="text-xs text-gray-500">{format(saleDate, 'hh:mm a')}</div>
-                          </td>
-                          <td className="py-4 px-2">
-                            <div className="space-y-1">
-                              {sale.items?.slice(0, 2).map((item, itemIndex) => (
-                                <div key={itemIndex} className="text-sm text-gray-900">
-                                  {item.name}
-                                </div>
-                              ))}
-                              {sale.items?.length > 2 && (
-                                <div className="text-xs text-gray-500">
-                                  +{sale.items.length - 2} more items
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="text-right py-4 px-2">
-                            <span className="font-medium text-gray-900">
-                              {sale.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1}
-                            </span>
-                          </td>
-                          <td className="text-right py-4 px-2">
-                            <span className="font-semibold text-gray-900">
-                              ₹{(sale.total || 0).toLocaleString()}
-                            </span>
-                          </td>
-                          <td className="py-4 px-2">
-                            <Badge 
-                              variant={sale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
-                              className={`${
-                                sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' :
-                                sale.paymentMethod === 'Card' ? 'bg-blue-100 text-blue-800' :
-                                'bg-purple-100 text-purple-800'
-                              }`}
-                            >
-                              {sale.paymentMethod || 'Cash'}
-                            </Badge>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              
-              {filteredSales.length === 0 && (
-                <div className="text-center py-12">
-                  <ReceiptIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No orders found for the selected period</p>
-                </div>
-              )}
-              
-              {filteredSales.length > 10 && (
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Showing latest 10 orders. Total {filteredSales.length} orders in selected period.
+        {/* Order Details Tab */}
+        <TabsContent value="orders" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Order History</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Complete transaction history and order details
                   </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </TabPanel>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleExportReport('Orders')}>
+                    <DownloadIcon className="w-4 h-4 mr-2" />
+                    Export Orders
+                  </Button>
+                </div>
+              </div>
 
-      {/* Trends Tab */}
-      <TabPanel value={tabValue} index={2}>
+              {/* Order Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <ReceiptIcon className="w-4 h-4" />
+                      Total Orders
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-3xl font-bold text-blue-600 mb-2">
+                      {filteredSales.length}
+                    </div>
+                    <p className="text-sm text-gray-500">In selected period</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <TrendingUpIcon className="w-4 h-4" />
+                      Average Items per Order
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-3xl font-bold text-green-600 mb-2">
+                      {filteredSales.length > 0 ? Math.round(filteredSales.reduce((sum, sale) => sum + (sale.items?.length || 0), 0) / filteredSales.length) : 0}
+                    </div>
+                    <p className="text-sm text-gray-500">Items per transaction</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <AssessmentIcon className="w-4 h-4" />
+                      Payment Methods
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="text-3xl font-bold text-purple-600 mb-2">
+                      {new Set(filteredSales.map(sale => sale.paymentMethod || 'Cash')).size}
+                    </div>
+                    <p className="text-sm text-gray-500">Different methods used</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardContent className="p-0">
+                  {filteredSales.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-gray-50">
+                            <th className="text-left py-4 px-6 font-medium">Order ID</th>
+                            <th className="text-left py-4 px-6 font-medium">Date & Time</th>
+                            <th className="text-left py-4 px-6 font-medium">Customer</th>
+                            <th className="text-right py-4 px-6 font-medium">Items</th>
+                            <th className="text-right py-4 px-6 font-medium">Total</th>
+                            <th className="text-left py-4 px-6 font-medium">Payment</th>
+                            <th className="text-left py-4 px-6 font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredSales.slice(0, 20).map((sale, index) => {
+                            const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
+                            return (
+                              <tr key={sale.id || index} className="border-b hover:bg-gray-50 transition-colors">
+                                <td className="py-4 px-6">
+                                  <div className="flex items-center">
+                                    <ReceiptIcon className="mr-2 h-4 w-4 text-blue-600" />
+                                    <span className="font-mono text-sm">#{sale.transactionId || `ORD-${String(index + 1).padStart(4, '0')}`}</span>
+                                  </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                  <div>
+                                    <div className="font-medium">
+                                      {format(saleDate, 'MMM dd, yyyy')}
+                                    </div>
+                                    <div className="text-gray-500 text-xs">
+                                      {format(saleDate, 'hh:mm a')}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-4 px-6">
+                                  <div>
+                                    <div className="font-medium">{sale.customerName || 'Walk-in Customer'}</div>
+                                    <div className="text-gray-500 text-xs">{sale.customerPhone || 'No contact info'}</div>
+                                  </div>
+                                </td>
+                                <td className="text-right py-4 px-6">
+                                  <div className="space-y-1">
+                                    <Badge variant="outline" className="font-medium">
+                                      {sale.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1} items
+                                    </Badge>
+                                    {sale.items && sale.items.length > 0 && (
+                                      <div className="text-xs text-gray-500">
+                                        {sale.items.slice(0, 2).map(item => item.name).join(', ')}
+                                        {sale.items.length > 2 && ` +${sale.items.length - 2} more`}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="text-right py-4 px-6">
+                                  <div className="font-bold text-lg">₹{(sale.total || 0).toLocaleString()}</div>
+                                  {sale.discount > 0 && (
+                                    <div className="text-xs text-green-600">-₹{sale.discount.toFixed(2)} discount</div>
+                                  )}
+                                </td>
+                                <td className="py-4 px-6">
+                                  <Badge 
+                                    variant={sale.paymentMethod === 'Cash' ? 'secondary' : 'default'}
+                                    className={`capitalize font-medium ${
+                                      sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' :
+                                      sale.paymentMethod === 'Card' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-purple-100 text-purple-800'
+                                    }`}
+                                  >
+                                    {sale.paymentMethod || 'Cash'}
+                                  </Badge>
+                                </td>
+                                <td className="py-4 px-6">
+                                  <Badge variant="default" className="bg-green-100 text-green-800 font-medium">
+                                    Completed
+                                  </Badge>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <ReceiptIcon className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+                      <p className="text-gray-500">No orders found for the selected period</p>
+                    </div>
+                  )}
+                  
+                  {filteredSales.length > 0 && (
+                    <div className="px-6 py-4 bg-gray-50 border-t">
+                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <p className="text-sm text-gray-600">
+                          Showing {Math.min(filteredSales.length, 20)} of {filteredSales.length} orders
+                        </p>
+                        {filteredSales.length > 20 && (
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" disabled>
+                              Previous
+                            </Button>
+                            <Button variant="outline" size="sm" disabled>
+                              Next
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Trends Tab */}
+        <TabsContent value="trends" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -667,11 +707,13 @@ function Reports() {
             </CardContent>
           </Card>
         </div>
-      </TabPanel>
+        </div>
+        </TabsContent>
 
-      {/* Popular Items Tab */}
-      <TabPanel value={tabValue} index={3}>
-        <div className="space-y-6">
+        {/* Peak Hours Tab */}
+        <TabsContent value="peak" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Top Selling Items</CardTitle>
@@ -740,25 +782,102 @@ function Reports() {
             </CardContent>
           </Card>
         </div>
-      </TabPanel>
+        </div>
+        </TabsContent>
 
-      {/* Tax & Audit Tab */}
-      <TabPanel value={tabValue} index={4}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Tax Summary Cards */}
+        {/* Popular Items Tab */}
+        <TabsContent value="popular" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Total GST Collected</CardTitle>
+              <CardTitle>Top Selling Items</CardTitle>
+              <p className="text-sm text-gray-600">
+                Track your best-performing products and optimize inventory
+              </p>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-600">
-                ₹{taxData.totalTaxCollected.toLocaleString()}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3">Rank</th>
+                      <th className="text-left py-3">Product Name</th>
+                      <th className="text-right py-3">Quantity Sold</th>
+                      <th className="text-right py-3">Revenue</th>
+                      <th className="text-right py-3">Avg Price</th>
+                      <th className="text-left py-3">Performance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesData.topSellingItems.map((item, index) => (
+                      <tr key={item.name} className="border-b">
+                        <td className="py-3">
+                          <Badge 
+                            variant={index === 0 ? 'default' : index === 1 ? 'secondary' : 'outline'}
+                            className={`${
+                              index === 0 ? 'bg-blue-500 text-white' :
+                              index === 1 ? 'bg-purple-500 text-white' : 'bg-gray-100'
+                            }`}
+                          >
+                            {index + 1}
+                          </Badge>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center">
+                            <StarIcon className="mr-2 h-4 w-4 text-yellow-500" />
+                            {item.name}
+                          </div>
+                        </td>
+                        <td className="text-right py-3">{item.quantity}</td>
+                        <td className="text-right py-3">₹{item.revenue.toLocaleString()}</td>
+                        <td className="text-right py-3">₹{Math.round(item.revenue / item.quantity)}</td>
+                        <td className="py-3">
+                          <div className="w-24 bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${
+                                index < 2 ? 'bg-green-500' :
+                                index < 4 ? 'bg-blue-500' : 'bg-gray-400'
+                              }`}
+                              style={{ width: `${(item.quantity / 85) * 100}%` }}
+                            ></div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <p className="text-sm text-gray-600 mt-1">
-                This month
-              </p>
+              
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>Insight:</strong> Citrus flavors (Lemon, Orange) are consistently popular. Consider expanding this category.
+                </p>
+              </div>
             </CardContent>
           </Card>
+        </div>
+        </div>
+        </TabsContent>
+
+        {/* GST & Audit Tab */}
+        <TabsContent value="gst" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Tax Summary Cards */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total GST Collected</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600">
+                    ₹{taxData.totalTaxCollected.toLocaleString()}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    This month
+                  </p>
+                </CardContent>
+              </Card>
           
           <Card>
             <CardHeader>
@@ -890,8 +1009,9 @@ function Reports() {
             </Card>
           </div>
         </div>
-      </TabPanel>
         </div>
+        </TabsContent>
+      </Tabs>
       </div>
     </div>
   )

@@ -139,11 +139,19 @@ export function SettingsProvider({ children }) {
   // Save settings to Firestore
   const saveSettings = async (newSettings) => {
     if (!currentUser) {
-      toast.error('User not authenticated')
+      console.error('SettingsContext: User not authenticated')
+      toast.error('User not authenticated. Please log in again.')
       return
     }
 
+    console.log('SettingsContext: Attempting to save settings:', newSettings)
+
     try {
+      // Validate Firebase connection
+      if (!db) {
+        throw new Error('Firebase database not initialized')
+      }
+
       const settingsDocRef = doc(db, 'settings', currentUser.uid)
       const updatedSettings = {
         ...settings,
@@ -151,16 +159,38 @@ export function SettingsProvider({ children }) {
         updatedAt: new Date()
       }
       
+      console.log('SettingsContext: Saving to Firestore with document ID:', currentUser.uid)
       await setDoc(settingsDocRef, updatedSettings, { merge: true })
+      
       setSettings(updatedSettings)
       
       // Also save to localStorage as backup
-      localStorage.setItem('posSettings', JSON.stringify(updatedSettings))
+      try {
+        localStorage.setItem('posSettings', JSON.stringify(updatedSettings))
+        console.log('SettingsContext: Settings also saved to localStorage')
+      } catch (localStorageError) {
+        console.warn('SettingsContext: Failed to save to localStorage:', localStorageError)
+      }
       
+      console.log('SettingsContext: Settings saved successfully')
       toast.success('Settings saved successfully')
     } catch (error) {
-      console.error('Error saving settings:', error)
-      toast.error('Failed to save settings')
+      console.error('SettingsContext: Error saving settings:', error)
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to save settings'
+      
+      if (error.code === 'permission-denied') {
+        errorMessage = 'Permission denied. Please check your account permissions.'
+      } else if (error.code === 'unavailable') {
+        errorMessage = 'Service temporarily unavailable. Please try again.'
+      } else if (error.code === 'unauthenticated') {
+        errorMessage = 'Authentication expired. Please log in again.'
+      } else if (error.message.includes('Firebase')) {
+        errorMessage = 'Database connection error. Please check your internet connection.'
+      }
+      
+      toast.error(errorMessage)
       throw error
     }
   }

@@ -77,11 +77,15 @@ function StaffManagement() {
     }
   }
 
-  const handleDeleteStaff = async (id) => {
+  const handleDeleteStaff = async (id, name) => {
+    const confirmed = window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)
+    if (!confirmed) return
+    
     try {
       await deleteStaffMember(id)
-      toast.success('Staff member removed')
+      toast.success('Staff member removed successfully')
     } catch (error) {
+      console.error('Error removing staff member:', error)
       toast.error('Error removing staff member')
     }
   }
@@ -175,8 +179,8 @@ function StaffManagement() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteStaff(member.id)}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => handleDeleteStaff(member.id, member.name)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>

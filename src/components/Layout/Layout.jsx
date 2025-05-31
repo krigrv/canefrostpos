@@ -73,16 +73,10 @@ const menuItems = [
     path: '/reports'
   },
   {
-    text: 'Multi-Outlet System',
+    text: 'MOS',
     icon: <BuildingIcon />,
     path: '/multi-outlet',
     badge: 'ENTERPRISE'
-  },
-  { 
-    text: 'UI Demo', 
-    icon: <PaletteIcon />, 
-    path: '/demo',
-    badge: 'NEW'
   },
   { 
     text: 'Profile', 

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui'
 import {
   Plus as AddIcon,
+  Plus,
   Edit as EditIcon,
   Trash2 as DeleteIcon,
   Search as SearchIcon,
@@ -34,30 +35,32 @@ import {
   Download as ExportIcon,
   Eye as VisibilityIcon,
   EyeOff as HideIcon,
-  DollarSign as PriceIcon
+  DollarSign as PriceIcon,
+  Filter as FilterIcon,
+  Settings
 } from 'lucide-react'
 import { useInventory } from '../../hooks/useInventory'
+import { useAdvancedDeviceDetection } from '../../hooks/useDeviceDetection'
 import toast from 'react-hot-toast'
 
 function ProductManagement() {
-  const { products, addProduct, updateProduct, deleteProduct } = useInventory()
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const { 
+    products, 
+    addProduct, 
+    updateProduct, 
+    deleteProduct, 
+    categories, 
+    addCategory, 
+    deleteCategory,
+    getCategoriesForDropdown 
+  } = useInventory()
+  const deviceInfo = useAdvancedDeviceDetection()
+  const { isMobile, isTablet, orientation } = deviceInfo
   
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  // Determine if we should show mobile filter layout
+  const showMobileFilters = isMobile || (isTablet && orientation === 'portrait')
   
-  // Dynamically get unique categories from products
-  const categories = React.useMemo(() => {
-    const uniqueCategories = [...new Set(products.map(product => product.category))]
-    return uniqueCategories.sort()
-  }, [products])
+  // Categories are now managed through InventoryContext
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [stockFilter, setStockFilter] = useState('all')
@@ -67,6 +70,10 @@ function ProductManagement() {
   const [selectedProducts, setSelectedProducts] = useState(new Set())
   const [bulkPriceDialogOpen, setBulkPriceDialogOpen] = useState(false)
   const [bulkPrice, setBulkPrice] = useState('')
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false)
+  const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false)
+  const [manageCategoriesDialogOpen, setManageCategoriesDialogOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -344,7 +351,7 @@ function ProductManagement() {
                 <VisibilityIcon className="h-3 w-3 text-gray-400" />
               )}
               <span className="text-xs text-gray-600">
-                {product.visibility === 'shown' ? 'Shown' : 'Hidden'}
+                {product.visibility === 'shown' ? 'Shown' : 'Not Shown'}
               </span>
             </div>
           </div>
@@ -405,100 +412,140 @@ function ProductManagement() {
           </div>
           <div>
             <Label htmlFor="category-select" className="text-sm md:text-base block mb-2">Category</Label>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="text-sm md:text-base h-10">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category} value={category}>{category}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="text-sm md:text-base h-10">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {getCategoriesForDropdown().map(category => (
+                    <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateCategoryDialogOpen(true)}
+                className="h-10 px-3 whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManageCategoriesDialogOpen(true)}
+                className="h-10 px-3 whitespace-nowrap"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-          <div>
-            <Label htmlFor="stock-filter" className="text-sm md:text-base block mb-2">Inventory</Label>
-            <Select value={stockFilter} onValueChange={setStockFilter}>
-              <SelectTrigger className="text-sm md:text-base h-10">
-                <SelectValue placeholder="Stock status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="in-stock">In stock</SelectItem>
-                <SelectItem value="out-of-stock">Out of stock</SelectItem>
-                <SelectItem value="partially-out-of-stock">Partially out of stock</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="visibility-filter" className="text-sm md:text-base block mb-2">Visibility</Label>
-            <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-              <SelectTrigger className="text-sm md:text-base h-10">
-                <SelectValue placeholder="Visibility status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="shown">Shown in online store</SelectItem>
-                <SelectItem value="hidden">Hidden from online store</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Desktop/Landscape Tablet Filters */}
+          {!showMobileFilters && (
+            <>
+              <div>
+                <Label className="text-sm md:text-base block mb-2">Inventory</Label>
+                <Select value={stockFilter} onValueChange={setStockFilter}>
+                  <SelectTrigger className="text-sm md:text-base h-10">
+                    <SelectValue placeholder="Select inventory status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="in-stock">In Stock</SelectItem>
+                    <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+                    <SelectItem value="partially-out-of-stock">Partially Out</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm md:text-base block mb-2">Visibility</Label>
+                <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+                  <SelectTrigger className="text-sm md:text-base h-10">
+                    <SelectValue placeholder="Select visibility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        <span>All</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="shown">
+                      <div className="flex items-center gap-2">
+                        <VisibilityIcon className="w-4 h-4" />
+                        <span>Visible</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="hidden">
+                      <div className="flex items-center gap-2">
+                        <HideIcon className="w-4 h-4" />
+                        <span>Hidden</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+          
+          {/* Mobile/Portrait Tablet Filter Button */}
+          {showMobileFilters && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFilterDialogOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <FilterIcon className="w-4 h-4" />
+                Filters
+                {(stockFilter !== 'all' || visibilityFilter !== 'all') && (
+                  <Badge variant="secondary" className="ml-1 px-1 py-0 text-xs">
+                    {[stockFilter !== 'all' ? 1 : 0, visibilityFilter !== 'all' ? 1 : 0].reduce((a, b) => a + b, 0)}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+          )}
          </div>
        </div>
 
       {/* Bulk Actions */}
       {selectedProducts.size > 0 && (
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-900">
+            <span className="text-sm font-medium text-gray-900">
               {selectedProducts.size} product{selectedProducts.size > 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleBulkExport}
-                className="text-green-600 border-green-300 hover:bg-green-50"
+                onClick={() => {
+                  // Toggle visibility based on first selected product's current state
+                  const firstProduct = products.find(p => selectedProducts.has(p.id))
+                  const newVisibility = firstProduct?.visibility === 'shown' ? 'hidden' : 'shown'
+                  handleBulkVisibility(newVisibility)
+                }}
+                className="text-gray-600 border-gray-300 hover:bg-gray-100"
               >
-                <ExportIcon className="w-4 h-4 mr-1" />
-                Export
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkVisibility('shown')}
-                className="text-blue-600 border-blue-300 hover:bg-blue-50"
-              >
-                <VisibilityIcon className="w-4 h-4 mr-1" />
-                Show
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleBulkVisibility('hidden')}
-                className="text-gray-600 border-gray-300 hover:bg-gray-50"
-              >
-                <HideIcon className="w-4 h-4 mr-1" />
-                Hide
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setBulkPriceDialogOpen(true)}
-                className="text-purple-600 border-purple-300 hover:bg-purple-50"
-              >
-                <PriceIcon className="w-4 h-4 mr-1" />
-                Price
+                {(() => {
+                  const firstProduct = products.find(p => selectedProducts.has(p.id))
+                  return firstProduct?.visibility === 'shown' ? (
+                    <HideIcon className="w-4 h-4" />
+                  ) : (
+                    <VisibilityIcon className="w-4 h-4" />
+                  )
+                })()}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={handleBulkDelete}
-                className="text-red-600 border-red-300 hover:bg-red-50"
+                className="text-gray-600 border-gray-300 hover:bg-gray-100"
               >
-                <DeleteIcon className="w-4 h-4 mr-1" />
-                Delete
+                <DeleteIcon className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -527,14 +574,16 @@ function ProductManagement() {
           <Table>
             <TableHeader>
                <TableRow className="bg-gray-50">
-                 <TableHead className="w-12">
-                   <Checkbox
-                     checked={isAllSelected}
-                     onCheckedChange={handleSelectAll}
-                     ref={(el) => {
-                       if (el) el.indeterminate = isIndeterminate
-                     }}
-                   />
+                 <TableHead className="w-12 px-4">
+                   <div className="flex justify-center">
+                     <Checkbox
+                       checked={isAllSelected}
+                       onCheckedChange={handleSelectAll}
+                       ref={(el) => {
+                         if (el) el.indeterminate = isIndeterminate
+                       }}
+                     />
+                   </div>
                  </TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Name</TableHead>
                  <TableHead className="font-semibold text-xs md:text-sm text-gray-700 py-3 md:py-4">Category</TableHead>
@@ -551,11 +600,13 @@ function ProductManagement() {
                    key={product.id}
                    className="hover:bg-gray-50 transition-colors"
                   >
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedProducts.has(product.id)}
-                        onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
-                      />
+                    <TableCell className="px-4">
+                      <div className="flex justify-center">
+                        <Checkbox
+                          checked={selectedProducts.has(product.id)}
+                          onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
                     <TableCell className="py-3 md:py-4">
@@ -592,7 +643,7 @@ function ProductManagement() {
                             <VisibilityIcon className="h-4 w-4 text-gray-400" />
                           )}
                           <span className="text-xs md:text-sm text-gray-600">
-                            {product.visibility === 'shown' ? 'Shown' : 'Hidden'}
+                            {product.visibility === 'shown' ? 'Shown' : 'Not Shown'}
                           </span>
                         </div>
                       </div>
@@ -688,9 +739,9 @@ function ProductManagement() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                    {getCategoriesForDropdown().map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -742,7 +793,7 @@ function ProductManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="shown">Shown in online store</SelectItem>
-                    <SelectItem value="hidden">Hidden from online store</SelectItem>
+                    <SelectItem value="hidden">Not shown in online store</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -780,6 +831,215 @@ function ProductManagement() {
               <Button onClick={handleSave} className="w-full sm:w-auto">
                 <Save className="w-4 h-4 mr-2" />
                 {editingProduct ? 'Update' : 'Add'} Product
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Mobile Filter Dialog */}
+        <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FilterIcon className="w-5 h-5" />
+                Filter Products
+              </DialogTitle>
+              <DialogDescription>
+                Apply filters to narrow down your product list
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Inventory Filter */}
+              <div>
+                <Label className="text-base font-medium block mb-3">Inventory Status</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'All', value: 'all' },
+                    { label: 'In Stock', value: 'in-stock' },
+                    { label: 'Out of Stock', value: 'out-of-stock' },
+                    { label: 'Partially Out', value: 'partially-out-of-stock' }
+                  ].map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={stockFilter === option.value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setStockFilter(option.value)}
+                      className={`transition-all duration-200 text-xs ${
+                        stockFilter === option.value 
+                          ? 'bg-blue-600 text-white shadow-md' 
+                          : 'hover:bg-blue-50 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Visibility Filter */}
+              <div>
+                <Label className="text-base font-medium block mb-3">Visibility</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'All', value: 'all' },
+                    { label: 'Shown', value: 'shown' },
+                    { label: 'Not Shown', value: 'hidden' }
+                  ].map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={visibilityFilter === option.value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setVisibilityFilter(option.value)}
+                      className={`transition-all duration-200 text-xs ${
+                        visibilityFilter === option.value 
+                          ? 'bg-blue-600 text-white shadow-md' 
+                          : 'hover:bg-blue-50 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStockFilter('all')
+                  setVisibilityFilter('all')
+                }}
+                className="flex-1"
+              >
+                Clear All
+              </Button>
+              <Button
+                onClick={() => setFilterDialogOpen(false)}
+                className="flex-1"
+              >
+                Apply Filters
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Category Dialog */}
+        <Dialog open={createCategoryDialogOpen} onOpenChange={setCreateCategoryDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create New Category</DialogTitle>
+              <DialogDescription>
+                Add a new category for your products.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="category-name" className="text-sm font-medium">Category Name</Label>
+                <Input
+                  id="category-name"
+                  placeholder="Enter category name"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            
+            <DialogFooter className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreateCategoryDialogOpen(false)
+                  setNewCategoryName('')
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (newCategoryName.trim()) {
+                    try {
+                      // Actually save to Firebase
+                      await addCategory({
+                        name: newCategoryName.trim(),
+                        description: `Custom category: ${newCategoryName.trim()}`
+                      })
+                      
+                      // Update local form state
+                      setFormData(prev => ({ ...prev, category: newCategoryName.trim() }))
+                      setSelectedCategory(newCategoryName.trim())
+                      setCreateCategoryDialogOpen(false)
+                      setNewCategoryName('')
+                      // Success toast is already handled by addCategory function
+                    } catch (error) {
+                      toast.error('Failed to create category')
+                    }
+                  } else {
+                    toast.error('Please enter a category name')
+                  }
+                }}
+                className="flex-1"
+                disabled={!newCategoryName.trim()}
+              >
+                Create Category
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Manage Categories Dialog */}
+        <Dialog open={manageCategoriesDialogOpen} onOpenChange={setManageCategoriesDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Manage Categories</DialogTitle>
+              <DialogDescription>
+                View and delete existing categories. Note: Categories with products cannot be deleted.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {categories.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">No categories found</p>
+              ) : (
+                categories.map((category) => (
+                  <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm">{category.name}</h4>
+                      {category.description && (
+                        <p className="text-xs text-gray-500 mt-1">{category.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await deleteCategory(category.id)
+                          // Success toast is handled by deleteCategory function
+                        } catch (error) {
+                          toast.error('Failed to delete category')
+                        }
+                      }}
+                      className="ml-2 h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <DeleteIcon className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setManageCategoriesDialogOpen(false)}
+                className="w-full"
+              >
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

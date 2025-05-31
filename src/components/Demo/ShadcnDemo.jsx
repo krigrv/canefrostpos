@@ -13,7 +13,9 @@ import { Progress } from '../ui/progress'
 import { Separator } from '../ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { useToast } from '../ui/use-toast'
-import { CheckCircle, AlertCircle, ShoppingCart, Users, Package } from 'lucide-react'
+import { Textarea } from '../ui/textarea'
+import { CheckCircle, AlertCircle, ShoppingCart, Users, Package, Info, XCircle } from 'lucide-react'
+import ErrorTestingDemo from '../DevTools/ErrorTestingDemo'
 
 const ShadcnDemo = () => {
   const [inputValue, setInputValue] = useState('')
@@ -105,10 +107,11 @@ const ShadcnDemo = () => {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="forms" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="forms">Forms</TabsTrigger>
               <TabsTrigger value="controls">Controls</TabsTrigger>
               <TabsTrigger value="display">Display</TabsTrigger>
+              <TabsTrigger value="testing">Log Testing</TabsTrigger>
             </TabsList>
             
             <TabsContent value="forms" className="space-y-4">
@@ -213,6 +216,10 @@ const ShadcnDemo = () => {
                 <Button variant="ghost">Ghost</Button>
                 <Button variant="destructive">Destructive</Button>
               </div>
+            </TabsContent>
+            
+            <TabsContent value="testing" className="space-y-4">
+              <ErrorTestingDemo />
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -22,6 +22,7 @@ import MultiOutletSystem from './components/MultiOutletSystem/MultiOutletSystem'
 import { Loader2 } from 'lucide-react'
 import { Toaster } from './components/ui/toaster'
 
+
 function ProtectedRoute({ children }) {
   const { currentUser } = useAuth()
   return currentUser ? children : <Navigate to="/login" />

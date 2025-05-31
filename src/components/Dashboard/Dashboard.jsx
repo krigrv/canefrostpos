@@ -93,6 +93,7 @@ function Dashboard() {
     getCartTax,
     getCartSubtotal,
     getCategoryGroup,
+    categories,
     sales,
     addSale
   } = useInventory()
@@ -461,12 +462,8 @@ function Dashboard() {
 
   // Get unique categories from products
   const categoryFilters = useMemo(() => {
-    const filterSet = new Set()
-    products.forEach(product => {
-      filterSet.add(product.category)
-    })
-    return Array.from(filterSet).sort()
-  }, [products])
+    return categories.map(category => category.name).sort()
+  }, [categories])
 
   // Get unique product types for filtering
   const typeFilters = useMemo(() => {
@@ -1277,29 +1274,29 @@ function Dashboard() {
               </div>
               
               {/* Thermal Receipt Preview */}
-              <div className="border rounded-lg p-3 bg-gray-50 max-h-64 overflow-y-auto">
-                <div className="text-xs font-mono leading-tight" style={{ width: '80mm', maxWidth: '100%' }}>
+              <div className="border rounded-lg p-2 bg-gray-50 max-h-64 overflow-y-auto">
+                <div className="text-xs font-mono leading-tight w-full max-w-sm mx-auto">
                   {/* Header */}
                   {settings?.showBusinessName && (
-                    <div className="text-center font-bold text-sm mb-1">
+                    <div className="text-center font-bold text-sm">
                       {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
                     </div>
                   )}
                   
                   {settings?.thermalHeaderText && (
-                    <div className="text-center mb-1">
+                    <div className="text-center">
                       {settings.thermalHeaderText}
                     </div>
                   )}
                   
                   {settings?.showBusinessAddress && settings?.businessAddress && (
-                    <div className="text-center mb-1">
+                    <div className="text-center">
                       {settings.businessAddress}
                     </div>
                   )}
                   
                   {settings?.showGstNumber && settings?.gstNumber && (
-                    <div className="text-center mb-1">
+                    <div className="text-center">
                       GST: {settings.gstNumber}
                     </div>
                   )}
@@ -1322,17 +1319,17 @@ function Dashboard() {
                   {settings?.showDividers && <div className="border-t border-dashed border-gray-400 my-1" />}
                   
                   {/* Items */}
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {(lastSale.items || []).map((item, index) => (
                       <div key={index}>
                         <div className="flex justify-between">
                           <span className="truncate flex-1 mr-2">{item.name || 'Unknown Item'}</span>
-                          <span>₹{(item.price || 0).toLocaleString()}</span>
+                          <span className="flex-shrink-0">₹{(item.price || 0).toLocaleString()}</span>
                         </div>
                         {(item.quantity || 1) > 1 && (
                           <div className="flex justify-between text-xs text-gray-600">
                             <span>{item.quantity || 1} x ₹{(item.price || 0).toLocaleString()}</span>
-                            <span>₹{((item.quantity || 1) * (item.price || 0)).toLocaleString()}</span>
+                            <span className="flex-shrink-0">₹{((item.quantity || 1) * (item.price || 0)).toLocaleString()}</span>
                           </div>
                         )}
                       </div>
@@ -1342,35 +1339,35 @@ function Dashboard() {
                   {settings?.showDividers && <div className="border-t border-dashed border-gray-400 my-1" />}
                   
                   {/* Totals */}
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
-                      <span>₹{(lastSale.subtotal || 0).toLocaleString()}</span>
+                      <span className="flex-shrink-0">₹{(lastSale.subtotal || 0).toLocaleString()}</span>
                     </div>
                     {(lastSale.packagingCharge || 0) > 0 && (
                       <div className="flex justify-between">
                         <span>Packaging:</span>
-                        <span>₹{(lastSale.packagingCharge || 0).toLocaleString()}</span>
+                        <span className="flex-shrink-0">₹{(lastSale.packagingCharge || 0).toLocaleString()}</span>
                       </div>
                     )}
                     {(lastSale.tax || 0) > 0 && (
                       <div className="flex justify-between">
                         <span>Tax:</span>
-                        <span>₹{(lastSale.tax || 0).toLocaleString()}</span>
+                        <span className="flex-shrink-0">₹{(lastSale.tax || 0).toLocaleString()}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold border-t border-gray-400 pt-1">
                       <span>TOTAL:</span>
-                      <span>₹{(lastSale.total || 0).toLocaleString()}</span>
+                      <span className="flex-shrink-0">₹{(lastSale.total || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Payment ({lastSale.paymentMethod || 'Cash'}):</span>
-                      <span>₹{(lastSale.amountPaid || 0).toLocaleString()}</span>
+                      <span className="flex-shrink-0">₹{(lastSale.amountPaid || 0).toLocaleString()}</span>
                     </div>
                     {(lastSale.changeAmount || 0) > 0 && (
                       <div className="flex justify-between font-bold">
                         <span>Change:</span>
-                        <span>₹{(lastSale.changeAmount || 0).toLocaleString()}</span>
+                        <span className="flex-shrink-0">₹{(lastSale.changeAmount || 0).toLocaleString()}</span>
                       </div>
                     )}
                   </div>
@@ -1383,7 +1380,7 @@ function Dashboard() {
                     </div>
                   )}
                   
-                  <div className="text-center mt-2 text-xs">
+                  <div className="text-center text-xs mt-2">
                     Thank you for your business!
                   </div>
                 </div>
@@ -1621,26 +1618,28 @@ function Dashboard() {
                         {item.size && (
                           <Badge variant="outline" className="text-xs mt-1">{item.size}</Badge>
                         )}
-                        <p className="text-sm text-gray-600">{item.category}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                        <div className="flex items-center gap-3 mt-1">
+                          <p className="text-sm text-gray-600">{item.category}</p>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-6 text-center text-xs font-medium">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-sm">₹{(item.price * item.quantity).toFixed(2)}</p>

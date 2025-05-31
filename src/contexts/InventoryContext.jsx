@@ -25,6 +25,7 @@ function InventoryProvider({ children }) {
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [sales, setSales] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [pendingUpdates, setPendingUpdates] = useState(new Set())
   const { queueOperation, isOnline, syncCollection } = useSync()
@@ -352,37 +353,45 @@ function InventoryProvider({ children }) {
     }
   }
 
-  // Upload all inventory data from JSON file to Firebase
-  const uploadAllInventoryToFirebase = async () => {
+  // Auto-sync inventory data from JSON file to Firebase
+  const autoSyncInventoryToFirebase = async () => {
     try {
-      setLoading(true)
+      console.log('🔄 Auto-syncing inventory from formatted_inventory.json to Firebase...')
       
       // Fetch the inventory JSON data from formatted_inventory.json
       const response = await fetch('/formatted_inventory.json')
       if (!response.ok) {
-        throw new Error('Failed to fetch inventory data')
+        console.warn('Could not fetch formatted_inventory.json for auto-sync')
+        return
       }
       const inventoryData = await response.json()
       
       // Get all existing products from Firebase
       const snapshot = await getDocs(collection(db, 'products'))
+      const existingProducts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
       
-      // Delete all existing products
-      if (snapshot.docs.length > 0) {
-        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref))
-        await Promise.all(deletePromises)
-        console.log(`Deleted ${snapshot.docs.length} existing products`)
-      }
+      // Create a map of existing products by name for quick lookup
+      const existingProductsMap = new Map()
+      existingProducts.forEach(product => {
+        existingProductsMap.set(product.name, product)
+      })
       
-      // Transform and upload all inventory data
-      const uploadPromises = inventoryData.map(item => {
+      // Track changes
+      let addedCount = 0
+      let updatedCount = 0
+      let deletedCount = 0
+      
+      // Add or update products from JSON
+      const syncPromises = inventoryData.map(async (item) => {
         const productData = {
           name: item.name,
           category: item.category,
           price: item.price,
           taxPercentage: item.taxPercentage,
-          stock: item.stock || 50, // Use existing stock or default
-          createdAt: new Date(),
+          stock: item.stock || 50,
           updatedAt: new Date()
         }
         
@@ -391,13 +400,85 @@ function InventoryProvider({ children }) {
           productData.size = item.size
         }
         
-        return addDoc(collection(db, 'products'), productData)
+        const existingProduct = existingProductsMap.get(item.name)
+        
+        if (existingProduct) {
+          // Update existing product if data has changed
+          const hasChanges = (
+            existingProduct.category !== item.category ||
+            existingProduct.price !== item.price ||
+            existingProduct.taxPercentage !== item.taxPercentage ||
+            existingProduct.size !== item.size
+          )
+          
+          if (hasChanges) {
+            await updateDoc(doc(db, 'products', existingProduct.id), productData)
+            updatedCount++
+            console.log(`📝 Updated product: ${item.name}`)
+          }
+          
+          // Remove from map to track what's left for deletion
+          existingProductsMap.delete(item.name)
+        } else {
+          // Add new product
+          productData.createdAt = new Date()
+          await addDoc(collection(db, 'products'), productData)
+          addedCount++
+          console.log(`➕ Added new product: ${item.name}`)
+        }
       })
       
-      await Promise.all(uploadPromises)
+      await Promise.all(syncPromises)
       
-      toast.success(`Successfully uploaded ${inventoryData.length} products to Firebase!`)
-      console.log(`Uploaded ${inventoryData.length} products to Firebase`)
+      // Delete products that are no longer in the JSON file
+      const deletePromises = Array.from(existingProductsMap.values()).map(async (product) => {
+        await deleteDoc(doc(db, 'products', product.id))
+        deletedCount++
+        console.log(`🗑️ Removed product: ${product.name}`)
+      })
+      
+      await Promise.all(deletePromises)
+      
+      // Log summary
+      if (addedCount > 0 || updatedCount > 0 || deletedCount > 0) {
+        console.log(`✅ Auto-sync completed: +${addedCount} added, ~${updatedCount} updated, -${deletedCount} deleted`)
+        toast.success(`Inventory synced: ${addedCount} added, ${updatedCount} updated, ${deletedCount} removed`)
+      } else {
+        console.log('✅ Auto-sync completed: No changes detected')
+      }
+      
+    } catch (error) {
+      console.error('❌ Error during auto-sync:', error)
+      // Don't show error toast for auto-sync failures to avoid spam
+    }
+  }
+  
+  // Auto-sync on component mount and periodically
+  useEffect(() => {
+    console.log('🚀 Setting up auto-sync for inventory...')
+    
+    // Initial sync after a short delay
+    const initialSyncTimer = setTimeout(() => {
+      autoSyncInventoryToFirebase()
+    }, 2000)
+    
+    // Periodic sync every 30 seconds
+    const syncInterval = setInterval(() => {
+      autoSyncInventoryToFirebase()
+    }, 30000)
+    
+    return () => {
+      clearTimeout(initialSyncTimer)
+      clearInterval(syncInterval)
+      console.log('🛑 Auto-sync cleanup completed')
+    }
+  }, [])
+  
+  // Manual upload function (kept for backward compatibility)
+  const uploadAllInventoryToFirebase = async () => {
+    try {
+      setLoading(true)
+      await autoSyncInventoryToFirebase()
     } catch (error) {
       console.error('Error uploading inventory to Firebase:', error)
       toast.error('Failed to upload inventory data to Firebase')
@@ -549,10 +630,139 @@ function InventoryProvider({ children }) {
     }
   }
 
+  // Load categories from Firestore with real-time updates
+  useEffect(() => {
+    console.log('InventoryContext: Setting up categories real-time listener')
+    
+    const categoriesQuery = query(collection(db, 'categories'), orderBy('name', 'asc'))
+    const unsubscribe = onSnapshot(
+      categoriesQuery,
+      async (snapshot) => {
+        const categoriesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        
+        console.log(`InventoryContext: Loaded ${categoriesData.length} categories (real-time)`)
+        
+        // If no categories exist, add default ones
+        if (categoriesData.length === 0) {
+          console.log('No categories found, adding default categories...')
+          const defaultCategories = [
+            { name: 'Cane Blend', description: 'Fresh sugarcane juice blended with natural flavors' },
+            { name: 'Cane Fusion', description: 'Premium fusion drinks with sugarcane base' },
+            { name: 'Cane Pops', description: 'Frozen sugarcane treats and popsicles' },
+            { name: 'Cane Special', description: 'Special signature sugarcane beverages' },
+            { name: 'Others', description: 'Additional items and accessories' }
+          ]
+          
+          try {
+            for (const category of defaultCategories) {
+              await addDoc(collection(db, 'categories'), {
+                ...category,
+                createdAt: new Date(),
+                updatedAt: new Date()
+              })
+            }
+            console.log('Default categories added successfully')
+          } catch (error) {
+            console.error('Error adding default categories:', error)
+          }
+        } else {
+          setCategories(categoriesData)
+        }
+      },
+      (error) => {
+        console.error('Error loading categories from Firestore:', error)
+        setCategories([])
+      }
+    )
+
+    return () => {
+      console.log('InventoryContext: Cleanup - unsubscribing from categories listener')
+      unsubscribe()
+    }
+  }, [])
+
+  // Add category
+  const addCategory = async (categoryData) => {
+    try {
+      console.log('Adding category to Firebase:', categoryData)
+      
+      const categoryWithTimestamp = {
+        ...categoryData,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      
+      const docRef = await addDoc(collection(db, 'categories'), categoryWithTimestamp)
+      console.log('Category added with ID:', docRef.id)
+      toast.success('Category created successfully!')
+      return docRef.id
+    } catch (error) {
+      console.error('Error adding category to Firebase:', error)
+      toast.error('Failed to create category')
+      throw error
+    }
+  }
+
+  // Update category
+  const updateCategory = async (id, categoryData) => {
+    try {
+      console.log('Updating category with ID:', id, 'Data:', categoryData)
+      
+      const updatedCategory = {
+        ...categoryData,
+        updatedAt: new Date()
+      }
+      
+      await updateDoc(doc(db, 'categories', id), updatedCategory)
+      console.log('Category updated successfully')
+      toast.success('Category updated successfully!')
+      return { id, ...updatedCategory }
+    } catch (error) {
+      console.error('Error updating category:', error)
+      toast.error('Failed to update category')
+      throw error
+    }
+  }
+
+  // Delete category
+  const deleteCategory = async (categoryId) => {
+    try {
+      console.log('Deleting category with ID:', categoryId)
+      
+      // Check if any products use this category
+      const productsUsingCategory = products.filter(product => product.category === categoryId)
+      if (productsUsingCategory.length > 0) {
+        toast.error(`Cannot delete category. ${productsUsingCategory.length} products are using this category.`)
+        return false
+      }
+      
+      await deleteDoc(doc(db, 'categories', categoryId))
+      console.log('Category deleted successfully')
+      toast.success('Category deleted successfully!')
+      return true
+    } catch (error) {
+      console.error('Error deleting category:', error)
+      toast.error('Failed to delete category')
+      throw error
+    }
+  }
+
+  // Get categories for dropdown
+  const getCategoriesForDropdown = () => {
+    return categories.map(category => ({
+      value: category.name,
+      label: category.name
+    }))
+  }
+
   const value = {
     products,
     cart,
     sales,
+    categories,
     loading,
     addToCart,
     removeFromCart,
@@ -561,6 +771,10 @@ function InventoryProvider({ children }) {
     addProduct,
     updateProduct,
     deleteProduct,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    getCategoriesForDropdown,
     uploadAllInventoryToFirebase,
     getCartTotal,
     getCartTax,

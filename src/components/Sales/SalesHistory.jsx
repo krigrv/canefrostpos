@@ -26,7 +26,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger
+  AlertDialogTrigger,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger
 } from '@/components/ui'
 import {
   Search as SearchIcon,
@@ -44,6 +48,7 @@ import {
 import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns'
 import { db } from '../../firebase/config'
 import { collection, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore'
+import { useAdvancedDeviceDetection } from '../../hooks/useDeviceDetection'
 import toast from 'react-hot-toast'
 
 function SalesHistory() {
@@ -57,6 +62,12 @@ function SalesHistory() {
   const [selectedSales, setSelectedSales] = useState([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  
+  // Device detection
+  const deviceInfo = useAdvancedDeviceDetection()
+  const { isMobile, isTablet, orientation } = deviceInfo
+  const showMobileLayout = isMobile || (isTablet && orientation === 'portrait')
 
   // Real-time sales data from Firestore - No mock data
   useEffect(() => {
@@ -283,8 +294,22 @@ function SalesHistory() {
         Sales History
       </h1>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+      {/* Tab Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <TrendingUpIcon className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <ReceiptIcon className="h-4 w-4" />
+            Order History
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab - Statistics Cards */}
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center mb-2">
@@ -328,10 +353,13 @@ function SalesHistory() {
               {totalOrders}
             </p>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+          </div>
+        </TabsContent>
 
-      {/* Search and Filter */}
+        {/* Order History Tab */}
+        <TabsContent value="history" className="space-y-6">
+          {/* Search and Filter */}
       <Card className="p-4 mb-6">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -414,66 +442,44 @@ function SalesHistory() {
         </div>
       </Card>
 
-      {/* Sales Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
+      {/* Sales Display - Responsive */}
+      {showMobileLayout ? (
+        /* Mobile Card Layout */
+        <div className="space-y-4">
+          {/* Mobile Select All */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Checkbox
                   checked={selectedSales.length === filteredSales.length && filteredSales.length > 0}
                   onCheckedChange={handleSelectAll}
                   aria-label="Select all"
                 />
-              </TableHead>
-              <TableHead>Order ID</TableHead>
-              <TableHead>Date & Time</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Items</TableHead>
-              <TableHead>Payment Method</TableHead>
-              <TableHead>Total (₹)</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredSales.map((sale) => (
-              <TableRow key={sale.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedSales.includes(sale.id)}
-                    onCheckedChange={() => handleSelectSale(sale.id)}
-                    aria-label={`Select sale ${sale.id}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  <span className="font-bold text-sm">
-                    {sale.id}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {format(new Date(sale.timestamp), 'MMM dd, yyyy HH:mm')}
-                </TableCell>
-                <TableCell>{sale.customerName}</TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-primary border-primary">
-                    {sale.items.length} items
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge 
-                    variant={sale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
-                    className={sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
-                  >
-                    {sale.paymentMethod}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="font-bold text-sm">
-                    ₹{sale.total.toFixed(2)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
+                <span className="text-sm font-medium">Select All</span>
+              </div>
+              {selectedSales.length > 0 && (
+                <Badge variant="secondary" className="px-2 py-1">
+                  {selectedSales.length} selected
+                </Badge>
+              )}
+            </div>
+          </Card>
+          
+          {/* Mobile Sales Cards */}
+          {filteredSales.map((sale) => (
+            <Card key={sale.id} className="p-4">
+              <div className="space-y-3">
+                {/* Header Row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={selectedSales.includes(sale.id)}
+                      onCheckedChange={() => handleSelectSale(sale.id)}
+                      aria-label={`Select sale ${sale.id}`}
+                    />
+                    <span className="font-bold text-lg">{sale.id}</span>
+                  </div>
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -511,12 +517,153 @@ function SalesHistory() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
-                </TableCell>
+                </div>
+                
+                {/* Date & Time */}
+                <div>
+                  <p className="text-sm text-gray-600">Date & Time</p>
+                  <p className="font-medium">{format(new Date(sale.timestamp), 'MMM dd, yyyy HH:mm')}</p>
+                </div>
+                
+                {/* Customer & Items Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Customer</p>
+                    <p className="font-medium">{sale.customerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Items</p>
+                    <Badge variant="outline" className="text-primary border-primary">
+                      {sale.items.length} items
+                    </Badge>
+                  </div>
+                </div>
+                
+                {/* Payment & Total Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Payment</p>
+                    <Badge 
+                      variant={sale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
+                      className={sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
+                    >
+                      {sale.paymentMethod}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total</p>
+                    <p className="font-bold text-lg text-primary">₹{sale.total.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        /* Desktop Table Layout */
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={selectedSales.length === filteredSales.length && filteredSales.length > 0}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+                <TableHead>Order ID</TableHead>
+                <TableHead>Date & Time</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead>Items</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Total (₹)</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
+            </TableHeader>
+            <TableBody>
+              {filteredSales.map((sale) => (
+                <TableRow key={sale.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedSales.includes(sale.id)}
+                      onCheckedChange={() => handleSelectSale(sale.id)}
+                      aria-label={`Select sale ${sale.id}`}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-bold text-sm">
+                      {sale.id}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {format(new Date(sale.timestamp), 'MMM dd, yyyy HH:mm')}
+                  </TableCell>
+                  <TableCell>{sale.customerName}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-primary border-primary">
+                      {sale.items.length} items
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant={sale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
+                      className={sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
+                    >
+                      {sale.paymentMethod}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-bold text-sm">
+                      ₹{sale.total.toFixed(2)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewDetails(sale)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <VisibilityIcon className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-600 hover:bg-red-50"
+                          >
+                            <DeleteIcon className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Sale</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this sale (Order ID: {sale.id})? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteSale(sale)} 
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
       {/* Sale Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
@@ -705,6 +852,8 @@ function SalesHistory() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
