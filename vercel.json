@@ -2,6 +2,7 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "installCommand": "npm ci",
   "routes": [
     {
       "src": "/assets/(.*)",
@@ -33,6 +34,7 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "CI": "false"
   }
 }
