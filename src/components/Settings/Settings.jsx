@@ -36,7 +36,7 @@ import {
   Info as InfoIcon,
   AlertTriangle as AlertTriangleIcon,
   Palette as PaletteIcon,
-  CloudUpload as CloudSyncIcon,
+  Upload as CloudSyncIcon,
   Save,
   X
 } from 'lucide-react'
