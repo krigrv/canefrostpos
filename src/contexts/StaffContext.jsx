@@ -1,22 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
-import { db } from '../firebase/config'
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDocs,
-  onSnapshot,
-  query,
-  orderBy
-} from 'firebase/firestore'
-import toast from 'react-hot-toast'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '../supabase/config'
 import { useSync } from './SyncContext'
+import toast from 'react-hot-toast'
 
 const StaffContext = createContext()
 
-export function useStaff() {
+export const useStaff = () => {
   const context = useContext(StaffContext)
   if (!context) {
     throw new Error('useStaff must be used within a StaffProvider')
@@ -24,213 +13,255 @@ export function useStaff() {
   return context
 }
 
-export function StaffProvider({ children }) {
+export const StaffProvider = ({ children }) => {
   const [staff, setStaff] = useState([])
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
-  const { queueOperation, isOnline } = useSync()
+  const { isOnline, queueOperation } = useSync()
 
-  // Load staff from Firestore with real-time updates
+  // Load staff data
   useEffect(() => {
-    console.log('StaffContext: Setting up real-time listener for staff')
-    
-    const staffQuery = query(collection(db, 'staff'), orderBy('createdAt', 'desc'))
-    const unsubscribeStaff = onSnapshot(
-      staffQuery,
-      (snapshot) => {
-        const staffData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          joinDate: doc.data().joinDate?.toDate?.() || doc.data().joinDate
-        }))
+    const loadStaff = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff')
+          .select('*')
+          .order('created_at', { ascending: false })
         
-        console.log(`StaffContext: Loaded ${staffData.length} staff members (real-time)`)
-        setStaff(staffData)
-        setLoading(false)
-      },
-      (error) => {
-        console.error('Error loading staff from Firestore:', error)
-        setStaff([])
+        if (error) {
+          throw error
+        }
+        
+        setStaff(data || [])
+      } catch (error) {
+        console.error('Error loading staff:', error)
+        toast.error('Failed to load staff data')
+      } finally {
         setLoading(false)
       }
-    )
-
-    // Load shifts from Firestore
-    const shiftsQuery = query(collection(db, 'shifts'), orderBy('date', 'desc'))
-    const unsubscribeShifts = onSnapshot(
-      shiftsQuery,
-      (snapshot) => {
-        const shiftsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          date: doc.data().date?.toDate?.() || doc.data().date
-        }))
-        
-        console.log(`StaffContext: Loaded ${shiftsData.length} shifts (real-time)`)
-        setShifts(shiftsData)
-      },
-      (error) => {
-        console.error('Error loading shifts from Firestore:', error)
-        setShifts([])
-      }
-    )
-
-    return () => {
-      console.log('StaffContext: Cleanup - unsubscribing from real-time listeners')
-      unsubscribeStaff()
-      unsubscribeShifts()
     }
+
+    loadStaff()
   }, [])
 
-  // Add new staff member with sync support
-  const addStaffMember = async (staffData) => {
+  // Load shifts data
+  useEffect(() => {
+    const loadShifts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('shifts')
+          .select('*')
+          .order('start_time', { ascending: false })
+        
+        if (error) {
+          throw error
+        }
+        
+        setShifts(data || [])
+      } catch (error) {
+        console.error('Error loading shifts:', error)
+        toast.error('Failed to load shifts data')
+      }
+    }
+
+    loadShifts()
+  }, [])
+
+  // Add new staff member
+  const addStaffMember = useCallback(async (staffData) => {
     try {
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const staffWithDefaults = {
         ...staffData,
-        id: tempId,
-        joinDate: new Date(staffData.joinDate),
-        totalSales: 0,
-        shiftsThisWeek: 0,
-        status: 'Active',
-        createdAt: new Date(),
-        updatedAt: new Date()
+        join_date: staffData.joinDate ? new Date(staffData.joinDate).toISOString() : new Date().toISOString(),
+        is_active: staffData.isActive !== undefined ? staffData.isActive : true,
+        permissions: staffData.permissions || {
+          canManageInventory: false,
+          canManageStaff: false,
+          canViewReports: false,
+          canManageSettings: false
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
 
-      // Add to local state immediately for optimistic updates
-      setStaff(prev => [...prev, staffWithDefaults])
+      const { data, error } = await supabase
+        .from('staff')
+        .insert([staffWithDefaults])
+        .select()
+        .single()
       
-      if (isOnline) {
-        // Try immediate sync
-        try {
-          const docRef = await addDoc(collection(db, 'staff'), staffWithDefaults)
-          // Update local state with real Firebase ID
-          setStaff(prev => prev.map(s => 
-            s.id === tempId ? { ...s, id: docRef.id } : s
-          ))
-          console.log('Staff member added with ID:', docRef.id)
-          toast.success('Staff member added successfully')
-          return docRef.id
-        } catch (error) {
-          // Queue for later sync if immediate sync fails
-          queueOperation({
-            type: 'create',
-            collection: 'staff',
-            data: staffWithDefaults,
-            tempId
-          })
-          toast.success('Staff member added (will sync when online)')
-          return tempId
-        }
-      } else {
-        // Queue for sync when online
-        queueOperation({
-          type: 'create',
-          collection: 'staff',
-          data: staffWithDefaults,
-          tempId
-        })
-        toast.success('Staff member added (will sync when online)')
-        return tempId
+      if (error) {
+        throw error
       }
+      
+      // Update local state
+      setStaff(prev => [data, ...prev])
+      
+      console.log('Staff member added with ID:', data.id)
+      toast.success('Staff member added successfully')
+      return data.id
     } catch (error) {
       console.error('Error adding staff member:', error)
       toast.error('Failed to add staff member')
       throw error
     }
-  }
+  }, [isOnline, queueOperation])
 
   // Update staff member
-  const updateStaffMember = async (staffId, staffData) => {
+  const updateStaffMember = useCallback(async (staffId, staffData) => {
     try {
-      const updateData = {
+      const updatePayload = {
         ...staffData,
-        updatedAt: new Date()
+        updated_at: new Date().toISOString()
+      }
+
+      // Convert joinDate to ISO string if it's a Date or string
+      if (staffData.joinDate) {
+        updatePayload.join_date = new Date(staffData.joinDate).toISOString()
+        delete updatePayload.joinDate
       }
       
-      // Convert joinDate to Date if it's a string
-      if (staffData.joinDate && typeof staffData.joinDate === 'string') {
-        updateData.joinDate = new Date(staffData.joinDate)
+      // Convert isActive to is_active
+      if (staffData.isActive !== undefined) {
+        updatePayload.is_active = staffData.isActive
+        delete updatePayload.isActive
+      }
+
+      const { error } = await supabase
+        .from('staff')
+        .update(updatePayload)
+        .eq('id', staffId)
+      
+      if (error) {
+        throw error
       }
       
-      await updateDoc(doc(db, 'staff', staffId), updateData)
+      // Update local state
+      setStaff(prev => 
+        prev.map(s => s.id === staffId ? { ...s, ...updatePayload } : s)
+      )
+      
       toast.success('Staff member updated successfully')
     } catch (error) {
       console.error('Error updating staff member:', error)
       toast.error('Failed to update staff member')
       throw error
     }
-  }
+  }, [])
 
   // Delete staff member
-  const deleteStaffMember = async (staffId) => {
+  const deleteStaffMember = useCallback(async (staffId) => {
     try {
-      await deleteDoc(doc(db, 'staff', staffId))
+      const { error } = await supabase
+        .from('staff')
+        .delete()
+        .eq('id', staffId)
+      
+      if (error) {
+        throw error
+      }
+      
+      // Update local state
+      setStaff(prev => prev.filter(s => s.id !== staffId))
+      
       toast.success('Staff member deleted successfully')
     } catch (error) {
       console.error('Error deleting staff member:', error)
       toast.error('Failed to delete staff member')
       throw error
     }
-  }
+  }, [])
 
   // Add new shift
-  const addShift = async (shiftData) => {
+  const addShift = useCallback(async (shiftData) => {
     try {
-      const docRef = await addDoc(collection(db, 'shifts'), {
-        ...shiftData,
-        date: new Date(shiftData.date),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
+      const { data, error } = await supabase
+        .from('shifts')
+        .insert([{
+          ...shiftData,
+          date: new Date(shiftData.date).toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }])
+        .select()
+        .single()
       
-      console.log('Shift added with ID:', docRef.id)
+      if (error) {
+        throw error
+      }
+      
+      // Update local state
+      setShifts(prev => [data, ...prev])
+      
+      console.log('Shift added with ID:', data.id)
       toast.success('Shift added successfully')
-      return docRef.id
+      return data.id
     } catch (error) {
       console.error('Error adding shift:', error)
       toast.error('Failed to add shift')
       throw error
     }
-  }
+  }, [])
 
   // Update shift
-  const updateShift = async (shiftId, shiftData) => {
+  const updateShift = useCallback(async (shiftId, shiftData) => {
     try {
       const updateData = {
         ...shiftData,
-        updatedAt: new Date()
+        updated_at: new Date().toISOString()
       }
       
-      // Convert date to Date if it's a string
-      if (shiftData.date && typeof shiftData.date === 'string') {
-        updateData.date = new Date(shiftData.date)
+      // Convert date to ISO string if it's a Date or string
+      if (shiftData.date) {
+        updateData.date = new Date(shiftData.date).toISOString()
       }
       
-      await updateDoc(doc(db, 'shifts', shiftId), updateData)
+      const { error } = await supabase
+        .from('shifts')
+        .update(updateData)
+        .eq('id', shiftId)
+      
+      if (error) {
+        throw error
+      }
+      
+      // Update local state
+      setShifts(prev => 
+        prev.map(s => s.id === shiftId ? { ...s, ...updateData } : s)
+      )
+      
       toast.success('Shift updated successfully')
     } catch (error) {
       console.error('Error updating shift:', error)
       toast.error('Failed to update shift')
       throw error
     }
-  }
+  }, [])
 
   // Delete shift
-  const deleteShift = async (shiftId) => {
+  const deleteShift = useCallback(async (shiftId) => {
     try {
-      await deleteDoc(doc(db, 'shifts', shiftId))
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('id', shiftId)
+      
+      if (error) {
+        throw error
+      }
+      
+      // Update local state
+      setShifts(prev => prev.filter(s => s.id !== shiftId))
+      
       toast.success('Shift deleted successfully')
     } catch (error) {
       console.error('Error deleting shift:', error)
       toast.error('Failed to delete shift')
       throw error
     }
-  }
+  }, [])
 
-
-
-  const value = {
+  const value = useMemo(() => ({
     staff,
     shifts,
     loading,
@@ -240,7 +271,17 @@ export function StaffProvider({ children }) {
     addShift,
     updateShift,
     deleteShift
-  }
+  }), [
+    staff,
+    shifts,
+    loading,
+    addStaffMember,
+    updateStaffMember,
+    deleteStaffMember,
+    addShift,
+    updateShift,
+    deleteShift
+  ])
 
   return (
     <StaffContext.Provider value={value}>

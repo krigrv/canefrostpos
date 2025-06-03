@@ -1,794 +1,639 @@
-import React, { createContext, useState, useEffect } from 'react'
-import { db } from '../firebase/config'
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDocs,
-  getDoc,
-  setDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  limit
-} from 'firebase/firestore'
-import toast from 'react-hot-toast'
-import { InventoryContext } from '../hooks/useInventory'
-import { useSync } from './SyncContext'
-import { v4 as uuidv4 } from 'uuid'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { supabaseOperations } from '../utils/supabaseOperations';
+import { useAuth } from './AuthContextSupabase';
+import toast from 'react-hot-toast';
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '../supabase/config';
 
-function InventoryProvider({ children }) {
-  console.log('📦 InventoryProvider rendering at:', new Date().toISOString())
-  
-  const [products, setProducts] = useState([])
-  const [cart, setCart] = useState([])
-  const [sales, setSales] = useState([])
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [pendingUpdates, setPendingUpdates] = useState(new Set())
-  const { queueOperation, isOnline, syncCollection } = useSync()
-  // Load products from Firestore with real-time updates
-  useEffect(() => {
-    console.log('InventoryContext: Setting up real-time listener')
-    
-    const productsQuery = query(collection(db, 'products'), orderBy('name', 'asc'))
-    const unsubscribe = onSnapshot(
-      productsQuery,
-      (snapshot) => {
-        const productsData = snapshot.docs.map(doc => {
-          const productData = {
-            id: doc.id,
-            ...doc.data()
-          }
-          
-          // Add type field based on product name if it doesn't exist
-          if (!productData.type) {
-            productData.type = getCategoryGroup(productData.name)
-          }
-          
-          return productData
-        })
-        
-        console.log(`InventoryContext: Loaded ${productsData.length} products (real-time)`)
-        console.log('Pending updates:', Array.from(pendingUpdates))
-        
-        // Merge with existing products, preserving pending updates
-        setProducts(prevProducts => {
-          const mergedProducts = productsData.map(newProduct => {
-            // If this product has pending updates, keep the local version
-            if (pendingUpdates.has(newProduct.id)) {
-              const existingProduct = prevProducts.find(p => p.id === newProduct.id)
-              console.log(`Preserving local version for product ${newProduct.id}`)
-              return existingProduct || newProduct
-            }
-            return newProduct
-          })
-          
-          // Add any local products that aren't in Firebase yet and don't have pending updates
-          const localOnlyProducts = prevProducts.filter(p => 
-            !productsData.find(fp => fp.id === p.id) && !pendingUpdates.has(p.id)
-          )
-          
-          return [...mergedProducts, ...localOnlyProducts]
-        })
-        setLoading(false)
-      },
-      (error) => {
-        console.error('Error loading products from Firestore:', error)
-        setProducts([])
-        setLoading(false)
-      }
-    )
+// Create the context
+export const InventoryContext = createContext();
 
-    return () => {
-      console.log('InventoryContext: Cleanup - unsubscribing from real-time listener')
-      unsubscribe()
-    }
-  }, [pendingUpdates])
-
-  // Load sales from Firestore with real-time updates
-  useEffect(() => {
-    console.log('InventoryContext: Setting up sales real-time listener')
-    
-    const salesQuery = query(collection(db, 'sales'), orderBy('createdAt', 'desc'))
-    const unsubscribe = onSnapshot(
-      salesQuery,
-      (snapshot) => {
-        const salesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-        
-        console.log(`InventoryContext: Loaded ${salesData.length} sales records (real-time)`)
-        setSales(salesData)
-      },
-      (error) => {
-        console.error('Error loading sales from Firestore:', error)
-        setSales([])
-      }
-    )
-
-    return () => {
-      console.log('InventoryContext: Cleanup - unsubscribing from sales listener')
-      unsubscribe()
-    }
-  }, [])
-
-  // Cleanup mechanism for stuck pending updates
-  useEffect(() => {
-    const cleanup = setInterval(() => {
-      setPendingUpdates(prev => {
-        if (prev.size > 0) {
-          console.log('Cleaning up pending updates:', Array.from(prev))
-          // Clear pending updates that are older than 30 seconds
-          // In a real app, you'd want more sophisticated tracking
-          return new Set()
-        }
-        return prev
-      })
-    }, 30000) // Clean up every 30 seconds
-
-    return () => clearInterval(cleanup)
-  }, [])
-
-  // Category mapping function
-  const getCategoryGroup = (productName) => {
-    const name = productName.toLowerCase()
-    
-    // Citrus fruits
-    if (name.includes('lemon') || name.includes('orange') || name.includes('mosambi') || name.includes('lime')) {
-      return 'citrus'
-    }
-    
-    // Berries
-    if (name.includes('strawberry') || name.includes('blueberry') || name.includes('gooseberry') || name.includes('grapes') || name.includes('jamun')) {
-      return 'berries'
-    }
-    
-    // Tropical fruits
-    if (name.includes('pineapple') || name.includes('mango') || name.includes('dragon fruit') || name.includes('guava') || 
-        name.includes('jackfruit') || name.includes('avocado') || name.includes('watermelon') || name.includes('muskmelon') ||
-        name.includes('pomegranate') || name.includes('fig') || name.includes('tender coconut') || name.includes('ice apple')) {
-      return 'tropical'
-    }
-    
-    // Spiced, herbal & others
-    return 'spiced, herbal & others'
+// Custom hook to use the context
+export const useInventory = () => {
+  const context = useContext(InventoryContext);
+  if (!context) {
+    throw new Error('useInventory must be used within an InventoryProvider');
   }
+  return context;
+};
+
+// Provider component
+export const InventoryProvider = ({ children }) => {
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingUpdates, setPendingUpdates] = useState(new Set());
+  const { user } = useAuth();
+
+  // Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Load products with real-time subscription
+  useEffect(() => {
+    let unsubscribe;
+
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        
+        // Initial load
+        const productsData = await supabaseOperations.products.getAll();
+        console.log(`InventoryContext: Loaded ${productsData.length} products`);
+        
+        const productsWithType = productsData;
+        
+        setProducts(productsWithType);
+        setLoading(false);
+
+        // Set up real-time subscription
+        unsubscribe = supabaseOperations.subscriptions.products((payload) => {
+          console.log('Real-time update received:', payload);
+          
+          switch (payload.eventType) {
+            case 'INSERT':
+              setProducts(prev => {
+                const newProduct = payload.new;
+                return [...prev, newProduct];
+              });
+              break;
+              
+            case 'UPDATE':
+              setProducts(prev => 
+                prev.map(product => 
+                  product.id === payload.new.id 
+                    ? payload.new
+                    : product
+                )
+              );
+              break;
+              
+            case 'DELETE':
+              setProducts(prev => prev.filter(product => product.id !== payload.old.id));
+              break;
+              
+            default:
+              console.log('Unknown event type:', payload.eventType);
+          }
+        });
+
+      } catch (error) {
+        console.error('Error loading products:', error);
+        setProducts([]);
+        setLoading(false);
+        toast.error('Failed to load products');
+      }
+    };
+
+    loadProducts();
+
+    return () => {
+      if (unsubscribe) {
+        console.log('InventoryContext: Cleanup - unsubscribing from real-time listener');
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  // Load categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        console.log('Loading categories from Supabase...');
+        const categoriesData = await supabaseOperations.categories.getAll();
+        console.log('Categories loaded:', categoriesData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        // Set default categories if loading fails
+        setCategories([
+          { id: '1', name: 'Cane Pops', description: 'Cane Pops category' },
+          { id: '2', name: 'Cane Fusion', description: 'Cane Fusion category' },
+          { id: '3', name: 'Special', description: 'Special category' },
+          { id: '4', name: 'Cane Blend', description: 'Cane Blend category' },
+          { id: '5', name: 'Others', description: 'Other products' }
+        ]);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
 
 
-
-  // Add product to cart
-  const addToCart = (product, quantity = 1) => {
-    console.log('addToCart called with:', product.name, 'quantity:', quantity)
+  // Cart operations
+  const addToCart = useCallback((product, quantity = 1) => {
+    console.log('addToCart called with:', product.name, 'quantity:', quantity);
     setCart(prevCart => {
-      console.log('Current cart before adding:', prevCart.length, 'items')
-      const existingItem = prevCart.find(item => item.id === product.id)
+      const existingItem = prevCart.find(item => item.id === product.id);
       if (existingItem) {
-        console.log('Product already in cart, updating quantity')
-        const newCart = prevCart.map(item =>
+        return prevCart.map(item =>
           item.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
-        )
-        console.log('New cart after update:', newCart.length, 'items')
-        return newCart
+        );
       } else {
-        console.log('Adding new product to cart')
-        const newCart = [...prevCart, { ...product, quantity }]
-        console.log('New cart after adding:', newCart.length, 'items')
-        return newCart
+        return [...prevCart, { ...product, quantity }];
       }
-    })
-    toast.success(`${product.name} added to cart`)
-  }
+    });
+    toast.success(`${product.name} added to cart`);
+  }, []);
 
-  // Remove from cart
-  const removeFromCart = (productId) => {
-    setCart(prevCart => prevCart.filter(item => item.id !== productId))
-  }
+  const removeFromCart = useCallback((productId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+  }, []);
 
-  // Update cart item quantity
-  const updateCartQuantity = (productId, quantity) => {
+  const updateCartQuantity = useCallback((productId, quantity) => {
     if (quantity <= 0) {
-      removeFromCart(productId)
-      return
+      removeFromCart(productId);
+      return;
     }
     setCart(prevCart =>
       prevCart.map(item =>
         item.id === productId ? { ...item, quantity } : item
       )
-    )
-  }
+    );
+  }, [removeFromCart]);
 
-  // Clear cart
-  const clearCart = () => {
-    setCart([])
-  }
-
-  // Add product with sync support
-  const addProduct = async (productData) => {
-    const newProduct = {
-      ...productData,
-      id: Date.now().toString(),
-      type: productData.type || getCategoryGroup(productData.name),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-
-    // Add to local state immediately
-    setProducts(prev => [...prev, newProduct])
-    
-    // Mark as pending update
-    setPendingUpdates(prev => new Set(prev).add(newProduct.id))
-    
-    try {
-      // Queue for sync
-      await queueOperation({
-        collection: 'products',
-        operation: 'create',  // Changed from 'type' to 'operation'
-        data: newProduct,
-        id: newProduct.id  // Ensure id is explicitly set
-      })
-      
-      // Clear pending update
-      setPendingUpdates(prev => {
-        const updated = new Set(prev)
-        updated.delete(newProduct.id)
-        return updated
-      })
-      
-      toast.success('Product added successfully')
-      return newProduct
-    } catch (error) {
-      console.error('Error adding product:', error)
-      toast.error('Failed to add product')
-      throw error
-    }
-  }
-
-  // Delete product with sync support
-  const deleteProduct = async (productId) => {
-    // Store the product to delete for potential restoration
-    const productToDelete = products.find(p => p.id === productId)
-    
-    try {
-      // Remove from local state immediately for optimistic updates
-      setProducts(prev => prev.filter(p => p.id !== productId))
-      
-      // Add to pending updates to prevent real-time listener from re-adding
-      setPendingUpdates(prev => new Set([...prev, productId]))
-      
-      if (isOnline) {
-        // Try immediate sync
-        await deleteDoc(doc(db, 'products', productId))
-        // Remove from pending updates after successful sync
-        setPendingUpdates(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(productId)
-          return newSet
-        })
-      } else {
-        // Queue for sync when online
-        queueOperation({
-          operation: 'delete',  // Changed from 'type' to 'operation'
-          collection: 'products',
-          id: productId  // Ensure id is explicitly set
-        })
-        throw new Error('Device is offline - deletion will sync when online')
-      }
-    } catch (error) {
-      console.error('Error deleting product:', error)
-      
-      // Restore product on error
-      if (productToDelete) {
-        setProducts(prev => [...prev, productToDelete])
-      }
-      
-      // Remove from pending updates on error
-      setPendingUpdates(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(productId)
-        return newSet
-      })
-      
-      // Queue for retry if immediate sync failed and we're online
-      if (isOnline) {
-        queueOperation({
-          operation: 'delete',  // Changed from 'type' to 'operation'
-          collection: 'products',
-          id: productId  // Ensure id is explicitly set
-        })
-      }
-      
-      throw error // Re-throw to let the component handle the error
-    }
-  }
-
-  // Update product with sync support
-  const updateProduct = async (id, productData) => {
-    console.log('Updating product with ID:', id, 'Data:', productData);
-    
-    const updatedProduct = {
-      ...productData,
-      type: productData.type || getCategoryGroup(productData.name),
-      updatedAt: new Date()
-    }
-    
-    // Update local state immediately
-    setProducts(prev =>
-      prev.map(product =>
-        product.id === id ? { ...product, ...updatedProduct, id } : product
-      )
-    )
-    
-    // Mark as pending update
-    setPendingUpdates(prev => new Set(prev).add(id))
-    
-    try {
-      // Queue for sync
-      await queueOperation({
-        collection: 'products',
-        operation: 'update',  // Changed from 'type' to 'operation'
-        data: updatedProduct,
-        id: id  // Ensure id is explicitly set
-      })
-      
-      // Clear pending update
-      setPendingUpdates(prev => {
-        const updated = new Set(prev)
-        updated.delete(id)
-        return updated
-      })
-      
-      toast.success('Product updated successfully')
-      return { id, ...updatedProduct }
-    } catch (error) {
-      console.error('Error updating product:', error)
-      toast.error('Failed to update product')
-      throw error
-    }
-  }
-
-  // Auto-sync inventory data from JSON file to Firebase
-  const autoSyncInventoryToFirebase = async () => {
-    try {
-      console.log('🔄 Auto-syncing inventory from formatted_inventory.json to Firebase...')
-      
-      // Fetch the inventory JSON data from formatted_inventory.json
-      const response = await fetch('/formatted_inventory.json')
-      if (!response.ok) {
-        console.warn('Could not fetch formatted_inventory.json for auto-sync')
-        return
-      }
-      const inventoryData = await response.json()
-      
-      // Get all existing products from Firebase
-      const snapshot = await getDocs(collection(db, 'products'))
-      const existingProducts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      
-      // Create a map of existing products by name for quick lookup
-      const existingProductsMap = new Map()
-      existingProducts.forEach(product => {
-        existingProductsMap.set(product.name, product)
-      })
-      
-      // Track changes
-      let addedCount = 0
-      let updatedCount = 0
-      let deletedCount = 0
-      
-      // Add or update products from JSON
-      const syncPromises = inventoryData.map(async (item) => {
-        const productData = {
-          name: item.name,
-          category: item.category,
-          price: item.price,
-          taxPercentage: item.taxPercentage,
-          stock: item.stock || 50,
-          updatedAt: new Date()
-        }
-        
-        // Add size field if it exists
-        if (item.size) {
-          productData.size = item.size
-        }
-        
-        const existingProduct = existingProductsMap.get(item.name)
-        
-        if (existingProduct) {
-          // Update existing product if data has changed
-          const hasChanges = (
-            existingProduct.category !== item.category ||
-            existingProduct.price !== item.price ||
-            existingProduct.taxPercentage !== item.taxPercentage ||
-            existingProduct.size !== item.size
-          )
-          
-          if (hasChanges) {
-            await updateDoc(doc(db, 'products', existingProduct.id), productData)
-            updatedCount++
-            console.log(`📝 Updated product: ${item.name}`)
-          }
-          
-          // Remove from map to track what's left for deletion
-          existingProductsMap.delete(item.name)
-        } else {
-          // Add new product
-          productData.createdAt = new Date()
-          await addDoc(collection(db, 'products'), productData)
-          addedCount++
-          console.log(`➕ Added new product: ${item.name}`)
-        }
-      })
-      
-      await Promise.all(syncPromises)
-      
-      // Delete products that are no longer in the JSON file
-      const deletePromises = Array.from(existingProductsMap.values()).map(async (product) => {
-        await deleteDoc(doc(db, 'products', product.id))
-        deletedCount++
-        console.log(`🗑️ Removed product: ${product.name}`)
-      })
-      
-      await Promise.all(deletePromises)
-      
-      // Log summary
-      if (addedCount > 0 || updatedCount > 0 || deletedCount > 0) {
-        console.log(`✅ Auto-sync completed: +${addedCount} added, ~${updatedCount} updated, -${deletedCount} deleted`)
-        toast.success(`Inventory synced: ${addedCount} added, ${updatedCount} updated, ${deletedCount} removed`)
-      } else {
-        console.log('✅ Auto-sync completed: No changes detected')
-      }
-      
-    } catch (error) {
-      console.error('❌ Error during auto-sync:', error)
-      // Don't show error toast for auto-sync failures to avoid spam
-    }
-  }
-  
-  // Auto-sync on component mount and periodically
-  useEffect(() => {
-    console.log('🚀 Setting up auto-sync for inventory...')
-    
-    // Initial sync after a short delay
-    const initialSyncTimer = setTimeout(() => {
-      autoSyncInventoryToFirebase()
-    }, 2000)
-    
-    // Periodic sync every 30 seconds
-    const syncInterval = setInterval(() => {
-      autoSyncInventoryToFirebase()
-    }, 30000)
-    
-    return () => {
-      clearTimeout(initialSyncTimer)
-      clearInterval(syncInterval)
-      console.log('🛑 Auto-sync cleanup completed')
-    }
-  }, [])
-  
-  // Manual upload function (kept for backward compatibility)
-  const uploadAllInventoryToFirebase = async () => {
-    try {
-      setLoading(true)
-      await autoSyncInventoryToFirebase()
-    } catch (error) {
-      console.error('Error uploading inventory to Firebase:', error)
-      toast.error('Failed to upload inventory data to Firebase')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-
+  const clearCart = useCallback(() => {
+    setCart([]);
+  }, []);
 
   // Calculate cart total
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0)
-  }
+  const getCartTotal = useCallback(() => {
+    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  }, [cart]);
 
   // Calculate cart tax
-  const getCartTax = () => {
+  const getCartTax = useCallback(() => {
     return cart.reduce((tax, item) => {
-      const itemTotal = item.price * item.quantity
-      const itemTax = (itemTotal * item.taxPercentage) / 100
-      return tax + itemTax
-    }, 0)
-  }
+      const itemTotal = item.price * item.quantity;
+      const itemTax = (itemTotal * (item.taxPercentage || 0)) / 100;
+      return tax + itemTax;
+    }, 0);
+  }, [cart]);
 
   // Calculate cart subtotal (total before tax)
-  const getCartSubtotal = () => {
-    return getCartTotal() - getCartTax()
-  }
+  const getCartSubtotal = useCallback(() => {
+    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  }, [cart]);
 
-  // Check for duplicate sales
-  const checkForDuplicates = async (newSale) => {
+  // Product CRUD operations
+  const addProduct = useCallback(async (productData) => {
     try {
-      const salesQuery = query(
-        collection(db, 'sales'),
-        orderBy('timestamp', 'desc'),
-        limit(50) // Check last 50 sales for performance
-      )
-      const snapshot = await getDocs(salesQuery)
-      
-      const recentSales = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
-      }))
-      
-      // Check for duplicates within last 5 minutes with same total and items count
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
-      const newSaleTime = new Date(newSale.timestamp)
-      
-      const duplicates = recentSales.filter(sale => {
-        const saleTime = new Date(sale.timestamp)
-        return (
-          Math.abs(saleTime - newSaleTime) < 10000 && // Within 10 seconds
-          Math.abs(sale.total - newSale.total) < 0.01 && // Same total (accounting for floating point)
-          sale.items?.length === newSale.items?.length && // Same number of items
-          sale.paymentMethod === newSale.paymentMethod // Same payment method
-        )
-      })
-      
-      return duplicates.length > 0
-    } catch (error) {
-      console.error('Error checking for duplicates:', error)
-      return false // If check fails, allow the sale to proceed
-    }
-  }
-
-  // Clean up duplicate sales
-  const cleanupDuplicates = async () => {
-    try {
-      console.log('Starting duplicate cleanup...')
-      const salesQuery = query(collection(db, 'sales'), orderBy('timestamp', 'desc'))
-      const snapshot = await getDocs(salesQuery)
-      
-      const allSales = snapshot.docs.map(doc => ({
-        id: doc.id,
-        docRef: doc.ref,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
-      }))
-      
-      const duplicatesToDelete = []
-      const seenSales = new Map()
-      
-      // Group sales by potential duplicate criteria
-      allSales.forEach(sale => {
-        const key = `${sale.total}_${sale.items?.length}_${sale.paymentMethod}_${Math.floor(new Date(sale.timestamp).getTime() / 10000)}` // 10-second window
-        
-        if (seenSales.has(key)) {
-          // This is a potential duplicate
-          const existingSale = seenSales.get(key)
-          const timeDiff = Math.abs(new Date(sale.timestamp) - new Date(existingSale.timestamp))
-          
-          // If within 10 seconds and same details, mark as duplicate
-          if (timeDiff < 10000) {
-            duplicatesToDelete.push(sale)
-          }
-        } else {
-          seenSales.set(key, sale)
-        }
-      })
-      
-      // Delete duplicates
-      if (duplicatesToDelete.length > 0) {
-        console.log(`Found ${duplicatesToDelete.length} duplicate sales to delete`)
-        const deletePromises = duplicatesToDelete.map(sale => deleteDoc(sale.docRef))
-        await Promise.all(deletePromises)
-        
-        console.log(`Successfully deleted ${duplicatesToDelete.length} duplicate sales`)
-        return { removedCount: duplicatesToDelete.length }
-      } else {
-        console.log('No duplicate sales found')
-        return { removedCount: 0 }
+      // Check for duplicates
+      const existingProducts = await supabaseOperations.products.getByName(productData.name);
+      if (existingProducts.length > 0) {
+        toast.error(`Product "${productData.name}" already exists`);
+        throw new Error(`Duplicate product: ${productData.name}`);
       }
-    } catch (error) {
-      console.error('Error cleaning up duplicates:', error)
-      throw error
-    }
-  }
 
-  // Add sale to Firebase with duplicate prevention
-  const addSale = async (saleData) => {
+      const newProduct = {
+        ...productData,
+        type: productData.type,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add to Supabase
+      const result = await supabaseOperations.products.create(newProduct);
+      
+      toast.success('Product added successfully');
+      return result;
+    } catch (error) {
+      console.error('Error adding product:', error);
+      if (!error.message.includes('Duplicate product')) {
+        toast.error('Failed to add product');
+      }
+      throw error;
+    }
+  }, []);
+
+  const updateProduct = useCallback(async (id, productData) => {
     try {
-      console.log('Adding sale to Firebase:', saleData)
+      const updatedProduct = {
+        ...productData,
+        updated_at: new Date().toISOString()
+      };
+
+      const result = await supabaseOperations.products.update(id, updatedProduct);
+      
+      toast.success('Product updated successfully');
+      return result;
+    } catch (error) {
+      console.error('Error updating product:', error);
+      toast.error('Failed to update product');
+      throw error;
+    }
+  }, []);
+
+  const deleteProduct = useCallback(async (productId) => {
+    try {
+      await supabaseOperations.products.delete(productId);
+      toast.success('Product deleted successfully');
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Failed to delete product');
+      throw error;
+    }
+  }, []);
+
+  // Bulk operations
+  const bulkDeleteProducts = useCallback(async (productIds) => {
+    try {
+      await supabaseOperations.products.bulkDelete(productIds);
+      toast.success(`${productIds.length} products deleted successfully`);
+    } catch (error) {
+      console.error('Error bulk deleting products:', error);
+      toast.error('Failed to delete products');
+      throw error;
+    }
+  }, []);
+
+  const bulkUpdateVisibility = useCallback(async (productIds, isVisible) => {
+    try {
+      const updates = productIds.map(id => ({
+        id,
+        is_visible: isVisible,
+        updated_at: new Date().toISOString()
+      }));
+      
+      await supabaseOperations.products.bulkUpdate(updates);
+      
+      const action = isVisible ? 'shown' : 'hidden';
+      toast.success(`${productIds.length} products ${action} successfully`);
+    } catch (error) {
+      console.error('Error bulk updating visibility:', error);
+      toast.error('Failed to update product visibility');
+      throw error;
+    }
+  }, []);
+
+  // Stock operations
+  const updateStock = useCallback(async (productId, newStock) => {
+    try {
+      await supabaseOperations.products.updateStock(productId, newStock);
+      toast.success('Stock updated successfully');
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      toast.error('Failed to update stock');
+      throw error;
+    }
+  }, []);
+
+  // Search and filter functions
+  const searchProducts = useCallback((searchTerm) => {
+    if (!searchTerm.trim()) return products;
+    
+    const term = searchTerm.toLowerCase();
+    return products.filter(product => 
+      product.name.toLowerCase().includes(term) ||
+      product.barcode?.toLowerCase().includes(term) ||
+      product.type?.toLowerCase().includes(term)
+    );
+  }, [products]);
+
+  const getProductsByCategory = useCallback((category) => {
+    if (!category) return products;
+    return products.filter(product => product.type === category);
+  }, [products]);
+
+  const getLowStockProducts = useCallback((threshold = 10) => {
+    return products.filter(product => 
+      product.stock !== undefined && product.stock <= threshold
+    );
+  }, [products]);
+
+  // Category operations
+  const addCategory = useCallback(async (categoryData) => {
+    try {
+      const newCategory = await supabaseOperations.categories.create(categoryData);
+      setCategories(prev => [...prev, newCategory]);
+      toast.success('Category added successfully');
+      return newCategory;
+    } catch (error) {
+      console.error('Error adding category:', error);
+      toast.error('Failed to add category');
+      throw error;
+    }
+  }, []);
+
+  const deleteCategory = useCallback(async (categoryId) => {
+    try {
+      await supabaseOperations.categories.delete(categoryId);
+      setCategories(prev => prev.filter(cat => cat.id !== categoryId));
+      toast.success('Category deleted successfully');
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast.error('Failed to delete category');
+      throw error;
+    }
+  }, []);
+
+  const getCategoriesForDropdown = useCallback(() => {
+    return categories.map(cat => ({
+      value: cat.name.toLowerCase(),
+      label: cat.name
+    }));
+  }, [categories]);
+
+  // Statistics
+  const getInventoryStats = useCallback(() => {
+    const totalProducts = products.length;
+    const totalValue = products.reduce((sum, product) => {
+      return sum + (product.price * (product.stock || 0));
+    }, 0);
+    const lowStockCount = getLowStockProducts().length;
+    const outOfStockCount = products.filter(p => p.stock === 0).length;
+    
+    return {
+      totalProducts,
+      totalValue,
+      lowStockCount,
+      outOfStockCount
+    };
+  }, [products, getLowStockProducts]);
+
+  // Sales operations
+  const [sales, setSales] = useState([]);
+
+  /**
+   * Loads recent sales from Supabase database
+   * @param {number} limit - Maximum number of sales to load (default: 50)
+   * @returns {Promise<Array>} Array of sales data or empty array on error
+   */
+  const loadSales = useCallback(async (limit = 50) => {
+    try {
+      if (!limit || limit <= 0) {
+        throw new Error('Invalid limit parameter');
+      }
+      
+      const data = await supabaseOperations.sales.getAll(limit);
+      const salesData = data || [];
+      setSales(salesData);
+      console.log(`Loaded ${salesData.length} recent sales from Supabase`);
+      return salesData;
+    } catch (error) {
+      console.error('Error loading sales:', error);
+      toast.error(`Failed to load sales: ${error.message}`);
+      return [];
+    }
+  }, []);
+
+  /**
+   * Adds a new sale to the database with duplicate prevention
+   * @param {Object} saleData - Sale data object containing transaction details
+   * @param {string} saleData.transactionId - Unique transaction identifier
+   * @param {Array} saleData.items - Array of sale items
+   * @param {number} saleData.total - Total sale amount
+   * @returns {Promise<Object|null>} Created sale object or null if duplicate/error
+   */
+  const addSale = useCallback(async (saleData) => {
+    try {
+      // Input validation
+      if (!saleData || typeof saleData !== 'object') {
+        throw new Error('Invalid sale data provided');
+      }
+      
+      if (!saleData.items || !Array.isArray(saleData.items) || saleData.items.length === 0) {
+        throw new Error('Sale must contain at least one item');
+      }
+      
+      if (!saleData.total || saleData.total <= 0) {
+        throw new Error('Sale total must be greater than zero');
+      }
+      
+      console.log('Adding sale:', saleData);
       
       // Check for duplicates before adding
-      const isDuplicate = await checkForDuplicates(saleData)
+      const isDuplicate = await checkForDuplicates(saleData);
       if (isDuplicate) {
-        console.log('Duplicate sale detected, skipping...')
-        toast.warning('Duplicate sale detected and prevented')
-        return null
+        console.log('Duplicate sale detected, skipping...');
+        toast.warning('Duplicate sale detected and prevented');
+        return null;
       }
       
       // Add unique transaction ID if not present
       const saleWithId = {
         ...saleData,
         transactionId: saleData.transactionId || uuidv4(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
       
-      const docRef = await addDoc(collection(db, 'sales'), saleWithId)
-      console.log('Sale added with ID:', docRef.id)
-      toast.success('Sale recorded successfully!')
-      return docRef.id
-    } catch (error) {
-      console.error('Error adding sale to Firebase:', error)
-      toast.error('Failed to record sale')
-      throw error
-    }
-  }
-
-  // Load categories from Firestore with real-time updates
-  useEffect(() => {
-    console.log('InventoryContext: Setting up categories real-time listener')
-    
-    const categoriesQuery = query(collection(db, 'categories'), orderBy('name', 'asc'))
-    const unsubscribe = onSnapshot(
-      categoriesQuery,
-      async (snapshot) => {
-        const categoriesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
+      // Primary: Try to save to Supabase
+      try {
+        const newSale = await supabaseOperations.sales.create(saleWithId);
+        if (!newSale || !newSale.id) {
+          throw new Error('Invalid response from Supabase - no sale ID returned');
+        }
         
-        console.log(`InventoryContext: Loaded ${categoriesData.length} categories (real-time)`)
+        setSales(prev => [newSale, ...prev]);
+        console.log('Sale added to Supabase:', newSale);
+        toast.success('Sale recorded successfully!');
+        return newSale.id;
+      } catch (supabaseError) {
+        console.error('Supabase error details:', {
+          message: supabaseError.message,
+          code: supabaseError.code,
+          details: supabaseError.details
+        });
         
-        // If no categories exist, add default ones
-        if (categoriesData.length === 0) {
-          console.log('No categories found, adding default categories...')
-          const defaultCategories = [
-            { name: 'Cane Blend', description: 'Fresh sugarcane juice blended with natural flavors' },
-            { name: 'Cane Fusion', description: 'Premium fusion drinks with sugarcane base' },
-            { name: 'Cane Pops', description: 'Frozen sugarcane treats and popsicles' },
-            { name: 'Cane Special', description: 'Special signature sugarcane beverages' },
-            { name: 'Others', description: 'Additional items and accessories' }
-          ]
-          
+        // Fallback: Try Firebase if available
+        if (typeof window !== 'undefined' && window.addSaleToFirebase) {
           try {
-            for (const category of defaultCategories) {
-              await addDoc(collection(db, 'categories'), {
-                ...category,
-                createdAt: new Date(),
-                updatedAt: new Date()
-              })
+            console.log('Attempting Firebase fallback for sale...');
+            const docId = await window.addSaleToFirebase(saleWithId);
+            
+            if (!docId) {
+              throw new Error('Firebase fallback failed - no document ID returned');
             }
-            console.log('Default categories added successfully')
-          } catch (error) {
-            console.error('Error adding default categories:', error)
+            
+            console.log('Sale added to Firebase fallback:', docId);
+            toast.success('Sale recorded successfully (Firebase fallback)!');
+            return docId;
+          } catch (firebaseError) {
+            console.error('Firebase fallback error:', firebaseError);
+            throw new Error(`Both Supabase and Firebase failed: ${supabaseError.message}; Firebase: ${firebaseError.message}`);
           }
         } else {
-          setCategories(categoriesData)
+          // No fallback available, provide detailed error
+          throw new Error(`Supabase error: ${supabaseError.message || 'Unknown database error'}`);
         }
-      },
-      (error) => {
-        console.error('Error loading categories from Firestore:', error)
-        setCategories([])
       }
-    )
-
-    return () => {
-      console.log('InventoryContext: Cleanup - unsubscribing from categories listener')
-      unsubscribe()
-    }
-  }, [])
-
-  // Add category
-  const addCategory = async (categoryData) => {
-    try {
-      console.log('Adding category to Firebase:', categoryData)
-      
-      const categoryWithTimestamp = {
-        ...categoryData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-      
-      const docRef = await addDoc(collection(db, 'categories'), categoryWithTimestamp)
-      console.log('Category added with ID:', docRef.id)
-      toast.success('Category created successfully!')
-      return docRef.id
     } catch (error) {
-      console.error('Error adding category to Firebase:', error)
-      toast.error('Failed to create category')
-      throw error
+      console.error('Error adding sale:', error);
+      toast.error('Failed to record sale');
+      throw error;
     }
-  }
+  }, []);
 
-  // Update category
-  const updateCategory = async (id, categoryData) => {
+  /**
+   * Retrieves sales within a specified date range
+   * @param {Date|string} startDate - Start date for the range
+   * @param {Date|string} endDate - End date for the range
+   * @returns {Promise<Array>} Array of sales within the date range
+   */
+  const getSalesByDateRange = useCallback(async (startDate, endDate) => {
     try {
-      console.log('Updating category with ID:', id, 'Data:', categoryData)
-      
-      const updatedCategory = {
-        ...categoryData,
-        updatedAt: new Date()
+      // Input validation
+      if (!startDate || !endDate) {
+        throw new Error('Both start date and end date are required');
       }
       
-      await updateDoc(doc(db, 'categories', id), updatedCategory)
-      console.log('Category updated successfully')
-      toast.success('Category updated successfully!')
-      return { id, ...updatedCategory }
-    } catch (error) {
-      console.error('Error updating category:', error)
-      toast.error('Failed to update category')
-      throw error
-    }
-  }
-
-  // Delete category
-  const deleteCategory = async (categoryId) => {
-    try {
-      console.log('Deleting category with ID:', categoryId)
+      const start = new Date(startDate);
+      const end = new Date(endDate);
       
-      // Check if any products use this category
-      const productsUsingCategory = products.filter(product => product.category === categoryId)
-      if (productsUsingCategory.length > 0) {
-        toast.error(`Cannot delete category. ${productsUsingCategory.length} products are using this category.`)
-        return false
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        throw new Error('Invalid date format provided');
       }
       
-      await deleteDoc(doc(db, 'categories', categoryId))
-      console.log('Category deleted successfully')
-      toast.success('Category deleted successfully!')
-      return true
+      if (start > end) {
+        throw new Error('Start date cannot be after end date');
+      }
+      
+      const data = await supabaseOperations.sales.getByDateRange(startDate, endDate);
+      return data || [];
     } catch (error) {
-      console.error('Error deleting category:', error)
-      toast.error('Failed to delete category')
-      throw error
+      console.error('Error getting sales by date range:', error);
+      toast.error(`Failed to retrieve sales: ${error.message}`);
+      return [];
     }
-  }
+  }, []);
 
-  // Get categories for dropdown
-  const getCategoriesForDropdown = () => {
-    return categories.map(category => ({
-      value: category.name,
-      label: category.name
-    }))
-  }
+  /**
+   * Deletes a sale from the database
+   * @param {string} id - Unique identifier of the sale to delete
+   * @returns {Promise<boolean>} True if deletion was successful
+   * @throws {Error} If deletion fails
+   */
+  const deleteSale = useCallback(async (id) => {
+    try {
+      if (!id) {
+        throw new Error('Sale ID is required for deletion');
+      }
+      
+      await supabaseOperations.sales.delete(id);
+      setSales(prev => prev.filter(s => s.id !== id));
+      toast.success('Sale deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+      toast.error(`Failed to delete sale: ${error.message}`);
+      throw error;
+    }
+  }, []);
 
-  const value = {
+  /**
+   * Checks for duplicate sales based on transaction ID within a 5-minute window
+   * @param {Object} saleData - Sale data to check for duplicates
+   * @param {string} saleData.transactionId - Transaction ID to check
+   * @returns {Promise<boolean>} True if duplicate is found, false otherwise
+   */
+  const checkForDuplicates = useCallback(async (saleData) => {
+    try {
+      if (!saleData || !saleData.transactionId) {
+        throw new Error('Sale data with transaction ID is required');
+      }
+      
+      // Check for sales with the same transaction ID in the last 5 minutes
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      
+      const { data, error } = await supabase
+        .from('sales')
+        .select('id')
+        .eq('transactionId', saleData.transactionId)
+        .gte('created_at', fiveMinutesAgo)
+        .limit(1);
+      
+      if (error) throw error;
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Error checking for duplicate sales:', error);
+      return false; // Assume no duplicates if check fails
+    }
+  }, []);
+
+  // Load sales on component mount
+  useEffect(() => {
+    loadSales();
+  }, [loadSales]);
+
+  // Context value
+  const value = useMemo(() => ({
+    // State
     products,
-    cart,
-    sales,
     categories,
+    cart,
     loading,
+    isOnline,
+    pendingUpdates,
+    sales,
+    
+    // Cart operations
     addToCart,
     removeFromCart,
     updateCartQuantity,
     clearCart,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-    getCategoriesForDropdown,
-    uploadAllInventoryToFirebase,
     getCartTotal,
     getCartTax,
     getCartSubtotal,
-    getCategoryGroup,
+    
+    // Product CRUD
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    
+    // Category operations
+    addCategory,
+    deleteCategory,
+    getCategoriesForDropdown,
+    
+    // Bulk operations
+    bulkDeleteProducts,
+    bulkUpdateVisibility,
+    
+    // Stock operations
+    updateStock,
+    
+    // Search and filter
+    searchProducts,
+    getProductsByCategory,
+    getLowStockProducts,
+    
+    // Sales operations
     addSale,
-    cleanupDuplicates
-  }
+    loadSales,
+    getSalesByDateRange,
+    deleteSale,
+    checkForDuplicates,
+    
+    // Statistics
+    getInventoryStats,
+    
+    // Utilities
+  }), [products, categories, cart, loading, isOnline, pendingUpdates, sales, addToCart, removeFromCart, 
+      updateCartQuantity, clearCart, getCartTotal, getCartTax, getCartSubtotal, addProduct, updateProduct, deleteProduct, addCategory, 
+      deleteCategory, getCategoriesForDropdown, bulkDeleteProducts, bulkUpdateVisibility, 
+      updateStock, searchProducts, getProductsByCategory, getLowStockProducts, addSale, loadSales, getSalesByDateRange, deleteSale, 
+      checkForDuplicates, getInventoryStats]);
 
   return (
     <InventoryContext.Provider value={value}>
       {children}
     </InventoryContext.Provider>
-  )
-}
-
-export { InventoryProvider }
+  );
+};

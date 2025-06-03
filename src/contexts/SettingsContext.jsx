@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
-import { db } from '../firebase/config'
-import { doc, setDoc, onSnapshot } from 'firebase/firestore'
-import { useAuth } from './AuthContext'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '../supabase/config'
+import { useAuth } from './AuthContextSupabase'
 import toast from 'react-hot-toast'
 
 const SettingsContext = createContext()
@@ -99,45 +98,53 @@ export function SettingsProvider({ children }) {
   })
   const [loading, setLoading] = useState(true)
 
-  // Load settings from Firestore with real-time updates
+  // Load settings from Supabase
   useEffect(() => {
     if (!currentUser) {
       setLoading(false)
       return
     }
 
-    console.log('SettingsContext: Setting up real-time listener for settings')
+    console.log('SettingsContext: Loading settings from Supabase')
     
-    const settingsDocRef = doc(db, 'settings', currentUser.uid)
-    const unsubscribe = onSnapshot(
-      settingsDocRef,
-      (doc) => {
-        if (doc.exists()) {
-          const settingsData = doc.data()
-          console.log('SettingsContext: Loaded settings from Firestore')
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('settings')
+          .eq('user_id', currentUser.id)
+          .single()
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+          if (error.code === '42P01') {
+            // Table doesn't exist - use defaults silently
+            console.log('Settings table not found, using defaults')
+            return
+          }
+          throw error
+        }
+        
+        if (data?.settings) {
+          console.log('SettingsContext: Loaded settings from Supabase')
           setSettings(prevSettings => ({
             ...prevSettings,
-            ...settingsData
+            ...data.settings
           }))
         } else {
-          console.log('SettingsContext: No settings document found, using defaults')
+          console.log('SettingsContext: No settings found, using defaults')
         }
-        setLoading(false)
-      },
-      (error) => {
-        console.error('Error loading settings from Firestore:', error)
+      } catch (error) {
+        console.error('Error loading settings from Supabase:', error)
+      } finally {
         setLoading(false)
       }
-    )
-
-    return () => {
-      console.log('SettingsContext: Cleanup - unsubscribing from real-time listener')
-      unsubscribe()
     }
+    
+    loadSettings()
   }, [currentUser])
 
-  // Save settings to Firestore
-  const saveSettings = async (newSettings) => {
+  // Save settings to Supabase
+  const saveSettings = useCallback(async (newSettings) => {
     if (!currentUser) {
       console.error('SettingsContext: User not authenticated')
       toast.error('User not authenticated. Please log in again.')
@@ -147,20 +154,29 @@ export function SettingsProvider({ children }) {
     console.log('SettingsContext: Attempting to save settings:', newSettings)
 
     try {
-      // Validate Firebase connection
-      if (!db) {
-        throw new Error('Firebase database not initialized')
-      }
-
-      const settingsDocRef = doc(db, 'settings', currentUser.uid)
       const updatedSettings = {
         ...settings,
         ...newSettings,
-        updatedAt: new Date()
+        updatedAt: new Date().toISOString()
       }
       
-      console.log('SettingsContext: Saving to Firestore with document ID:', currentUser.uid)
-      await setDoc(settingsDocRef, updatedSettings, { merge: true })
+      console.log('SettingsContext: Saving to Supabase for user:', currentUser.id)
+      
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({
+          user_id: currentUser.id,
+          settings: updatedSettings,
+          updated_at: new Date().toISOString()
+        })
+      
+      if (error) {
+        if (error.code === '42P01') {
+          console.log('Settings table not found, skipping save')
+          return
+        }
+        throw error
+      }
       
       setSettings(updatedSettings)
       
@@ -180,28 +196,24 @@ export function SettingsProvider({ children }) {
       // Provide more specific error messages
       let errorMessage = 'Failed to save settings'
       
-      if (error.code === 'permission-denied') {
+      if (error.code === '42501') {
         errorMessage = 'Permission denied. Please check your account permissions.'
-      } else if (error.code === 'unavailable') {
-        errorMessage = 'Service temporarily unavailable. Please try again.'
-      } else if (error.code === 'unauthenticated') {
-        errorMessage = 'Authentication expired. Please log in again.'
-      } else if (error.message.includes('Firebase')) {
-        errorMessage = 'Database connection error. Please check your internet connection.'
+      } else if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection.'
       }
       
       toast.error(errorMessage)
       throw error
     }
-  }
+  }, [currentUser, settings])
 
   // Update specific setting
-  const updateSetting = async (key, value) => {
+  const updateSetting = useCallback(async (key, value) => {
     await saveSettings({ [key]: value })
-  }
+  }, [saveSettings])
 
   // Reset settings to default
-  const resetSettings = async () => {
+  const resetSettings = useCallback(async () => {
     if (!currentUser) {
       toast.error('User not authenticated')
       return
@@ -255,10 +267,10 @@ export function SettingsProvider({ children }) {
       toast.error('Failed to reset settings')
       throw error
     }
-  }
+  }, [currentUser])
 
   // Export settings
-  const exportSettings = () => {
+  const exportSettings = useCallback(() => {
     try {
       const dataStr = JSON.stringify(settings, null, 2)
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
@@ -275,10 +287,10 @@ export function SettingsProvider({ children }) {
       console.error('Error exporting settings:', error)
       toast.error('Failed to export settings')
     }
-  }
+  }, [settings])
 
   // Import settings
-  const importSettings = async (settingsData) => {
+  const importSettings = useCallback(async (settingsData) => {
     try {
       // Validate settings data
       if (typeof settingsData !== 'object' || settingsData === null) {
@@ -292,10 +304,10 @@ export function SettingsProvider({ children }) {
       toast.error('Failed to import settings')
       throw error
     }
-  }
+  }, [saveSettings])
 
   // Get formatted currency
-  const formatCurrency = (amount) => {
+  const formatCurrency = useCallback((amount) => {
     const formattedAmount = new Intl.NumberFormat('en-IN', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
@@ -306,10 +318,10 @@ export function SettingsProvider({ children }) {
     } else {
       return `${formattedAmount}${settings.currencySymbol}`
     }
-  }
+  }, [settings.currencyPosition, settings.currencySymbol])
 
   // Calculate tax amount
-  const calculateTax = (amount, taxRate = null) => {
+  const calculateTax = useCallback((amount, taxRate = null) => {
     if (!settings.enableTax) return 0
     
     const rate = taxRate || settings.defaultTaxRate
@@ -318,20 +330,20 @@ export function SettingsProvider({ children }) {
     } else {
       return (amount * rate) / 100
     }
-  }
+  }, [settings.enableTax, settings.defaultTaxRate, settings.taxInclusive])
 
   // Calculate loyalty points
-  const calculateLoyaltyPoints = (amount) => {
+  const calculateLoyaltyPoints = useCallback((amount) => {
     if (!settings.enableLoyalty) return 0
     return Math.floor(amount * settings.pointsPerRupee)
-  }
+  }, [settings.enableLoyalty, settings.pointsPerRupee])
 
   // Convert points to currency
-  const pointsToCurrency = (points) => {
+  const pointsToCurrency = useCallback((points) => {
     return points / settings.pointsRedemptionRate
-  }
+  }, [settings.pointsRedemptionRate])
 
-  const value = {
+  const value = useMemo(() => ({
     settings,
     loading,
     saveSettings,
@@ -343,7 +355,19 @@ export function SettingsProvider({ children }) {
     calculateTax,
     calculateLoyaltyPoints,
     pointsToCurrency
-  }
+  }), [
+    settings,
+    loading,
+    saveSettings,
+    updateSetting,
+    resetSettings,
+    exportSettings,
+    importSettings,
+    formatCurrency,
+    calculateTax,
+    calculateLoyaltyPoints,
+    pointsToCurrency
+  ])
 
   return (
     <SettingsContext.Provider value={value}>

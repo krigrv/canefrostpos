@@ -46,12 +46,11 @@ import {
   CheckSquare as SelectAllIcon
 } from 'lucide-react'
 import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns'
-import { db } from '../../firebase/config'
-import { collection, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc, writeBatch } from 'firebase/firestore'
+import { supabaseOperations } from '../../utils/supabaseOperations'
 import { useAdvancedDeviceDetection } from '../../hooks/useDeviceDetection'
 import toast from 'react-hot-toast'
 
-function SalesHistory() {
+const SalesHistory = React.memo(() => {
   const [sales, setSales] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDate, setSelectedDate] = useState('')
@@ -69,31 +68,40 @@ function SalesHistory() {
   const { isMobile, isTablet, orientation } = deviceInfo
   const showMobileLayout = isMobile || (isTablet && orientation === 'portrait')
 
-  // Real-time sales data from Firestore - No mock data
+  // Load sales data from Supabase
   useEffect(() => {
-    console.log('SalesHistory: Setting up real-time listener for sales')
-    
-    const salesQuery = query(collection(db, 'sales'), orderBy('timestamp', 'desc'))
-    const unsubscribe = onSnapshot(
-      salesQuery,
-      (snapshot) => {
-        const salesData = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          firestoreId: doc.id, // Store the actual Firestore document ID
-          id: doc.data().transactionId || doc.data().id || doc.id, // Use transactionId for display
-          timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
+    const loadSales = async () => {
+      console.log('SalesHistory: Loading sales from Supabase')
+      try {
+        const salesData = await supabaseOperations.sales.getAll()
+        const formattedSales = salesData.map(sale => ({
+          ...sale,
+          id: sale.transaction_id || sale.id,
+          timestamp: new Date(sale.created_at),
+          customerName: sale.customer_name || 'Walk-in Customer'
         }))
         
-        console.log(`SalesHistory: Loaded ${salesData.length} sales records (real-time)`)
-        setSales(salesData)
-      },
-      (error) => {
+        console.log(`SalesHistory: Loaded ${formattedSales.length} sales records`)
+        setSales(formattedSales)
+      } catch (error) {
         console.error('SalesHistory: Error loading sales:', error)
         toast.error('Error loading sales data')
       }
-    )
-    
-    return () => unsubscribe()
+    }
+
+    loadSales()
+
+    // Set up real-time subscription for sales
+    const subscription = supabaseOperations.subscriptions.sales((payload) => {
+      console.log('SalesHistory: Real-time sales update:', payload)
+      loadSales() // Reload all sales on any change
+    })
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   // Filter sales based on search and date
@@ -155,10 +163,9 @@ function SalesHistory() {
 
   const handleSaveEdit = async () => {
     try {
-      const saleRef = doc(db, 'sales', editedSale.id)
       const { id, ...updateData } = editedSale
       
-      await updateDoc(saleRef, updateData)
+      await supabaseOperations.sales.update(id, updateData)
       
       setSelectedSale(editedSale)
       setIsEditing(false)
@@ -236,9 +243,8 @@ function SalesHistory() {
   // Delete single sale
   const handleDeleteSale = async (sale) => {
     try {
-      const docId = sale.firestoreId || sale.id
-      console.log('Deleting sale with Firestore ID:', docId)
-      await deleteDoc(doc(db, 'sales', docId))
+      console.log('Deleting sale with ID:', sale.id)
+      await supabaseOperations.sales.delete(sale.id)
       toast.success('Sale deleted successfully!')
       setDeleteDialogOpen(false)
     } catch (error) {
@@ -250,16 +256,8 @@ function SalesHistory() {
   // Delete multiple sales
   const handleDeleteSelected = async () => {
     try {
-      const batch = writeBatch(db)
-      selectedSales.forEach(saleId => {
-        // Find the sale object to get the correct Firestore ID
-        const sale = sales.find(s => s.id === saleId)
-        const docId = sale?.firestoreId || saleId
-        console.log('Deleting selected sale with Firestore ID:', docId)
-        const saleRef = doc(db, 'sales', docId)
-        batch.delete(saleRef)
-      })
-      await batch.commit()
+      console.log('Deleting selected sales:', selectedSales)
+      await supabaseOperations.sales.bulkDelete(selectedSales)
       toast.success(`${selectedSales.length} sales deleted successfully`)
       setSelectedSales([])
       setDeleteDialogOpen(false)
@@ -272,14 +270,8 @@ function SalesHistory() {
   // Delete all sales
   const handleDeleteAllSales = async () => {
     try {
-      const batch = writeBatch(db)
-      sales.forEach(sale => {
-        const docId = sale.firestoreId || sale.id
-        console.log('Deleting sale with Firestore ID:', docId)
-        const saleRef = doc(db, 'sales', docId)
-        batch.delete(saleRef)
-      })
-      await batch.commit()
+      console.log('Deleting all sales')
+      await supabaseOperations.sales.deleteAll()
       setDeleteAllDialogOpen(false)
       toast.success(`All ${sales.length} sales deleted successfully!`)
     } catch (error) {
@@ -856,6 +848,8 @@ function SalesHistory() {
       </Tabs>
     </div>
   )
-}
+})
+
+SalesHistory.displayName = "SalesHistory";
 
 export default SalesHistory

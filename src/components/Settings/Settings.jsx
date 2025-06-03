@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useInventory } from '../../hooks/useInventory'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContextSupabase'
 import { db } from '../../firebase/config'
 import { doc, getDoc } from 'firebase/firestore'
+import { syncFirebaseToJSON } from '../../utils/inventorySync'
+import { resetDatabaseWithCSV, cleanAllDatabases, validateCSVStructure } from '../../utils/databaseCleanup'
 import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -34,6 +36,7 @@ import {
   Info as InfoIcon,
   AlertTriangle as AlertTriangleIcon,
   Palette as PaletteIcon,
+  CloudUpload as CloudSyncIcon,
   Save,
   X
 } from 'lucide-react'
@@ -43,7 +46,7 @@ import LogAnalyzerPanel from '../DevTools/LogAnalyzerPanel'
 
 function Settings() {
   const { settings: contextSettings, saveSettings } = useSettings()
-  const { cleanupDuplicates } = useInventory()
+  const { cleanupDuplicates, uploadAllInventoryToFirebase } = useInventory()
   const { currentUser } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(0)
@@ -68,6 +71,22 @@ function Settings() {
   const [printSettingsOpen, setPrintSettingsOpen] = useState(false)
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false)
   const [showDevTools, setShowDevTools] = useState(false)
+  const [showFirebaseSync, setShowFirebaseSync] = useState(false)
+  const [syncingToFirebase, setSyncingToFirebase] = useState(false)
+  const [syncingToJSON, setSyncingToJSON] = useState(false)
+  const [resettingDatabase, setResettingDatabase] = useState(false)
+  const [cleaningAllDatabases, setCleaningAllDatabases] = useState(false)
+  const [importingFromCSV, setImportingFromCSV] = useState(false)
+  const [showDatabaseCleanup, setShowDatabaseCleanup] = useState(false)
+  const [selectiveCleanup, setSelectiveCleanup] = useState({
+    products: true,
+    sales: true,
+    customers: true,
+    staff: true,
+    categories: true,
+    localStorage: true,
+    firebaseData: true
+  })
   const [printSettings, setPrintSettings] = useState({
     businessName: contextSettings.businessName || businessDetails.businessName,
     businessAddress: contextSettings.businessAddress || businessDetails.businessAddress,
@@ -169,6 +188,219 @@ function Settings() {
     }
   }
 
+  const handleSyncToFirebase = async () => {
+    if (syncingToFirebase) return
+    
+    setSyncingToFirebase(true)
+    try {
+      await uploadAllInventoryToFirebase()
+      toast.success('Successfully synced inventory to Firebase')
+    } catch (error) {
+      console.error('Error syncing to Firebase:', error)
+      toast.error('Failed to sync inventory to Firebase')
+    } finally {
+      setSyncingToFirebase(false)
+    }
+  }
+
+  const handleSyncToJSON = async () => {
+    if (syncingToJSON) return
+    
+    setSyncingToJSON(true)
+    try {
+      await syncFirebaseToJSON()
+      toast.success('Successfully synced Firebase data to JSON file')
+    } catch (error) {
+      console.error('Error syncing to JSON:', error)
+      toast.error('Failed to sync Firebase data to JSON file')
+    } finally {
+      setSyncingToJSON(false)
+    }
+  }
+
+  const handleResetDatabase = async () => {
+    if (resettingDatabase) return
+    
+    const confirmed = window.confirm(
+      '⚠️ WARNING: This will DELETE ALL PRODUCTS from Firebase!\n\n' +
+      'This action cannot be undone. Are you sure you want to proceed?'
+    )
+    
+    if (!confirmed) return
+    
+    const doubleConfirmed = window.confirm(
+      '🚨 FINAL WARNING: You are about to permanently delete all product data!\n\n' +
+      'Type "DELETE" in the next prompt to confirm.'
+    )
+    
+    if (!doubleConfirmed) return
+    
+    const deleteConfirmation = window.prompt(
+      'Type "DELETE" (in capital letters) to confirm database reset:'
+    )
+    
+    if (deleteConfirmation !== 'DELETE') {
+      toast.error('Database reset cancelled - confirmation text did not match')
+      return
+    }
+    
+    setResettingDatabase(true)
+    try {
+      // Run the reset database script
+      const response = await fetch('/api/reset-database', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to reset database')
+      }
+      
+      const result = await response.json()
+      toast.success(`Database reset completed! Deleted ${result.deletedCount} documents.`)
+    } catch (error) {
+      console.error('Error resetting database:', error)
+      toast.error('Failed to reset database. You may need to run the reset script manually.')
+    } finally {
+      setResettingDatabase(false)
+    }
+  }
+
+  const handleSelectiveCleanup = async () => {
+    if (cleaningAllDatabases) return
+    
+    const selectedItems = Object.entries(selectiveCleanup)
+      .filter(([key, value]) => value)
+      .map(([key]) => key)
+    
+    if (selectedItems.length === 0) {
+      toast.error('Please select at least one data type to clean')
+      return
+    }
+    
+    const itemLabels = {
+      products: 'Products',
+      sales: 'Sales History',
+      customers: 'Customers',
+      staff: 'Staff Records',
+      categories: 'Categories',
+      localStorage: 'Local Storage',
+      firebaseData: 'Firebase Data'
+    }
+    
+    const selectedLabels = selectedItems.map(item => itemLabels[item]).join('\n- ')
+    
+    const confirmed = window.confirm(
+      `⚠️ WARNING: This will DELETE the following data:\n\n- ${selectedLabels}\n\nThis action cannot be undone. Are you sure you want to proceed?`
+    )
+    
+    if (!confirmed) return
+    
+    const deleteConfirmation = window.prompt(
+      'Type "CLEAN SELECTED" (in capital letters) to confirm selective cleanup:'
+    )
+    
+    if (deleteConfirmation !== 'CLEAN SELECTED') {
+      toast.error('Selective cleanup cancelled - confirmation text did not match')
+      return
+    }
+    
+    setCleaningAllDatabases(true)
+    try {
+      await cleanAllDatabases(selectiveCleanup)
+      toast.success(`Successfully cleaned selected data: ${selectedLabels.replace(/\n- /g, ', ')}`)
+      // Refresh the page to reflect changes
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+    } catch (error) {
+      console.error('Error cleaning selected data:', error)
+      toast.error('Failed to clean selected data: ' + error.message)
+    } finally {
+      setCleaningAllDatabases(false)
+    }
+  }
+
+  const handleCleanAllDatabases = async () => {
+    if (cleaningAllDatabases) return
+    
+    const confirmed = window.confirm(
+      '⚠️ WARNING: This will DELETE ALL DATA from both Firebase and local storage!\n\n' +
+      'This includes:\n' +
+      '- All products\n' +
+      '- All sales history\n' +
+      '- All customers\n' +
+      '- All staff records\n' +
+      '- All categories\n' +
+      '- Local storage data\n\n' +
+      'This action cannot be undone. Are you sure you want to proceed?'
+    )
+    
+    if (!confirmed) return
+    
+    const deleteConfirmation = window.prompt(
+      'Type "CLEAN ALL" (in capital letters) to confirm complete database cleanup:'
+    )
+    
+    if (deleteConfirmation !== 'CLEAN ALL') {
+      toast.error('Database cleanup cancelled - confirmation text did not match')
+      return
+    }
+    
+    setCleaningAllDatabases(true)
+    try {
+      await cleanAllDatabases()
+      toast.success('All databases cleaned successfully')
+      // Refresh the page to reflect changes
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+    } catch (error) {
+      console.error('Error cleaning databases:', error)
+      toast.error('Failed to clean databases: ' + error.message)
+    } finally {
+      setCleaningAllDatabases(false)
+    }
+  }
+
+  const handleImportFromCSV = async () => {
+    if (importingFromCSV) return
+    
+    const confirmed = window.confirm(
+      '🔄 CSV Import Process\n\n' +
+      'This will:\n' +
+      '1. Clean all existing data (products, sales, etc.)\n' +
+      '2. Import fresh data from Canefrost Inventory Final.csv\n' +
+      '3. Sync data to both Firebase and local storage\n\n' +
+      'Continue with import?'
+    )
+    
+    if (!confirmed) return
+    
+    setImportingFromCSV(true)
+    try {
+      // First validate CSV structure
+       await validateCSVStructure('/Users/krishnagaurav/Documents/GitHub/canefrostpos/public/Canefrost Inventory Final.csv')
+       
+       // Perform the complete reset and import
+       const result = await resetDatabaseWithCSV('/Users/krishnagaurav/Documents/GitHub/canefrostpos/public/Canefrost Inventory Final.csv')
+      
+      toast.success(`Successfully imported ${result.productCount} products from CSV`)
+      
+      // Refresh the page to reflect changes
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+    } catch (error) {
+      console.error('Error importing from CSV:', error)
+      toast.error('Failed to import from CSV: ' + error.message)
+    } finally {
+      setImportingFromCSV(false)
+    }
+  }
+
   const managementCards = [
     {
       title: 'Print Settings',
@@ -185,6 +417,22 @@ function Settings() {
       color: 'warning',
       features: ['Component Library', 'Design System', 'Interactive Examples', 'Style Guide'],
       action: () => navigate('/demo')
+    },
+    {
+      title: 'Firebase Sync',
+      description: 'Manage Firebase database synchronization and data integrity',
+      icon: <CloudSyncIcon sx={{ fontSize: 40, color: 'info.main' }} />,
+      color: 'info',
+      features: ['Sync to Firebase', 'Sync from Firebase', 'Reset Database', 'Data Management'],
+      action: () => setShowFirebaseSync(true)
+    },
+    {
+      title: 'Database Cleanup',
+      description: 'Clean all databases and import fresh data from CSV',
+      icon: <CleaningServicesIcon sx={{ fontSize: 40, color: 'error.main' }} />,
+      color: 'error',
+      features: ['Clean All Data', 'Import from CSV', 'Complete Reset', 'Fresh Start'],
+      action: () => setShowDatabaseCleanup(true)
     }
   ]
 
@@ -885,6 +1133,320 @@ function Settings() {
                  </div>
                </div>
              </div>
+           </div>
+         </DialogContent>
+       </Dialog>
+
+       {/* Firebase Sync Management Dialog */}
+       <Dialog open={showFirebaseSync} onOpenChange={setShowFirebaseSync}>
+         <DialogContent className="max-w-2xl">
+           <DialogHeader>
+             <DialogTitle className="flex items-center gap-2">
+               <CloudSyncIcon className="h-6 w-6 text-blue-600" />
+               Firebase Sync Management
+             </DialogTitle>
+             <DialogDescription>
+               Manage Firebase database synchronization and data integrity. Use these tools to sync data between your local inventory and Firebase.
+             </DialogDescription>
+           </DialogHeader>
+           
+           <div className="space-y-6">
+             {/* Sync Controls */}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <Card>
+                 <CardHeader>
+                   <CardTitle className="text-lg flex items-center gap-2">
+                     <CloudSyncIcon className="h-5 w-5 text-green-600" />
+                     Sync to Firebase
+                   </CardTitle>
+                   <CardDescription>
+                     Upload local inventory data to Firebase database
+                   </CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <Button 
+                     onClick={handleSyncToFirebase}
+                     disabled={syncingToFirebase}
+                     className="w-full bg-green-600 hover:bg-green-700"
+                   >
+                     {syncingToFirebase ? 'Syncing...' : 'Sync to Firebase'}
+                   </Button>
+                 </CardContent>
+               </Card>
+
+               <Card>
+                 <CardHeader>
+                   <CardTitle className="text-lg flex items-center gap-2">
+                     <CloudSyncIcon className="h-5 w-5 text-blue-600" />
+                     Sync from Firebase
+                   </CardTitle>
+                   <CardDescription>
+                     Download Firebase data to local JSON file
+                   </CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <Button 
+                     onClick={handleSyncToJSON}
+                     disabled={syncingToJSON}
+                     className="w-full bg-blue-600 hover:bg-blue-700"
+                   >
+                     {syncingToJSON ? 'Syncing...' : 'Sync from Firebase'}
+                   </Button>
+                 </CardContent>
+               </Card>
+             </div>
+
+             {/* Danger Zone */}
+             <Card className="border-red-200">
+               <CardHeader>
+                 <CardTitle className="text-lg text-red-600 flex items-center gap-2">
+                   <AlertTriangleIcon className="h-5 w-5" />
+                   Danger Zone
+                 </CardTitle>
+                 <CardDescription className="text-red-600">
+                   Irreversible actions that will permanently delete data
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <Button 
+                   onClick={handleResetDatabase}
+                   disabled={resettingDatabase}
+                   variant="destructive"
+                   className="w-full"
+                 >
+                   {resettingDatabase ? 'Resetting...' : 'Reset Firebase Database'}
+                 </Button>
+                 <p className="text-sm text-red-600 mt-2">
+                   ⚠️ This will delete ALL products from Firebase. This action cannot be undone.
+                 </p>
+               </CardContent>
+             </Card>
+
+             {/* Auto-sync Status */}
+             <Card className="bg-yellow-50 border-yellow-200">
+               <CardHeader>
+                 <CardTitle className="text-lg text-yellow-800">
+                   Auto-sync Status
+                 </CardTitle>
+                 <CardDescription className="text-yellow-700">
+                   Auto-sync is currently DISABLED to prevent data duplication
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <p className="text-sm text-yellow-800">
+                   Auto-sync has been temporarily disabled to prevent the data multiplication issue. 
+                   Use the manual sync options above to control when data is synchronized.
+                 </p>
+               </CardContent>
+             </Card>
+           </div>
+
+           <div className="flex justify-end">
+             <Button 
+               variant="outline" 
+               onClick={() => setShowFirebaseSync(false)}
+             >
+               Close
+             </Button>
+           </div>
+         </DialogContent>
+       </Dialog>
+
+       {/* Database Cleanup Dialog */}
+       <Dialog open={showDatabaseCleanup} onOpenChange={setShowDatabaseCleanup}>
+         <DialogContent className="w-[95vw] max-w-4xl h-[90vh] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+           <DialogHeader>
+             <DialogTitle className="flex items-center gap-2">
+               <CleaningServicesIcon className="h-6 w-6 text-red-600" />
+               Database Cleanup & CSV Import
+             </DialogTitle>
+             <DialogDescription>
+               Complete database cleanup and fresh data import from CSV file
+             </DialogDescription>
+           </DialogHeader>
+
+           <div className="space-y-6">
+             {/* Warning Section */}
+             <Alert className="border-red-200 bg-red-50">
+               <AlertTriangleIcon className="h-4 w-4 text-red-600" />
+               <AlertTitle className="text-red-800">⚠️ Critical Operation</AlertTitle>
+               <AlertDescription className="text-red-700">
+                 These operations will permanently delete all existing data. Make sure you have backups if needed.
+               </AlertDescription>
+             </Alert>
+
+             {/* Selective Cleanup */}
+             <Card className="bg-orange-50 border-orange-200">
+               <CardHeader>
+                 <CardTitle className="text-lg text-orange-800 flex items-center gap-2">
+                   <CheckCircleIcon className="h-5 w-5" />
+                   Selective Data Cleanup
+                 </CardTitle>
+                 <CardDescription className="text-orange-700">
+                   Choose which data types to clean. Only selected items will be deleted.
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <div className="space-y-3 mb-4">
+                   <Label className="text-sm font-medium text-orange-800">Select data to clean:</Label>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                     {Object.entries({
+                       products: 'Products',
+                       sales: 'Sales History',
+                       customers: 'Customers',
+                       staff: 'Staff Records',
+                       categories: 'Categories',
+                       localStorage: 'Local Storage',
+                       firebaseData: 'Firebase Data'
+                     }).map(([key, label]) => (
+                       <div key={key} className="flex items-center space-x-2">
+                         <Checkbox
+                           id={key}
+                           checked={selectiveCleanup[key]}
+                           onCheckedChange={(checked) => setSelectiveCleanup(prev => ({
+                             ...prev,
+                             [key]: checked
+                           }))}
+                         />
+                         <Label htmlFor={key} className="text-sm text-orange-700">
+                           {label}
+                         </Label>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+                 
+                 <div className="flex gap-2 mb-3">
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setSelectiveCleanup({
+                       products: true,
+                       sales: true,
+                       customers: true,
+                       staff: true,
+                       categories: true,
+                       localStorage: true,
+                       firebaseData: true
+                     })}
+                   >
+                     Select All
+                   </Button>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setSelectiveCleanup({
+                       products: false,
+                       sales: false,
+                       customers: false,
+                       staff: false,
+                       categories: false,
+                       localStorage: false,
+                       firebaseData: false
+                     })}
+                   >
+                     Select None
+                   </Button>
+                 </div>
+                 
+                 <Button 
+                   onClick={handleSelectiveCleanup}
+                   disabled={cleaningAllDatabases}
+                   className="w-full bg-orange-600 hover:bg-orange-700"
+                 >
+                   {cleaningAllDatabases ? 'Cleaning...' : 'Clean Selected Data'}
+                 </Button>
+                 <p className="text-sm text-orange-600 mt-2">
+                   🎯 Only the selected data types will be deleted from your databases.
+                 </p>
+               </CardContent>
+             </Card>
+
+             {/* Clean All Databases */}
+             <Card className="bg-red-50 border-red-200">
+               <CardHeader>
+                 <CardTitle className="text-lg text-red-800 flex items-center gap-2">
+                   <CleaningServicesIcon className="h-5 w-5" />
+                   Clean All Databases
+                 </CardTitle>
+                 <CardDescription className="text-red-700">
+                   Remove all data from Firebase and local storage
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <Button 
+                   onClick={handleCleanAllDatabases}
+                   disabled={cleaningAllDatabases}
+                   variant="destructive"
+                   className="w-full"
+                 >
+                   {cleaningAllDatabases ? 'Cleaning...' : 'Clean All Databases'}
+                 </Button>
+                 <p className="text-sm text-red-600 mt-2">
+                   ⚠️ This will delete ALL data including products, sales, customers, and staff records.
+                 </p>
+               </CardContent>
+             </Card>
+
+             {/* Import from CSV */}
+             <Card className="bg-blue-50 border-blue-200">
+               <CardHeader>
+                 <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
+                   <CloudSyncIcon className="h-5 w-5" />
+                   Import from CSV
+                 </CardTitle>
+                 <CardDescription className="text-blue-700">
+                   Clean all data and import fresh inventory from Canefrost Inventory Final.csv
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 <Button 
+                   onClick={handleImportFromCSV}
+                   disabled={importingFromCSV}
+                   className="w-full"
+                 >
+                   {importingFromCSV ? 'Importing...' : 'Clean & Import from CSV'}
+                 </Button>
+                 <p className="text-sm text-blue-600 mt-2">
+                   📁 Will import from: /Users/krishnagaurav/Documents/GitHub/canefrostpos/public/Canefrost Inventory Final.csv
+                 </p>
+               </CardContent>
+             </Card>
+
+             {/* Process Information */}
+             <Card className="bg-gray-50 border-gray-200">
+               <CardHeader>
+                 <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
+                   <InfoIcon className="h-5 w-5" />
+                   Process Information
+                 </CardTitle>
+               </CardHeader>
+               <CardContent>
+                 <div className="space-y-2 text-sm text-gray-700">
+                   <p><strong>CSV Import Process:</strong></p>
+                   <ul className="list-disc list-inside space-y-1 ml-4">
+                     <li>Validates CSV structure and format</li>
+                     <li>Cleans all existing data (products, sales, customers, etc.)</li>
+                     <li>Imports products from CSV with proper formatting</li>
+                     <li>Syncs data to both Firebase and local storage</li>
+                     <li>Refreshes the application to reflect changes</li>
+                   </ul>
+                   <p className="mt-3"><strong>Expected CSV Format:</strong></p>
+                   <p className="font-mono text-xs bg-gray-100 p-2 rounded">
+                     Item Name, Category, Size, MRP, Barcode, Stock Count
+                   </p>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+
+           <div className="flex justify-end">
+             <Button 
+               variant="outline" 
+               onClick={() => setShowDatabaseCleanup(false)}
+             >
+               Close
+             </Button>
            </div>
          </DialogContent>
        </Dialog>

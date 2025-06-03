@@ -18,6 +18,45 @@ console.log('🚀 Main.jsx loading at:', new Date().toISOString())
 
 // Initialize log analyzer
 if (process.env.NODE_ENV === 'development') {
+  // Global error handler for non-React errors
+  window.addEventListener('error', function(event) {
+    console.error('Global error caught:', event.error);
+    if (logAnalyzer) {
+      logAnalyzer.logEntry({
+        type: 'global-js-error',
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error ? {
+          message: event.error.message,
+          stack: event.error.stack
+        } : null,
+        timestamp: new Date().toISOString(),
+        source: 'global-error-listener'
+      });
+    }
+  });
+
+  // Global handler for unhandled promise rejections
+  window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled promise rejection caught:', event.reason);
+    if (logAnalyzer) {
+      logAnalyzer.logEntry({
+        type: 'unhandled-promise-rejection',
+        message: event.reason instanceof Error ? event.reason.message : String(event.reason),
+        reason: event.reason ? {
+          message: event.reason.message,
+          stack: event.reason.stack
+        } : null,
+        timestamp: new Date().toISOString(),
+        source: 'global-unhandled-rejection-listener'
+      });
+    }
+  });
+
+
+  console.log('🔧 Global error listeners initialized for development mode');
   console.log('📊 Log Analyzer initialized for development mode');
   console.log('💡 Available commands:');
   console.log('  - window.analyzeErrors() - Generate error analysis report');

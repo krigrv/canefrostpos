@@ -66,7 +66,8 @@ import {
 import { useInventory } from '../../hooks/useInventory'
 import { useCustomers } from '../../contexts/CustomerContext'
 import { useSettings } from '../../contexts/SettingsContext'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContextSupabase'
+
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { v4 as uuidv4 } from 'uuid'
@@ -92,7 +93,6 @@ function Dashboard() {
     getCartTotal,
     getCartTax,
     getCartSubtotal,
-    getCategoryGroup,
     categories,
     sales,
     addSale
@@ -105,6 +105,37 @@ function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedType, setSelectedType] = useState('all')
+
+  // Helper function to extract category type from full category string
+  const getMainCategoryName = (fullCategory) => {
+    if (!fullCategory) return null;
+    // Extract category type like "Cane Fusion" or "Cane Juice" from strings like "Citrus - Cane Fusion (CFRST63)"
+    const parts = fullCategory.split(' - ');
+    if (parts.length >= 2) {
+      // Get the second part and remove the product code in parentheses
+      return parts[1].replace(/\s*\([^)]*\)$/, '');
+    }
+    return fullCategory;
+  };
+
+  // Memoized categories and types based on products and filters
+  const productCategories = useMemo(() => {
+    const relevantProducts = products.filter(product => 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    const mainCategories = relevantProducts.map(p => getMainCategoryName(p.category)).filter(Boolean);
+    const uniqueCategories = new Set(mainCategories);
+    return ['all', ...Array.from(uniqueCategories).sort()];
+  }, [products, searchTerm]);
+
+  const productTypes = useMemo(() => {
+    const relevantProducts = products.filter(product => 
+      (selectedCategory === 'all' || product.category === selectedCategory) &&
+      product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    const uniqueTypes = new Set(relevantProducts.map(p => p.type).filter(Boolean));
+    return ['all', ...Array.from(uniqueTypes).sort()];
+  }, [products, selectedCategory, searchTerm]);
   const [checkoutDialog, setCheckoutDialog] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
   const [receiptDialog, setReceiptDialog] = useState(false)
@@ -118,7 +149,7 @@ function Dashboard() {
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
   const [customerSearchTerm, setCustomerSearchTerm] = useState('')
-
+  
   // Thermal receipt ref for browser printing fallback
   const thermalReceiptRef = useRef()
 
@@ -438,7 +469,8 @@ function Dashboard() {
   }
 
   // Calculate packaging charge for 500ml bottles in cane fusion or cane blend
-  const getPackagingCharge = () => {
+  // Memoize packaging charge calculation to prevent unnecessary re-computations
+  const packagingCharge = useMemo(() => {
     if (cart.length === 0) return 0;
     
     const bottleCount = cart.reduce((count, item) => {
@@ -456,14 +488,25 @@ function Dashboard() {
     }, 0)
     
     return bottleCount * 10 // ₹10 per 500ml bottle in cane fusion/blend
-  }
-  
-  const packagingCharge = getPackagingCharge()
+  }, [cart])
 
-  // Get unique categories from products
+
+
+  // Get unique categories from products using category field
   const categoryFilters = useMemo(() => {
-    return categories.map(category => category.name).sort()
-  }, [categories])
+    // Only include main categories like 'Cane Blend', 'Cane Fusion', etc.
+    // and exclude type values like 'Tropical', 'Citrus', etc.
+    const mainCategories = products
+      .map(product => getMainCategoryName(product.category))
+      .filter(Boolean)
+      .filter(category => 
+        category.includes('Cane') || 
+        category === 'Special' || 
+        category === 'Others'
+      );
+    const uniqueCategoryNames = new Set(mainCategories);
+    return Array.from(uniqueCategoryNames).sort();
+  }, [products]);
 
   // Get unique product types for filtering
   const typeFilters = useMemo(() => {
@@ -481,8 +524,9 @@ function Dashboard() {
     return products
       .filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
+        const productMainCategory = getMainCategoryName(product.category)
         const matchesCategory = !selectedCategory || selectedCategory === 'all' || 
-                             product.category === selectedCategory
+                             productMainCategory === selectedCategory
         const matchesType = !selectedType || selectedType === 'all' || 
                            (product.type && product.type.toLowerCase() === selectedType.toLowerCase())
         return matchesSearch && matchesCategory && matchesType
@@ -490,40 +534,96 @@ function Dashboard() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [products, searchTerm, selectedCategory, selectedType])
 
-  // Calculate total with optional packaging charge
-  const getCartTotalWithPackaging = () => {
+  // Memoize cart calculations to prevent unnecessary re-computations
+  const cartTotalWithPackaging = useMemo(() => {
     const baseTotal = getCartTotal()
     return includePackaging ? baseTotal + packagingCharge : baseTotal
+  }, [getCartTotal, includePackaging, packagingCharge])
+
+  // Memoize final total calculation
+  const finalTotal = useMemo(() => {
+    return cartTotalWithPackaging - discount
+  }, [cartTotalWithPackaging, discount])
+
+  /**
+   * Gets the current packaging charge for 500ml bottles in cane fusion/blend categories
+   * @returns {number} The packaging charge amount in rupees
+   */
+  const getPackagingCharge = () => {
+    return packagingCharge || 0
   }
 
-  // Calculate final total
-  const getFinalTotal = () => {
-    return getCartTotalWithPackaging() - discount
-  }
-
-  // Calculate change to be given
-  const getChangeAmount = () => {
+  // Memoize change amount calculation
+  const changeAmount = useMemo(() => {
     if (paymentMethod === 'CASH') {
-      return Math.max(0, receivedAmount - getFinalTotal())
+      return Math.max(0, receivedAmount - finalTotal)
     }
     if (paymentMethod === 'BOTH') {
       const totalPaid = cashAmount + upiAmount
-      return Math.max(0, totalPaid - getFinalTotal())
+      return Math.max(0, totalPaid - finalTotal)
     }
     return 0
-  }
+  }, [paymentMethod, receivedAmount, finalTotal, cashAmount, upiAmount])
 
-  // Calculate tax with optional packaging charge
-  const getCartTaxWithPackaging = () => {
+  // Memoize tax calculation with packaging charge
+  const cartTaxWithPackaging = useMemo(() => {
     const baseTax = getCartTax()
     if (includePackaging) {
       const packagingTax = packagingCharge * 0.12
       return baseTax + packagingTax
     }
     return baseTax
+  }, [getCartTax, includePackaging, packagingCharge])
+
+  /**
+   * Gets the cart total including optional packaging charge
+   * @returns {number} The total cart amount with packaging if enabled
+   */
+  const getCartTotalWithPackaging = () => {
+    return cartTotalWithPackaging || 0
   }
 
+  /**
+   * Gets the final total after applying discounts
+   * @returns {number} The final amount to be paid
+   */
+  const getFinalTotal = () => {
+    return finalTotal || 0
+  }
+
+  /**
+   * Calculates the change amount to be returned to customer
+   * @returns {number} The change amount in rupees
+   */
+  const getChangeAmount = () => {
+    return changeAmount || 0
+  }
+
+  /**
+   * Gets the total tax amount including packaging tax if applicable
+   * @returns {number} The total tax amount in rupees
+   */
+  const getCartTaxWithPackaging = () => {
+    return cartTaxWithPackaging || 0
+  }
+
+  /**
+   * Generates a unique order ID with INVCFN format
+   * @returns {string} Formatted transaction ID
+   */
+  const generateOrderId = () => {
+    const timestamp = Date.now().toString().slice(-6)
+    const randomNum = Math.floor(Math.random() * 100).toString().padStart(2, '0')
+    return `INVCFN${timestamp}${randomNum}`
+  }
+
+  /**
+   * Handles the order placement process including validation, payment processing,
+   * and saving the sale to the database
+   * @returns {Promise<void>}
+   */
   const handlePlaceOrder = async () => {
+    // Input validation
     if (cart.length === 0) {
       toast.error('Cart is empty')
       return
@@ -534,15 +634,22 @@ function Dashboard() {
       return
     }
 
-    // Validation for payment methods
-    if (paymentMethod === 'CASH' && receivedAmount < getFinalTotal()) {
+    // Payment validation
+    const finalAmount = getFinalTotal()
+    if (finalAmount <= 0) {
+      toast.error('Invalid order total')
+      return
+    }
+
+    // Payment method specific validation
+    if (paymentMethod === 'CASH' && receivedAmount < finalAmount) {
       toast.error('Received amount is less than total amount')
       return
     }
 
     if (paymentMethod === 'BOTH') {
       const totalPaid = cashAmount + upiAmount
-      if (totalPaid < getFinalTotal()) {
+      if (isNaN(totalPaid) || totalPaid < finalAmount) {
         toast.error('Total payment amount is less than bill amount')
         return
       }
@@ -551,8 +658,10 @@ function Dashboard() {
     setProcessingPayment(true)
     
     try {
+      // Simulate processing delay for better UX
       await new Promise(resolve => setTimeout(resolve, 1000))
       
+      // Prepare sale items including packaging if enabled
       const saleItems = [...cart]
       if (includePackaging) {
         saleItems.push({
@@ -564,13 +673,7 @@ function Dashboard() {
         })
       }
       
-      // Generate order ID with INVCFN format
-      const generateOrderId = () => {
-        const timestamp = Date.now().toString().slice(-6)
-        const randomNum = Math.floor(Math.random() * 100).toString().padStart(2, '0')
-        return `INVCFN${timestamp}${randomNum}`
-      }
-      
+      // Create sale object with all required information
       const transactionId = generateOrderId()
       const sale = {
         id: uuidv4(),
@@ -589,29 +692,36 @@ function Dashboard() {
         changeAmount: getChangeAmount()
       }
       
-      // Save sale to Firebase
-      await addSale(sale)
-      
-      setLastSale(sale)
-      clearCart()
-      setCheckoutDialog(false)
-      setReceiptDialog(true)
-      
-      // Reset payment fields
-      setDiscount(0)
-      setReceivedAmount(0)
-      setCashAmount(0)
-      setUpiAmount(0)
-      setPaymentMethod('CASH')
-      setSelectedCustomer(null)
-      setCustomerName('')
-      setCustomerPhone('')
-      setCustomerEmail('')
-      
-      toast.success('Order placed successfully!')
-      
+      try {
+        // Save sale to database (Supabase with Firebase fallback)
+        await addSale(sale)
+        
+        // Update UI state after successful save
+        setLastSale(sale)
+        clearCart()
+        setCheckoutDialog(false)
+        setReceiptDialog(true)
+        
+        // Reset payment fields
+        setDiscount(0)
+        setReceivedAmount(0)
+        setCashAmount(0)
+        setUpiAmount(0)
+        setPaymentMethod('CASH')
+        setSelectedCustomer(null)
+        setCustomerName('')
+        setCustomerPhone('')
+        setCustomerEmail('')
+        
+        toast.success(`Order #${transactionId} placed successfully!`)
+      } catch (dbError) {
+        console.error('Database error:', dbError)
+        toast.error(`Database error: ${dbError.message || 'Failed to save order'}`)
+        throw dbError // Re-throw to be caught by outer catch
+      }
     } catch (error) {
-      toast.error('Failed to place order')
+      console.error('Order processing error:', error)
+      toast.error(`Failed to place order: ${error.message || 'Unknown error'}`)
     } finally {
       setProcessingPayment(false)
     }

@@ -3,19 +3,18 @@
  * Handles user authentication state and methods
  * Updated with error handling for debugging blank screen issues
  */
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail // Added import
 } from 'firebase/auth';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
+
 
 const AuthContext = createContext();
 
@@ -28,27 +27,14 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Sign up with email and password
-  async function signup(email, password, displayName) {
-    try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Update profile with display name
-      if (displayName) {
-        await updateProfile(result.user, { displayName });
-      }
-      
-      // Send email verification
-      await sendEmailVerification(result.user);
-      
-      return result;
-    } catch (error) {
-      throw error;
-    }
-  }
+
+
+
+
+
 
   // Sign in with email and password
-  async function login(email, password) {
+  const login = React.useCallback(async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return result;
@@ -56,10 +42,10 @@ export function AuthProvider({ children }) {
       console.error('Login failed:', error);
       throw error;
     }
-  }
+  }, []);
 
   // Sign in with Google
-  async function loginWithGoogle() {
+  const loginWithGoogle = React.useCallback(async () => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({
@@ -70,10 +56,10 @@ export function AuthProvider({ children }) {
     } catch (error) {
       throw error;
     }
-  }
+  }, []);
 
   // Sign out
-  async function logout() {
+  const logout = React.useCallback(async () => {
     try {
       await signOut(auth);
       setCurrentUser(null);
@@ -81,19 +67,19 @@ export function AuthProvider({ children }) {
     } catch (error) {
       throw error;
     }
-  }
+  }, []);
 
   // Reset password
-  async function resetPassword(email) {
+  const resetPassword = React.useCallback(async (email) => {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       throw error;
     }
-  }
+  }, []);
 
   // Update user profile
-  async function updateUserProfile(updates) {
+  const updateUserProfile = React.useCallback(async (updates) => {
     try {
       if (currentUser) {
         await updateProfile(currentUser, updates);
@@ -102,7 +88,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       throw error;
     }
-  }
+  }, [currentUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -114,17 +100,14 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = {
+  const value = React.useMemo(() => ({
     currentUser,
-    isAuthenticated,
-    loading,
-    signup,
     login,
     loginWithGoogle,
     logout,
-    resetPassword,
-    updateUserProfile
-  };
+    resetPassword, // Added for completeness, though not strictly necessary if not exposed
+    updateProfile: updateUserProfile
+  }), [currentUser, login, loginWithGoogle, logout, resetPassword, updateUserProfile]);
 
   return (
     <AuthContext.Provider value={value}>

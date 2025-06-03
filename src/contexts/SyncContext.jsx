@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { db } from '../firebase/config'
 import {
   collection,
@@ -35,133 +35,8 @@ export function SyncProvider({ children }) {
   const syncQueueRef = useRef([])
   const retryTimeoutRef = useRef(null)
 
-  // Monitor online/offline status
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true)
-      toast.success('Connection restored - syncing data...')
-      processPendingOperations()
-    }
-
-    const handleOffline = () => {
-      setIsOnline(false)
-      toast.error('Connection lost - working offline')
-    }
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
-
-  // Load pending operations from localStorage on mount
-  useEffect(() => {
-    const savedOperations = localStorage.getItem('pendingOperations')
-    if (savedOperations) {
-      try {
-        const operations = JSON.parse(savedOperations)
-        setPendingOperations(operations)
-        syncQueueRef.current = operations
-      } catch (error) {
-        console.error('Error loading pending operations:', error)
-        localStorage.removeItem('pendingOperations')
-      }
-    }
-
-    const savedLastSync = localStorage.getItem('lastSyncTime')
-    if (savedLastSync) {
-      setLastSyncTime(new Date(savedLastSync))
-    }
-  }, [])
-
-  // Save pending operations to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('pendingOperations', JSON.stringify(pendingOperations))
-  }, [pendingOperations])
-
-  // Add operation to sync queue
-  const queueOperation = (operation) => {
-    console.log('Queueing operation:', operation);
-    
-    // Ensure consistent field names
-    const queuedOperation = {
-      id: Date.now() + Math.random(),
-      timestamp: new Date().toISOString(),
-      retryCount: 0,
-      ...operation
-    }
-    
-    // Make sure we have consistent field names
-    if (operation.type && !operation.operation) {
-      queuedOperation.operation = operation.type;
-    }
-    
-    if (operation.docId && !operation.id) {
-      queuedOperation.id = operation.docId;
-    }
-
-    console.log('Formatted operation for queue:', queuedOperation);
-    setPendingOperations(prev => [...prev, queuedOperation])
-    syncQueueRef.current.push(queuedOperation)
-
-    // If online, try to process immediately
-    if (isOnline) {
-      processPendingOperations()
-    }
-
-    return queuedOperation.id
-  }
-
-  // Process pending operations
-  const processPendingOperations = async () => {
-    if (!isOnline || syncQueueRef.current.length === 0) return
-
-    setSyncStatus('syncing')
-    const operations = [...syncQueueRef.current]
-    const failedOperations = []
-
-    for (const operation of operations) {
-      try {
-        await executeOperation(operation)
-        // Remove successful operation from queue
-        syncQueueRef.current = syncQueueRef.current.filter(op => op.id !== operation.id)
-        setPendingOperations(prev => prev.filter(op => op.id !== operation.id))
-      } catch (error) {
-        console.error('Operation failed:', operation, error)
-        
-        // Increment retry count
-        operation.retryCount = (operation.retryCount || 0) + 1
-        
-        // If max retries reached, mark as failed
-        if (operation.retryCount >= 3) {
-          failedOperations.push(operation)
-          syncQueueRef.current = syncQueueRef.current.filter(op => op.id !== operation.id)
-          setPendingOperations(prev => prev.filter(op => op.id !== operation.id))
-        }
-      }
-    }
-
-    if (failedOperations.length > 0) {
-      toast.error(`${failedOperations.length} operations failed after 3 retries`)
-      setSyncStatus('error')
-    } else if (syncQueueRef.current.length === 0) {
-      setSyncStatus('idle')
-      setLastSyncTime(new Date())
-      localStorage.setItem('lastSyncTime', new Date().toISOString())
-      toast.success('All data synced successfully')
-    }
-
-    // Schedule retry for remaining operations
-    if (syncQueueRef.current.length > 0) {
-      scheduleRetry()
-    }
-  }
-
   // Execute individual operation
-  const executeOperation = async (operation) => {
+  const executeOperation = useCallback(async (operation) => {
     const { collection: collectionName, operation: operationType, data, id } = operation
     console.log('Executing operation:', operationType, 'on collection:', collectionName, 'with ID:', id, 'Data:', data);
 
@@ -215,10 +90,10 @@ export function SyncProvider({ children }) {
       default:
         throw new Error(`Unknown operation type: ${operationType}`)
     }
-  }
+  }, [])
 
   // Schedule retry for failed operations
-  const scheduleRetry = () => {
+  const scheduleRetry = useCallback(() => {
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current)
     }
@@ -228,10 +103,150 @@ export function SyncProvider({ children }) {
         processPendingOperations()
       }
     }, 5000) // Retry after 5 seconds
-  }
+  }, [isOnline])
+
+  // Process pending operations
+  const processPendingOperations = useCallback(async () => {
+    if (!isOnline || syncQueueRef.current.length === 0) return
+
+    setSyncStatus('syncing')
+    const operations = [...syncQueueRef.current]
+    const failedOperations = []
+
+    for (const operation of operations) {
+      try {
+        await executeOperation(operation)
+        // Remove successful operation from queue
+        syncQueueRef.current = syncQueueRef.current.filter(op => op.id !== operation.id)
+        setPendingOperations(prev => prev.filter(op => op.id !== operation.id))
+      } catch (error) {
+        console.error('Operation failed:', operation, error)
+        
+        // Increment retry count
+        operation.retryCount = (operation.retryCount || 0) + 1
+        
+        // If max retries reached, mark as failed
+        if (operation.retryCount >= 3) {
+          failedOperations.push(operation)
+          syncQueueRef.current = syncQueueRef.current.filter(op => op.id !== operation.id)
+          setPendingOperations(prev => prev.filter(op => op.id !== operation.id))
+        }
+      }
+    }
+
+    if (failedOperations.length > 0) {
+      toast.error(`${failedOperations.length} operations failed after 3 retries`)
+      setSyncStatus('error')
+    } else if (syncQueueRef.current.length === 0) {
+      setSyncStatus('idle')
+      setLastSyncTime(new Date())
+      localStorage.setItem('lastSyncTime', new Date().toISOString())
+      toast.success('All data synced successfully')
+    }
+
+    // Schedule retry for remaining operations
+    if (syncQueueRef.current.length > 0) {
+      scheduleRetry()
+    }
+  }, [isOnline, executeOperation, scheduleRetry])
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      toast.success('Connection restored - syncing data...')
+      processPendingOperations()
+    }
+
+    const handleOffline = () => {
+      setIsOnline(false)
+      toast.error('Connection lost - working offline')
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [processPendingOperations])
+
+  // Load pending operations from localStorage on mount
+  useEffect(() => {
+    const savedOperations = localStorage.getItem('pendingOperations')
+    if (savedOperations) {
+      try {
+        const operations = JSON.parse(savedOperations)
+        setPendingOperations(operations)
+        syncQueueRef.current = operations
+      } catch (error) {
+        console.error('Error loading pending operations:', error)
+        localStorage.removeItem('pendingOperations')
+      }
+    }
+
+    const savedLastSync = localStorage.getItem('lastSyncTime')
+    if (savedLastSync) {
+      setLastSyncTime(new Date(savedLastSync))
+    }
+  }, [])
+
+  // Save pending operations to localStorage whenever they change
+  useEffect(() => {
+    // Debounce localStorage writes to prevent excessive I/O
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem('pendingOperations', JSON.stringify(pendingOperations))
+    }, 500)
+    
+    return () => clearTimeout(timeoutId)
+  }, [pendingOperations])
+
+  // Cleanup retry timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
+    }
+  }, [])
+
+  // Add operation to sync queue
+  const queueOperation = useCallback((operation) => {
+    console.log('Queueing operation:', operation);
+    
+    // Ensure consistent field names
+    const queuedOperation = {
+      id: Date.now() + Math.random(),
+      timestamp: new Date().toISOString(),
+      retryCount: 0,
+      ...operation
+    }
+    
+    // Make sure we have consistent field names
+    if (operation.type && !operation.operation) {
+      queuedOperation.operation = operation.type;
+    }
+    
+    if (operation.docId && !operation.id) {
+      queuedOperation.id = operation.docId;
+    }
+
+    console.log('Formatted operation for queue:', queuedOperation);
+    setPendingOperations(prev => [...prev, queuedOperation])
+    syncQueueRef.current.push(queuedOperation)
+
+    // If online, try to process immediately
+    if (isOnline) {
+      processPendingOperations()
+    }
+
+    return queuedOperation.id
+  }, [isOnline, processPendingOperations])
 
   // Sync specific collection with conflict resolution
-  const syncCollection = async (collectionName, localData, conflictResolver = null) => {
+  const syncCollection = useCallback(async (collectionName, localData, conflictResolver = null) => {
     if (!isOnline) {
       toast.error('Cannot sync while offline')
       return
@@ -338,10 +353,10 @@ export function SyncProvider({ children }) {
       toast.error('Sync failed - will retry automatically')
       return { success: false, error }
     }
-  }
+  }, [isOnline, executeOperation])
 
   // Force sync all collections
-  const forceSyncAll = async () => {
+  const forceSyncAll = useCallback(async () => {
     if (!isOnline) {
       toast.error('Cannot sync while offline')
       return
@@ -355,18 +370,18 @@ export function SyncProvider({ children }) {
       console.error('Force sync error:', error)
       toast.error('Force sync failed')
     }
-  }
+  }, [isOnline, processPendingOperations])
 
   // Clear all pending operations (use with caution)
-  const clearPendingOperations = () => {
+  const clearPendingOperations = useCallback(() => {
     setPendingOperations([])
     syncQueueRef.current = []
     localStorage.removeItem('pendingOperations')
     toast.success('Pending operations cleared')
-  }
+  }, [])
 
   // Get sync statistics
-  const getSyncStats = () => {
+  const getSyncStats = useCallback(() => {
     return {
       isOnline,
       syncStatus,
@@ -374,9 +389,9 @@ export function SyncProvider({ children }) {
       lastSyncTime,
       hasConflicts: syncStatus === 'error'
     }
-  }
+  }, [isOnline, syncStatus, pendingOperations.length, lastSyncTime])
 
-  const value = {
+  const value = useMemo(() => ({
     // Status
     isOnline,
     syncStatus,
@@ -390,7 +405,18 @@ export function SyncProvider({ children }) {
     forceSyncAll,
     clearPendingOperations,
     getSyncStats
-  }
+  }), [
+    isOnline,
+    syncStatus,
+    pendingOperations,
+    lastSyncTime,
+    queueOperation,
+    processPendingOperations,
+    syncCollection,
+    forceSyncAll,
+    clearPendingOperations,
+    getSyncStats
+  ])
 
   return (
     <SyncContext.Provider value={value}>

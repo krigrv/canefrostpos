@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Sheet, SheetContent } from '../ui/sheet'
 import { Separator } from '../ui/separator'
-import { Collapsible, CollapsibleContent } from '../ui/collapsible'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import { Card, CardContent } from '../ui/card'
 import {
@@ -30,11 +30,10 @@ import {
   X as CloseIcon,
   Building2 as BuildingIcon
 } from 'lucide-react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContextSupabase'
 import { useSync } from '../../contexts/SyncContext'
-import { db } from '../../firebase/config'
-import { doc, getDoc } from 'firebase/firestore'
+import DebugProducts from '../DebugProducts'
+import { supabase } from '../../supabase/config'
 import toast from 'react-hot-toast'
 
 const drawerWidth = 280
@@ -72,12 +71,7 @@ const menuItems = [
     icon: <AssessmentIcon />,
     path: '/reports'
   },
-  {
-    text: 'MOS',
-    icon: <BuildingIcon />,
-    path: '/multi-outlet',
-    badge: 'ENTERPRISE'
-  },
+
   { 
     text: 'Profile', 
     icon: <PersonIcon />, 
@@ -96,7 +90,7 @@ const menuItems = [
   }
 ]
 
-function Layout({ children }) {
+const Layout = React.memo(({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [expandedSections, setExpandedSections] = useState({})
@@ -119,16 +113,32 @@ function Layout({ children }) {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Load business name from Firebase
+  // Load business name from Supabase
   useEffect(() => {
     const loadBusinessName = async () => {
       if (currentUser) {
         try {
-          const docRef = doc(db, 'businessDetails', currentUser.uid)
-          const docSnap = await getDoc(docRef)
-          if (docSnap.exists()) {
-            const data = docSnap.data()
-            setBusinessName(data.businessName || 'Business Name')
+          const { data, error } = await supabase
+            .from('user_profiles')
+            .select('business_details')
+            .eq('user_id', currentUser.id)
+            .single()
+          
+          if (error) {
+            if (error.code === 'PGRST116') {
+              // No rows found - user hasn't set business details yet
+              return
+            }
+            if (error.code === '42P01') {
+              // Table doesn't exist - use default silently
+              console.log('User profiles table not found, using default business name')
+              return
+            }
+            throw error
+          }
+          
+          if (data?.business_details?.businessName) {
+            setBusinessName(data.business_details.businessName)
           }
         } catch (error) {
           console.error('Error loading business name:', error)
@@ -246,37 +256,40 @@ function Layout({ children }) {
             </div>
             
             {/* Expandable submenu */}
-            {item.expandable && (
-              <Collapsible open={expandedSections[item.text]}>
-                <CollapsibleContent>
-                  <div className="pl-4">
-                    {item.children?.map((child) => (
-                      <div key={child.text} className="mb-1">
-                        <button
-                          className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
-                            isPathActive(child.path)
-                              ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
-                              : 'text-gray-600 hover:bg-gray-50'
-                          }`}
-                          onClick={() => {
-                            navigate(child.path)
-                            setMobileOpen(false)
-                          }}
-                        >
-                          <span className={`text-sm ${
-                            isPathActive(child.path) ? 'font-semibold' : 'font-normal'
-                          }`}>
-                            {child.text}
-                          </span>
-                        </button>
-                      </div>
-                    ))}
+            {item.expandable && expandedSections[item.text] && (
+              <div className="pl-4">
+                {item.children?.map((child) => (
+                  <div key={child.text} className="mb-1">
+                    <button
+                      className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
+                        isPathActive(child.path)
+                          ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                      onClick={() => {
+                        navigate(child.path)
+                        setMobileOpen(false)
+                      }}
+                    >
+                      <span className={`text-sm ${
+                        isPathActive(child.path) ? 'font-semibold' : 'font-normal'
+                      }`}>
+                        {child.text}
+                      </span>
+                    </button>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
+                ))}
+              </div>
             )}
           </React.Fragment>
         ))}
+        
+        {/* Debug Products - positioned after logout */}
+        {!sidebarCollapsed && (
+          <div className="mt-4 px-2">
+            <DebugProducts />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -381,39 +394,42 @@ function Layout({ children }) {
             </div>
             
             {/* Expandable submenu */}
-            {item.expandable && !sidebarCollapsed && (
-              <Collapsible open={expandedSections[item.text]}>
-                <CollapsibleContent>
-                  <div className="pl-4">
-                    {item.children?.map((child) => (
-                      <div key={child.text} className="mb-1">
-                        <button
-                          className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
-                            isPathActive(child.path)
-                              ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
-                              : 'text-gray-600 hover:bg-gray-50'
-                          }`}
-                          onClick={() => {
-                            navigate(child.path)
-                            if (mobileOpen) {
-                              setMobileOpen(false)
-                            }
-                          }}
-                        >
-                          <span className={`text-sm ${
-                            isPathActive(child.path) ? 'font-semibold' : 'font-normal'
-                          }`}>
-                            {child.text}
-                          </span>
-                        </button>
-                      </div>
-                    ))}
+            {item.expandable && !sidebarCollapsed && expandedSections[item.text] && (
+              <div className="pl-4">
+                {item.children?.map((child) => (
+                  <div key={child.text} className="mb-1">
+                    <button
+                      className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
+                        isPathActive(child.path)
+                          ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                      onClick={() => {
+                        navigate(child.path)
+                        if (mobileOpen) {
+                          setMobileOpen(false)
+                        }
+                      }}
+                    >
+                      <span className={`text-sm ${
+                        isPathActive(child.path) ? 'font-semibold' : 'font-normal'
+                      }`}>
+                        {child.text}
+                      </span>
+                    </button>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
+                ))}
+              </div>
             )}
           </React.Fragment>
         ))}
+        
+        {/* Debug Products - positioned after logout */}
+        {!sidebarCollapsed && (
+          <div className="mt-4 px-2">
+            <DebugProducts />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -509,6 +525,8 @@ function Layout({ children }) {
       </main>
     </div>
   )
-}
+})
+
+Layout.displayName = "Layout";
 
 export default Layout

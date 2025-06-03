@@ -1,18 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
-import { db } from '../firebase/config'
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDocs,
-  onSnapshot,
-  query,
-  orderBy
-} from 'firebase/firestore'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { supabase } from '../supabase/config'
 import toast from 'react-hot-toast'
-import { useSync } from './SyncContext'
+import { useAuth } from './AuthContextSupabase'
 
 const CustomerContext = createContext()
 
@@ -27,138 +16,195 @@ export function useCustomers() {
 export function CustomerProvider({ children }) {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
-  const { queueOperation, isOnline } = useSync()
+  const { currentUser } = useAuth()
 
-  // Load customers from Firestore with real-time updates
+  // Load customers from Supabase
   useEffect(() => {
-    console.log('CustomerContext: Setting up real-time listener for customers')
-    
-    const customersQuery = query(collection(db, 'customers'), orderBy('createdAt', 'desc'))
-    const unsubscribe = onSnapshot(
-      customersQuery,
-      (snapshot) => {
-        const customersData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          joinDate: doc.data().joinDate?.toDate?.() || doc.data().joinDate,
-          lastVisit: doc.data().lastVisit?.toDate?.() || doc.data().lastVisit
+    const loadCustomers = async () => {
+      if (!currentUser) {
+        setLoading(false)
+        return
+      }
+      
+      try {
+        console.log('CustomerContext: Loading customers from Supabase')
+        
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (error) {
+          throw error
+        }
+        
+        // Format dates if needed
+        const customersData = data.map(customer => ({
+          ...customer,
+          joinDate: customer.join_date ? new Date(customer.join_date) : null,
+          lastVisit: customer.last_visit ? new Date(customer.last_visit) : null
         }))
         
-        console.log(`CustomerContext: Loaded ${customersData.length} customers (real-time)`)
+        console.log(`CustomerContext: Loaded ${customersData.length} customers`)
         setCustomers(customersData)
-        setLoading(false)
-      },
-      (error) => {
-        console.error('Error loading customers from Firestore:', error)
+      } catch (error) {
+        console.error('Error loading customers from Supabase:', error)
+        toast.error('Failed to load customers')
         setCustomers([])
+      } finally {
         setLoading(false)
       }
-    )
-
-    return () => {
-      console.log('CustomerContext: Cleanup - unsubscribing from real-time listener')
-      unsubscribe()
     }
-  }, [])
+    
+    loadCustomers()
+    
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('customers-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, () => {
+        // Reload customers when changes occur
+        loadCustomers()
+      })
+      .subscribe()
+    
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [currentUser])
 
-  // Add new customer with sync support
-  const addCustomer = async (customerData) => {
+  // Add new customer
+  const addCustomer = useCallback(async (customerData) => {
     try {
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       const customerWithDefaults = {
         ...customerData,
-        id: tempId,
-        joinDate: new Date(customerData.joinDate || new Date()),
-        lastVisit: new Date(),
-        totalSpent: customerData.totalSpent || 0,
+        join_date: new Date(customerData.joinDate || new Date()).toISOString(),
+        last_visit: new Date().toISOString(),
+        total_spent: customerData.totalSpent || 0,
         visits: customerData.visits || 1,
-        loyaltyPoints: customerData.loyaltyPoints || 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        loyalty_points: customerData.loyaltyPoints || 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
 
-      // Add to local state immediately for optimistic updates
-      setCustomers(prev => [...prev, customerWithDefaults])
+      const { data, error } = await supabase
+        .from('customers')
+        .insert([customerWithDefaults])
+        .select()
+        .single()
       
-      if (isOnline) {
-        // Try immediate sync
-        try {
-          const docRef = await addDoc(collection(db, 'customers'), customerWithDefaults)
-          // Update local state with real Firebase ID
-          setCustomers(prev => prev.map(c => 
-            c.id === tempId ? { ...c, id: docRef.id } : c
-          ))
-          console.log('Customer added with ID:', docRef.id)
-          toast.success('Customer added successfully')
-          return docRef.id
-        } catch (error) {
-          // Queue for later sync if immediate sync fails
-          queueOperation({
-            type: 'create',
-            collection: 'customers',
-            data: customerWithDefaults,
-            tempId
-          })
-          toast.success('Customer added (will sync when online)')
-          return tempId
-        }
-      } else {
-        // Queue for sync when online
-        queueOperation({
-          type: 'create',
-          collection: 'customers',
-          data: customerWithDefaults,
-          tempId
-        })
-        toast.success('Customer added (will sync when online)')
-        return tempId
+      if (error) {
+        throw error
       }
+      
+      // Format the returned data
+      const formattedCustomer = {
+        ...data,
+        joinDate: data.join_date ? new Date(data.join_date) : null,
+        lastVisit: data.last_visit ? new Date(data.last_visit) : null
+      }
+      
+      // Update local state
+      setCustomers(prev => [formattedCustomer, ...prev])
+      
+      console.log('Customer added with ID:', data.id)
+      toast.success('Customer added successfully')
+      return data.id
     } catch (error) {
       console.error('Error adding customer:', error)
       toast.error('Failed to add customer')
       throw error
     }
-  }
+  }, [])
 
   // Update customer
-  const updateCustomer = async (customerId, customerData) => {
+  const updateCustomer = useCallback(async (customerId, customerData) => {
     try {
-      const updateData = {
+      // Prepare update payload with snake_case for Supabase
+      const updatePayload = {
         ...customerData,
-        updatedAt: new Date()
+        updated_at: new Date().toISOString()
+      }
+
+      // Convert dates to ISO strings if they exist
+      if (customerData.joinDate) {
+        updatePayload.join_date = new Date(customerData.joinDate).toISOString()
+        delete updatePayload.joinDate // Remove camelCase version
+      }
+      if (customerData.lastVisit) {
+        updatePayload.last_visit = new Date(customerData.lastVisit).toISOString()
+        delete updatePayload.lastVisit // Remove camelCase version
       }
       
-      // Convert dates to Date objects if they're strings
-      if (customerData.joinDate && typeof customerData.joinDate === 'string') {
-        updateData.joinDate = new Date(customerData.joinDate)
+      // Convert other camelCase to snake_case
+      if ('totalSpent' in customerData) {
+        updatePayload.total_spent = customerData.totalSpent
+        delete updatePayload.totalSpent
       }
-      if (customerData.lastVisit && typeof customerData.lastVisit === 'string') {
-        updateData.lastVisit = new Date(customerData.lastVisit)
+      if ('loyaltyPoints' in customerData) {
+        updatePayload.loyalty_points = customerData.loyaltyPoints
+        delete updatePayload.loyaltyPoints
       }
+
+      const { error } = await supabase
+        .from('customers')
+        .update(updatePayload)
+        .eq('id', customerId)
       
-      await updateDoc(doc(db, 'customers', customerId), updateData)
+      if (error) {
+        throw error
+      }
+
+      // Update local state with the updated customer
+      setCustomers(prev => {
+        return prev.map(c => {
+          if (c.id === customerId) {
+            // Create a properly formatted customer object
+            return {
+              ...c,
+              ...customerData,
+              updatedAt: new Date(),
+              // Ensure dates are Date objects in local state
+              joinDate: customerData.joinDate ? new Date(customerData.joinDate) : c.joinDate,
+              lastVisit: customerData.lastVisit ? new Date(customerData.lastVisit) : c.lastVisit
+            }
+          }
+          return c
+        })
+      })
+      
       toast.success('Customer updated successfully')
     } catch (error) {
       console.error('Error updating customer:', error)
       toast.error('Failed to update customer')
       throw error
     }
-  }
+  }, [])
 
   // Delete customer
-  const deleteCustomer = async (customerId) => {
+  const deleteCustomer = useCallback(async (customerId) => {
     try {
-      await deleteDoc(doc(db, 'customers', customerId))
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customerId)
+      
+      if (error) {
+        throw error
+      }
+      
+      // Update local state
+      setCustomers(prev => prev.filter(c => c.id !== customerId))
+      
       toast.success('Customer deleted successfully')
     } catch (error) {
       console.error('Error deleting customer:', error)
       toast.error('Failed to delete customer')
       throw error
     }
-  }
+  }, [])
 
   // Update customer visit and spending
-  const updateCustomerVisit = async (customerId, purchaseAmount = 0) => {
+  const updateCustomerVisit = useCallback(async (customerId, purchaseAmount = 0) => {
     try {
       const customer = customers.find(c => c.id === customerId)
       if (!customer) {
@@ -166,40 +212,65 @@ export function CustomerProvider({ children }) {
       }
 
       const updatedData = {
-        lastVisit: new Date(),
+        last_visit: new Date().toISOString(),
         visits: (customer.visits || 0) + 1,
-        totalSpent: (customer.totalSpent || 0) + purchaseAmount,
-        loyaltyPoints: Math.floor(((customer.totalSpent || 0) + purchaseAmount) / 100), // 1 point per ₹100
-        updatedAt: new Date()
+        total_spent: (customer.totalSpent || 0) + purchaseAmount,
+        loyalty_points: Math.floor(((customer.totalSpent || 0) + purchaseAmount) / 100), // 1 point per ₹100
+        updated_at: new Date().toISOString()
       }
 
-      await updateDoc(doc(db, 'customers', customerId), updatedData)
+      const { error } = await supabase
+        .from('customers')
+        .update(updatedData)
+        .eq('id', customerId)
+      
+      if (error) {
+        throw error
+      }
+      
+      // Update local state
+      setCustomers(prev => {
+        return prev.map(c => {
+          if (c.id === customerId) {
+            return {
+              ...c,
+              lastVisit: new Date(),
+              visits: (c.visits || 0) + 1,
+              totalSpent: (c.totalSpent || 0) + purchaseAmount,
+              loyaltyPoints: Math.floor(((c.totalSpent || 0) + purchaseAmount) / 100),
+              updatedAt: new Date()
+            }
+          }
+          return c
+        })
+      })
+      
       console.log('Customer visit updated:', customerId)
     } catch (error) {
       console.error('Error updating customer visit:', error)
       throw error
     }
-  }
+  }, [customers])
 
   // Get customer by phone number
-  const getCustomerByPhone = (phoneNumber) => {
+  const getCustomerByPhone = useCallback((phoneNumber) => {
     return customers.find(customer => customer.phone === phoneNumber)
-  }
+  }, [customers])
 
   // Get customer by email
-  const getCustomerByEmail = (email) => {
+  const getCustomerByEmail = useCallback((email) => {
     return customers.find(customer => customer.email === email)
-  }
+  }, [customers])
 
   // Get top customers by spending
-  const getTopCustomers = (limit = 10) => {
+  const getTopCustomers = useCallback((limit = 10) => {
     return [...customers]
       .sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0))
       .slice(0, limit)
-  }
+  }, [customers])
 
   // Get customers by loyalty tier
-  const getCustomersByTier = (tier) => {
+  const getCustomersByTier = useCallback((tier) => {
     return customers.filter(customer => {
       const points = customer.loyaltyPoints || 0
       switch (tier) {
@@ -215,12 +286,12 @@ export function CustomerProvider({ children }) {
           return false
       }
     })
-  }
+  }, [customers])
 
 
 
 
-  const value = {
+  const value = useMemo(() => ({
     customers,
     loading,
     addCustomer,
@@ -231,7 +302,18 @@ export function CustomerProvider({ children }) {
     getCustomerByEmail,
     getTopCustomers,
     getCustomersByTier
-  }
+  }), [
+    customers,
+    loading,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    updateCustomerVisit,
+    getCustomerByPhone,
+    getCustomerByEmail,
+    getTopCustomers,
+    getCustomersByTier
+  ])
 
   return (
     <CustomerContext.Provider value={value}>

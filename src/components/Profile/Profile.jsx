@@ -5,9 +5,8 @@ import { Label } from '../ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Loader2, Save, Building, Phone, Mail, MapPin, FileText, User } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
-import { db } from '../../firebase/config'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { useAuth } from '../../contexts/AuthContextSupabase'
+import { supabase } from '../../supabase/config'
 import toast from 'react-hot-toast'
 
 function Profile() {
@@ -30,15 +29,23 @@ function Profile() {
     fssaiNumber: ''
   })
 
-  // Load saved business details from Firebase on component mount
+  // Load saved business details from Supabase on component mount
   useEffect(() => {
     const loadBusinessDetails = async () => {
       if (currentUser) {
         try {
-          const userDocRef = doc(db, 'users', currentUser.uid)
-          const userDoc = await getDoc(userDocRef)
-          if (userDoc.exists() && userDoc.data().businessDetails) {
-            setBusinessDetails(userDoc.data().businessDetails)
+          const { data, error } = await supabase
+            .from('user_profiles')
+            .select('business_details')
+            .eq('user_id', currentUser.id)
+            .single()
+          
+          if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+            throw error
+          }
+          
+          if (data?.business_details) {
+            setBusinessDetails(data.business_details)
           }
         } catch (error) {
           console.error('Error loading business details:', error)
@@ -129,13 +136,17 @@ function Profile() {
         throw new Error('GSTIN should be 15 characters long')
       }
 
-      // Save to Firebase Firestore
+      // Save to Supabase
       if (currentUser) {
-        const userDocRef = doc(db, 'users', currentUser.uid)
-        await setDoc(userDocRef, {
-          businessDetails: businessDetails,
-          updatedAt: new Date()
-        }, { merge: true })
+        const { error } = await supabase
+          .from('user_profiles')
+          .upsert({
+            user_id: currentUser.id,
+            business_details: businessDetails,
+            updated_at: new Date().toISOString()
+          })
+        
+        if (error) throw error
         
         // Also save to localStorage as backup
         localStorage.setItem('businessDetails', JSON.stringify(businessDetails))

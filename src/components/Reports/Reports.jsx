@@ -52,6 +52,9 @@ function Reports() {
   
   // Filter sales based on date range
   const filteredSales = useMemo(() => {
+    if (!sales || !Array.isArray(sales)) {
+      return []
+    }
     return sales.filter(sale => {
       const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
       return saleDate >= dateRangeFilter.startDate && saleDate <= dateRangeFilter.endDate

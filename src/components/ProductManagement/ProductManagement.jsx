@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react'
 import {
   Button,
   Dialog,
@@ -42,8 +42,9 @@ import {
 import { useInventory } from '../../hooks/useInventory'
 import { useAdvancedDeviceDetection } from '../../hooks/useDeviceDetection'
 import toast from 'react-hot-toast'
+import { uploadCSVProducts } from '../../utils/simpleCSVUpload'
 
-function ProductManagement() {
+const ProductManagement = React.memo(() => {
   const { 
     products, 
     addProduct, 
@@ -74,6 +75,8 @@ function ProductManagement() {
   const [createCategoryDialogOpen, setCreateCategoryDialogOpen] = useState(false)
   const [manageCategoriesDialogOpen, setManageCategoriesDialogOpen] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef(null)
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -85,10 +88,28 @@ function ProductManagement() {
     visibility: 'shown'
   })
 
+  const handleCSVUpload = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+    
+    try {
+      setIsUploading(true)
+      await uploadCSVProducts(file, addProduct)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } catch (error) {
+      console.error('CSV upload error:', error)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
   // Filter products
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory
+    const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category.toLowerCase() === selectedCategory
     
     // Stock filter logic
     let matchesStock = true
@@ -392,6 +413,36 @@ function ProductManagement() {
             <AddIcon className="w-4 h-4 mr-2" />
             Add Product
           </Button>
+          
+          {/* CSV Upload Button */}
+          <div className="relative">
+            <input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              onChange={handleCSVUpload}
+              className="hidden"
+              id="csv-upload"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="text-sm py-2 min-h-10 w-full md:w-auto"
+            >
+              {isUploading ? (
+                <span className="flex items-center">
+                  <span className="animate-spin mr-2">⏳</span>
+                  Uploading...
+                </span>
+              ) : (
+                <>
+                  <ExportIcon className="w-4 h-4 mr-2" />
+                  Import CSV
+                </>
+              )}
+            </Button>
+          </div>
         </div>
        </div>
 
@@ -1046,6 +1097,8 @@ function ProductManagement() {
         </Dialog>
       </div>
     );
-  }
+  })
+
+ProductManagement.displayName = "ProductManagement";
 
 export default ProductManagement

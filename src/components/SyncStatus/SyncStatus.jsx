@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useSync } from '../../contexts/SyncContext';
 
-const SyncStatus = () => {
+const SyncStatus = React.memo(() => {
   const {
     isOnline,
     isSyncing,
@@ -129,6 +129,8 @@ const SyncStatus = () => {
       )}
     </div>
   );
-};
+});
+
+SyncStatus.displayName = "SyncStatus";
 
 export default SyncStatus;

@@ -15,6 +15,8 @@ export const useDeviceDetection = () => {
   });
 
   useEffect(() => {
+    let resizeTimeout;
+    
     const updateDeviceInfo = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -46,11 +48,17 @@ export const useDeviceDetection = () => {
       });
     };
 
+    // Debounced resize handler to prevent excessive re-renders
+    const debouncedUpdateDeviceInfo = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(updateDeviceInfo, 150);
+    };
+
     // Initial detection
     updateDeviceInfo();
 
-    // Listen for window resize
-    window.addEventListener('resize', updateDeviceInfo);
+    // Listen for window resize with debouncing
+    window.addEventListener('resize', debouncedUpdateDeviceInfo);
     
     // Listen for orientation change (mobile/tablet)
     window.addEventListener('orientationchange', () => {
@@ -60,7 +68,8 @@ export const useDeviceDetection = () => {
 
     // Cleanup
     return () => {
-      window.removeEventListener('resize', updateDeviceInfo);
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', debouncedUpdateDeviceInfo);
       window.removeEventListener('orientationchange', updateDeviceInfo);
     };
   }, []);

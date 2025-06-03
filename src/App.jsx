@@ -1,32 +1,33 @@
-import React from 'react'
+import React, { useState, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { OutletProvider } from './contexts/OutletContext'
-import { InventoryProvider } from './contexts/InventoryContext'
+import { AuthProvider, useAuth } from './contexts/AuthContextSupabase'
+
+import { InventoryProvider } from './contexts/InventoryContext' // Using Supabase-based context
 import { SettingsProvider } from './contexts/SettingsContext'
 import { StaffProvider } from './contexts/StaffContext'
 import { CustomerProvider } from './contexts/CustomerContext'
 import { SyncProvider } from './contexts/SyncContext'
 import Login from './components/Auth/Login'
-import Dashboard from './components/Dashboard/Dashboard'
-import ProductManagement from './components/ProductManagement/ProductManagement'
-import SalesHistory from './components/Sales/SalesHistory'
-import Profile from './components/Profile/Profile'
-import StaffManagement from './components/Staff/StaffManagement'
-import CustomerManagement from './components/Customer/CustomerManagement'
-import Reports from './components/Reports/Reports'
-import Settings from './components/Settings/Settings'
+const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
+const ProductManagement = lazy(() => import('./components/ProductManagement/ProductManagement'))
+const SalesHistory = lazy(() => import('./components/Sales/SalesHistory'))
+const Profile = lazy(() => import('./components/Profile/Profile'))
+const StaffManagement = lazy(() => import('./components/Staff/StaffManagement'))
+const CustomerManagement = lazy(() => import('./components/Customer/CustomerManagement'))
+const Reports = lazy(() => import('./components/Reports/Reports'))
+const Settings = lazy(() => import('./components/Settings/Settings'))
 import Layout from './components/Layout/Layout'
-import ShadcnDemo from './components/Demo/ShadcnDemo'
-import MultiOutletSystem from './components/MultiOutletSystem/MultiOutletSystem'
+const ShadcnDemo = lazy(() => import('./components/Demo/ShadcnDemo'))
+
 import { Loader2 } from 'lucide-react'
 import { Toaster } from './components/ui/toaster'
 
 
-function ProtectedRoute({ children }) {
+const ProtectedRoute = React.memo(({ children }) => {
   const { currentUser } = useAuth()
   return currentUser ? children : <Navigate to="/login" />
-}
+})
+ProtectedRoute.displayName = "ProtectedRoute"
 
 function AppRoutes() {
   const { currentUser, loading } = useAuth()
@@ -50,7 +51,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Dashboard />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Dashboard />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -60,7 +63,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <ProductManagement />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <ProductManagement />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -70,7 +75,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <SalesHistory />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <SalesHistory />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -80,7 +87,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <StaffManagement />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <StaffManagement />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -90,7 +99,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <CustomerManagement />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <CustomerManagement />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -100,7 +111,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Reports />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Reports />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -110,7 +123,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Reports />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Reports />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -120,7 +135,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Reports />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Reports />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -130,7 +147,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Reports />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Reports />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -140,7 +159,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Settings />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Settings />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -150,7 +171,9 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <ShadcnDemo />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <ShadcnDemo />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
@@ -160,21 +183,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <Profile />
+              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+                <Profile />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } 
       />
-      <Route 
-        path="/multi-outlet" 
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <MultiOutletSystem />
-            </Layout>
-          </ProtectedRoute>
-        } 
-      />
+
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )
@@ -193,8 +209,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <OutletProvider>
-          <SyncProvider>
+        <SyncProvider>
             <SettingsProvider>
               <InventoryProvider>
                 <StaffProvider>
@@ -208,7 +223,6 @@ function App() {
               </InventoryProvider>
             </SettingsProvider>
           </SyncProvider>
-        </OutletProvider>
       </AuthProvider>
     </Router>
   )
