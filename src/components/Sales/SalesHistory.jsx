@@ -883,7 +883,7 @@ const SalesHistory = React.memo(() => {
             <AlertDialogDescription>
               {selectedSales.length > 0 
                 ? `Are you sure you want to delete the ${selectedSales.length} selected sales? This will permanently remove these sales records and cannot be undone.`
-                : `Are you sure you want to delete ALL sales history? This will permanently remove all ${salesData.length} sales records and cannot be undone.`
+                : `Are you sure you want to delete ALL sales history? This will permanently remove all ${sales.length} sales records and cannot be undone.`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>

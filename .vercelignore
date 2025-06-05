@@ -46,14 +46,9 @@ dist
 build
 
 # Database and upload scripts (not needed for frontend)
-cleanup-database.js
-firebase-upload.js
-upload-to-firebase.js
-simple-firebase-upload.js
-authenticated-upload.js
-clean_json.py
-load_inventory.py
-show_menu.py
+
+
+
 
 # Data files
 *.csv

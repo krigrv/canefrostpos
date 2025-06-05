@@ -2,6 +2,7 @@ import React, { useState, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContextSupabase'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 import { InventoryProvider } from './contexts/InventoryContext' // Using Supabase-based context
 import { SettingsProvider } from './contexts/SettingsContext'
@@ -222,6 +223,7 @@ function App() {
                       <AppRoutes />
                       <Toaster />
                       <Analytics />
+                      <SpeedInsights />
                     </div>
                     </CustomerProvider>
                   </StaffProvider>
