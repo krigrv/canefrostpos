@@ -1,6 +1,7 @@
 import React, { useState, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContextSupabase'
+import { Analytics } from '@vercel/analytics/react'
 
 import { InventoryProvider } from './contexts/InventoryContext' // Using Supabase-based context
 import { SettingsProvider } from './contexts/SettingsContext'
@@ -220,6 +221,7 @@ function App() {
                     <div className="app">
                       <AppRoutes />
                       <Toaster />
+                      <Analytics />
                     </div>
                     </CustomerProvider>
                   </StaffProvider>
