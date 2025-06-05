@@ -72,7 +72,8 @@ function Settings() {
     toggleScreenReaderMode,
     toggleKeyboardNavigation,
     runContrastAudit,
-    announceToScreenReader
+    announceToScreenReader,
+    resetAccessibilitySettings
   } = useAccessibility()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(0)
