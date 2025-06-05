@@ -429,6 +429,40 @@ function Dashboard() {
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [products, searchTerm, selectedCategory, selectedType])
 
+  // Group products by size for Cane Blend category
+  const groupedProducts = useMemo(() => {
+    const shouldGroup = selectedCategory === 'Cane Blend' || (selectedCategory === 'all' && !searchTerm)
+    
+    if (!shouldGroup) {
+      return { all: filteredProducts }
+    }
+
+    const groups = {
+      '240ml': [],
+      '500ml': [],
+      other: []
+    }
+
+    filteredProducts.forEach(product => {
+      const productMainCategory = getMainCategoryName(product.category)
+      const size = product.size || getProductSize(product.name)
+      
+      if (productMainCategory === 'Cane Blend') {
+        if (size === '240ml') {
+          groups['240ml'].push(product)
+        } else if (size === '500ml') {
+          groups['500ml'].push(product)
+        } else {
+          groups.other.push(product)
+        }
+      } else {
+        groups.other.push(product)
+      }
+    })
+
+    return groups
+  }, [filteredProducts, selectedCategory, searchTerm])
+
   // Memoize cart calculations to prevent unnecessary re-computations
   const cartTotalWithPackaging = useMemo(() => {
     const baseTotal = getCartTotal()
@@ -860,17 +894,19 @@ function Dashboard() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 auto-rows-max p-2">
-                    {filteredProducts.map((product) => {
-                      const isInCart = cart.some(item => item.id === product.id)
-                      return (
-                        <Card 
-          key={product.id} 
-          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-            isInCart ? 'ring-2 ring-black bg-muted relative z-10' : 'hover:bg-muted'
-          }`}
-          onClick={() => addToCart(product)}
-        >
+                  <div className="space-y-4 p-2">
+                    {groupedProducts.all ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 auto-rows-max">
+                        {groupedProducts.all.map((product) => {
+                          const isInCart = cart.some(item => item.id === product.id)
+                          return (
+                            <Card 
+              key={product.id} 
+              className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                isInCart ? 'ring-2 ring-black bg-muted relative z-10' : 'hover:bg-muted'
+              }`}
+              onClick={() => addToCart(product)}
+            >
                           <CardContent className="p-3">
                             <div className="space-y-2">
                               <div className="flex justify-between items-start gap-1">
@@ -898,10 +934,167 @@ function Dashboard() {
                                 </div>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <>
+                        {/* 240ml Section */}
+                        {groupedProducts['240ml']?.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="w-2 h-2 bg-primary rounded-full"></span>
+                              <h3 className="font-semibold text-sm text-primary">Cane Blend - 240ml</h3>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 auto-rows-max mb-6">
+                              {groupedProducts['240ml'].map((product) => {
+                                const isInCart = cart.some(item => item.id === product.id)
+                                return (
+                                  <Card 
+                    key={product.id} 
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                      isInCart ? 'ring-2 ring-black bg-muted relative z-10' : 'hover:bg-muted'
+                    }`}
+                    onClick={() => addToCart(product)}
+                  >
+                                    <CardContent className="p-3">
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between items-start gap-1">
+                                          <div className="flex-1 min-w-0">
+                                            <h3 className="font-medium text-sm leading-tight">{product.name}</h3>
+                                            {product.size && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-3 mt-1 bg-blue-50 text-blue-700 border-blue-200">
+                                                {product.size}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="font-bold text-base">₹{product.price}</span>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[10px]">{product.stock}</span>
+                                            <div 
+                                              className={`h-2 w-2 rounded-full ${product.stock > 15 ? 'bg-green-500' : product.stock > 10 ? 'bg-orange-500' : 'bg-red-500'}`}
+                                            ></div>
+                                            {isInCart && (
+                                              <div className="flex items-center justify-center">
+                                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              })}
+                            </div>
+                          </>
+                        )}
+
+                        {/* 500ml Section */}
+                        {groupedProducts['500ml']?.length > 0 && (
+                          <>
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className="w-2 h-2 bg-primary rounded-full"></span>
+                              <h3 className="font-semibold text-sm text-primary">Cane Blend - 500ml</h3>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 auto-rows-max mb-6">
+                              {groupedProducts['500ml'].map((product) => {
+                                const isInCart = cart.some(item => item.id === product.id)
+                                return (
+                                  <Card 
+                    key={product.id} 
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                      isInCart ? 'ring-2 ring-black bg-muted relative z-10' : 'hover:bg-muted'
+                    }`}
+                    onClick={() => addToCart(product)}
+                  >
+                                    <CardContent className="p-3">
+                                      <div className="space-y-2">
+                                        <div className="flex justify-between items-start gap-1">
+                                          <div className="flex-1 min-w-0">
+                                            <h3 className="font-medium text-sm leading-tight">{product.name}</h3>
+                                            {product.size && (
+                                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-3 mt-1 bg-blue-50 text-blue-700 border-blue-200">
+                                                {product.size}
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                          <span className="font-bold text-base">₹{product.price}</span>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[10px]">{product.stock}</span>
+                                            <div 
+                                              className={`h-2 w-2 rounded-full ${product.stock > 15 ? 'bg-green-500' : product.stock > 10 ? 'bg-orange-500' : 'bg-red-500'}`}
+                                            ></div>
+                                            {isInCart && (
+                                              <div className="flex items-center justify-center">
+                                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              })}
+                            </div>
+                          </>
+                        )}
+
+                        {/* Other Products Section */}
+                        {groupedProducts.other?.length > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 auto-rows-max">
+                            {groupedProducts.other.map((product) => {
+                              const isInCart = cart.some(item => item.id === product.id)
+                              return (
+                                <Card 
+                  key={product.id} 
+                  className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+                    isInCart ? 'ring-2 ring-black bg-muted relative z-10' : 'hover:bg-muted'
+                  }`}
+                  onClick={() => addToCart(product)}
+                >
+                                  <CardContent className="p-3">
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between items-start gap-1">
+                                        <div className="flex-1 min-w-0">
+                                          <h3 className="font-medium text-sm leading-tight">{product.name}</h3>
+                                          {product.size && (
+                                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-3 mt-1 bg-blue-50 text-blue-700 border-blue-200">
+                                              {product.size}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-bold text-base">₹{product.price}</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-[10px]">{product.stock}</span>
+                                          <div 
+                                            className={`h-2 w-2 rounded-full ${product.stock > 15 ? 'bg-green-500' : product.stock > 10 ? 'bg-orange-500' : 'bg-red-500'}`}
+                                          ></div>
+                                          {isInCart && (
+                                            <div className="flex items-center justify-center">
+                                              <CheckCircle className="h-4 w-4 text-green-600" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

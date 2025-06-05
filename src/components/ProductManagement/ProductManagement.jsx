@@ -132,6 +132,23 @@ const ProductManagement = React.memo(() => {
     return matchesSearch && matchesCategory && matchesStock && matchesVisibility
   })
 
+  // Group products by size for Cane Blend category
+  const groupedProducts = React.useMemo(() => {
+    if (selectedCategory === 'cane blend' || (selectedCategory === 'all' && searchTerm === '')) {
+      const caneBlendProducts = filteredProducts.filter(p => p.category.toLowerCase() === 'cane blend')
+      const otherProducts = filteredProducts.filter(p => p.category.toLowerCase() !== 'cane blend')
+      
+      const grouped = {
+        '240ml': caneBlendProducts.filter(p => p.size === '240ml'),
+        '500ml': caneBlendProducts.filter(p => p.size === '500ml'),
+        'other': otherProducts
+      }
+      
+      return grouped
+    }
+    return { all: filteredProducts }
+  }, [filteredProducts, selectedCategory, searchTerm])
+
   // Bulk operations
   const handleSelectAll = (checked) => {
     if (checked) {
@@ -608,14 +625,63 @@ const ProductManagement = React.memo(() => {
       {isMobile ? (
         // Mobile card view
         <div className="space-y-3">
-          {filteredProducts.map((product) => (
-            <MobileProductCard 
-              key={product.id} 
-              product={product} 
-              isSelected={selectedProducts.has(product.id)}
-              onSelect={(checked) => handleSelectProduct(product.id, checked)}
-            />
-          ))}
+          {groupedProducts.all ? (
+            groupedProducts.all.map((product) => (
+              <MobileProductCard 
+                key={product.id} 
+                product={product} 
+                isSelected={selectedProducts.has(product.id)}
+                onSelect={(checked) => handleSelectProduct(product.id, checked)}
+              />
+            ))
+          ) : (
+            <>
+              {groupedProducts['240ml']?.length > 0 && (
+                <>
+                  <div className="bg-accent/50 p-3 rounded-lg border border-primary/20">
+                    <h3 className="font-semibold text-sm text-primary flex items-center gap-2">
+                      <span className="w-2 h-2 bg-primary rounded-full"></span>
+                      Cane Blend - 240ml
+                    </h3>
+                  </div>
+                  {groupedProducts['240ml'].map((product) => (
+                    <MobileProductCard 
+                      key={product.id} 
+                      product={product} 
+                      isSelected={selectedProducts.has(product.id)}
+                      onSelect={(checked) => handleSelectProduct(product.id, checked)}
+                    />
+                  ))}
+                </>
+              )}
+              {groupedProducts['500ml']?.length > 0 && (
+                <>
+                  <div className="bg-accent/50 p-3 rounded-lg border border-primary/20">
+                    <h3 className="font-semibold text-sm text-primary flex items-center gap-2">
+                      <span className="w-2 h-2 bg-primary rounded-full"></span>
+                      Cane Blend - 500ml
+                    </h3>
+                  </div>
+                  {groupedProducts['500ml'].map((product) => (
+                    <MobileProductCard 
+                      key={product.id} 
+                      product={product} 
+                      isSelected={selectedProducts.has(product.id)}
+                      onSelect={(checked) => handleSelectProduct(product.id, checked)}
+                    />
+                  ))}
+                </>
+              )}
+              {groupedProducts.other?.map((product) => (
+                <MobileProductCard 
+                  key={product.id} 
+                  product={product} 
+                  isSelected={selectedProducts.has(product.id)}
+                  onSelect={(checked) => handleSelectProduct(product.id, checked)}
+                />
+              ))}
+            </>
+          )}
           {filteredProducts.length === 0 && (
             <div className="text-center py-8 text-gray-500">No products found</div>
           )}
@@ -648,20 +714,287 @@ const ProductManagement = React.memo(() => {
                </TableRow>
              </TableHeader>
              <TableBody>
-               {filteredProducts.map((product) => (
-                 <TableRow 
-                   key={product.id}
-                   className="hover:bg-muted transition-colors"
-                  >
-                    <TableCell className="px-4">
-                      <div className="flex justify-center">
-                        <Checkbox
-                          checked={selectedProducts.has(product.id)}
-                          onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
-                          size="sm"
-                        />
-                      </div>
-                    </TableCell>
+               {groupedProducts.all ? (
+                 groupedProducts.all.map((product) => (
+                   <TableRow 
+                     key={product.id}
+                     className="hover:bg-muted transition-colors"
+                    >
+                      <TableCell className="px-4">
+                               <div className="flex justify-center">
+                                 <Checkbox
+                                   checked={selectedProducts.has(product.id)}
+                                   onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                                   size="sm"
+                                 />
+                               </div>
+                             </TableCell>
+                             <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
+                              <TableCell className="py-3 md:py-4">
+                                <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
+                                  {product.category}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-3 md:py-4">
+                                {product.size ? (
+                                  <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7 bg-blue-50 text-blue-700 border-blue-200">
+                                    {product.size}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs md:text-sm text-gray-400">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
+                              <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
+                              <TableCell className="py-3 md:py-4">
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      product.stock > 10 ? 'bg-green-500' : 
+                                      product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                                    }`}></div>
+                                    <span className="text-xs md:text-sm font-medium text-gray-700">
+                                      Stock: {product.stock || 0}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {product.visibility === 'shown' ? (
+                                      <HideIcon className="h-4 w-4 text-blue-500" />
+                                    ) : (
+                                      <VisibilityIcon className="h-4 w-4 text-gray-400" />
+                                    )}
+                                    <span className="text-xs md:text-sm text-gray-600">
+                                      {product.visibility === 'shown' ? 'Shown' : 'Not Shown'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-3 md:py-4">
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingProduct(product)
+                                      setIsEditDialogOpen(true)
+                                    }}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <EditIcon className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteProduct(product.id)}
+                                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <DeleteIcon className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                         ))}
+                       </>
+                     )}
+                     {groupedProducts.other?.map((product) => (
+                       <TableRow 
+                         key={product.id}
+                         className="hover:bg-muted transition-colors"
+                        >
+                          <TableCell className="px-4">
+                            <div className="flex justify-center">
+                              <Checkbox
+                                checked={selectedProducts.has(product.id)}
+                                onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                                size="sm"
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
+                          <TableCell className="py-3 md:py-4">
+                            <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
+                              {product.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3 md:py-4">
+                            {product.size ? (
+                              <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7 bg-blue-50 text-blue-700 border-blue-200">
+                                {product.size}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs md:text-sm text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
+                          <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
+                          <TableCell className="py-3 md:py-4">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  product.stock > 10 ? 'bg-green-500' : 
+                                  product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}></div>
+                                <span className="text-xs md:text-sm font-medium text-gray-700">
+                                  Stock: {product.stock || 0}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {product.visibility === 'shown' ? (
+                                  <HideIcon className="h-4 w-4 text-blue-500" />
+                                ) : (
+                                  <VisibilityIcon className="h-4 w-4 text-gray-400" />
+                                )}
+                                <span className="text-xs md:text-sm text-gray-600">
+                                  {product.visibility === 'shown' ? 'Shown' : 'Not Shown'}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-3 md:py-4">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingProduct(product)
+                                  setIsEditDialogOpen(true)
+                                }}
+                                className="h-8 w-8 p-0"
+                              >
+                                <EditIcon className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteProduct(product.id)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <DeleteIcon className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                     ))}
+                   </>
+                 )}
+                        ))}
+                      </>
+                    )}
+                    {groupedProducts['500ml']?.length > 0 && (
+                      <>
+                        <TableRow className="bg-accent/30">
+                          <TableCell colSpan={8} className="py-2 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 bg-primary rounded-full"></span>
+                              <span className="font-semibold text-sm text-primary">Cane Blend - 500ml</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {groupedProducts['500ml'].map((product) => (
+                          <TableRow 
+                            key={product.id}
+                            className="hover:bg-muted transition-colors"
+                           >
+                             <TableCell className="px-4">
+                               <div className="flex justify-center">
+                                 <Checkbox
+                                   checked={selectedProducts.has(product.id)}
+                                   onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                                   size="sm"
+                                 />
+                               </div>
+                             </TableCell>
+                             <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
+                             <TableCell className="py-3 md:py-4">
+                        <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
+                          {product.category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-3 md:py-4">
+                        {product.size ? (
+                          <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7 bg-blue-50 text-blue-700 border-blue-200">
+                            {product.size}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs md:text-sm text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs md:text-sm py-3 md:py-4 font-semibold text-green-600">₹{product.price}</TableCell>
+                      <TableCell className="text-xs md:text-sm py-3 md:py-4 text-gray-500">{product.taxPercentage === 0 ? 'No GST' : `${product.taxPercentage || 12}%`}</TableCell>
+                      <TableCell className="py-3 md:py-4">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${
+                              product.stock > 10 ? 'bg-green-500' : 
+                              product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}></div>
+                            <span className="text-xs md:text-sm font-medium text-gray-700">
+                              Stock: {product.stock || 0}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {product.visibility === 'shown' ? (
+                              <HideIcon className="h-4 w-4 text-blue-500" />
+                            ) : (
+                              <VisibilityIcon className="h-4 w-4 text-gray-400" />
+                            )}
+                            <span className="text-xs md:text-sm text-gray-600">
+                              {product.visibility === 'shown' ? 'Shown' : 'Not Shown'}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 md:py-4">
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingProduct(product)
+                              setIsEditDialogOpen(true)
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            <EditIcon className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <DeleteIcon className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                 ))
+               ) : (
+                 <>
+                   {groupedProducts['240ml']?.length > 0 && (
+                     <>
+                       <TableRow className="bg-accent/30">
+                         <TableCell colSpan={8} className="py-2 px-4">
+                           <div className="flex items-center gap-2">
+                             <span className="w-2 h-2 bg-primary rounded-full"></span>
+                             <span className="font-semibold text-sm text-primary">Cane Blend - 240ml</span>
+                           </div>
+                         </TableCell>
+                       </TableRow>
+                       {groupedProducts['240ml'].map((product) => (
+                         <TableRow 
+                           key={product.id}
+                           className="hover:bg-muted transition-colors"
+                          >
+                            <TableCell className="px-4">
+                              <div className="flex justify-center">
+                                <Checkbox
+                                  checked={selectedProducts.has(product.id)}
+                                  onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                                  size="sm"
+                                />
+                              </div>
+                            </TableCell>
                     <TableCell className="text-xs md:text-sm py-3 md:py-4 font-medium text-gray-900">{product.name}</TableCell>
                     <TableCell className="py-3 md:py-4">
                       <Badge variant="outline" className="text-xs md:text-sm h-6 md:h-7">
