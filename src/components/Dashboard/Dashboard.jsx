@@ -613,7 +613,7 @@ function Dashboard() {
         originalTotal: getCartTotalWithPackaging(),
         discount: discount,
         timestamp: new Date(),
-        payment_method: paymentMethod,
+        paymentMethod: paymentMethod,
         cashAmount: paymentMethod === 'CASH' ? receivedAmount : (paymentMethod === 'BOTH' ? cashAmount : 0),
         upiAmount: paymentMethod === 'UPI' ? getFinalTotal() : (paymentMethod === 'BOTH' ? upiAmount : 0),
         receivedAmount: paymentMethod === 'CASH' ? receivedAmount : 0,
@@ -1591,7 +1591,12 @@ function Dashboard() {
                     </div>
                     <div className="flex justify-between">
                       <span>Payment ({lastSale.paymentMethod || 'Cash'}):</span>
-                      <span className="flex-shrink-0">₹{(lastSale.amountPaid || 0).toLocaleString()}</span>
+                      <span className="flex-shrink-0">₹{(
+                        lastSale.paymentMethod === 'CASH' ? (lastSale.cashAmount || lastSale.receivedAmount || lastSale.total) :
+                        lastSale.paymentMethod === 'UPI' ? (lastSale.upiAmount || lastSale.total) :
+                        lastSale.paymentMethod === 'BOTH' ? ((lastSale.cashAmount || 0) + (lastSale.upiAmount || 0)) :
+                        lastSale.total || 0
+                      ).toLocaleString()}</span>
                     </div>
                     {(lastSale.changeAmount || 0) > 0 && (
                       <div className="flex justify-between font-bold">

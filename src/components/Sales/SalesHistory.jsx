@@ -636,7 +636,11 @@ const SalesHistory = React.memo(() => {
                   <TableCell>
                     {format(new Date(sale.timestamp), 'MMM dd, yyyy HH:mm')}
                   </TableCell>
-                  <TableCell>{sale.customerName}</TableCell>
+                  <TableCell>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
+                      {sale.customerName}
+                    </span>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-primary border-primary">
                       {sale.items.length} items
@@ -873,9 +877,14 @@ const SalesHistory = React.memo(() => {
       <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete All Sales History</AlertDialogTitle>
+            <AlertDialogTitle>
+              {selectedSales.length > 0 ? 'Delete Selected Sales' : 'Delete All Sales History'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete ALL sales history? This will permanently remove all {sales.length} sales records and cannot be undone.
+              {selectedSales.length > 0 
+                ? `Are you sure you want to delete the ${selectedSales.length} selected sales? This will permanently remove these sales records and cannot be undone.`
+                : `Are you sure you want to delete ALL sales history? This will permanently remove all ${salesData.length} sales records and cannot be undone.`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

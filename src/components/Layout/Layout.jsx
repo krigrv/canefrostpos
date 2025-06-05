@@ -119,10 +119,15 @@ const Layout = React.memo(({ children }) => {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Load business name from Supabase
+  // Load business name from settings context
   useEffect(() => {
-    const loadBusinessName = async () => {
-      if (currentUser) {
+    if (settings?.businessName && settings.businessName !== 'CANEFROST JUICE SHOP') {
+      setBusinessName(settings.businessName)
+    } else {
+      // Fallback to loading from Supabase if not in settings
+      const loadBusinessName = async () => {
+        if (!currentUser?.id) return
+        
         try {
           const { data, error } = await supabase
             .from('user_profiles')
@@ -131,13 +136,9 @@ const Layout = React.memo(({ children }) => {
             .single()
           
           if (error) {
-            if (error.code === 'PGRST116') {
-              // No rows found - user hasn't set business details yet
-              return
-            }
-            if (error.code === '42P01') {
-              // Table doesn't exist - use default silently
-              console.log('User profiles table not found, using default business name')
+            // If user_profiles doesn't exist or user not found, keep default
+            if (error.code === 'PGRST116' || error.code === '42P01') {
+              console.log('User profiles table not found or no profile exists, using default business name')
               return
             }
             throw error
@@ -148,11 +149,13 @@ const Layout = React.memo(({ children }) => {
           }
         } catch (error) {
           console.error('Error loading business name:', error)
+          // Keep default name on error
         }
       }
+      
+      loadBusinessName()
     }
-    loadBusinessName()
-  }, [currentUser])
+  }, [currentUser, settings?.businessName])
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
