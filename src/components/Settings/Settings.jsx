@@ -827,7 +827,7 @@ function Settings() {
                     </div>
                   </div>
                   <Switch
-                    checked={highContrast}
+                    checked={highContrastMode}
                     onCheckedChange={toggleHighContrast}
                   />
                 </div>
