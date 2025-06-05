@@ -18,7 +18,7 @@ function Profile() {
   const [error, setError] = useState('')
   const [profileError, setProfileError] = useState('')
   
-  const [displayName, setDisplayName] = useState(currentUser?.displayName || '')
+  const [displayName, setDisplayName] = useState(currentUser?.user_metadata?.displayName || currentUser?.displayName || '')
   
   const [businessDetails, setBusinessDetails] = useState({
     businessName: 'Canefrost Juice Shop',
@@ -45,14 +45,29 @@ function Profile() {
           }
           
           if (data?.business_details) {
-            setBusinessDetails(data.business_details)
+            setBusinessDetails({
+              businessName: data.business_details.businessName || 'Canefrost Juice Shop',
+              phoneNumber: data.business_details.phoneNumber || '',
+              gstin: data.business_details.gstin || '',
+              emailId: data.business_details.emailId || '',
+              businessAddress: data.business_details.businessAddress || '',
+              fssaiNumber: data.business_details.fssaiNumber || ''
+            })
           }
         } catch (error) {
           console.error('Error loading business details:', error)
           // Fallback to localStorage for migration
           const savedDetails = localStorage.getItem('businessDetails')
           if (savedDetails) {
-            setBusinessDetails(JSON.parse(savedDetails))
+            const parsed = JSON.parse(savedDetails)
+            setBusinessDetails({
+              businessName: parsed.businessName || 'Canefrost Juice Shop',
+              phoneNumber: parsed.phoneNumber || '',
+              gstin: parsed.gstin || '',
+              emailId: parsed.emailId || '',
+              businessAddress: parsed.businessAddress || '',
+              fssaiNumber: parsed.fssaiNumber || ''
+            })
           }
         }
       }
@@ -62,7 +77,7 @@ function Profile() {
 
   // Update display name when currentUser changes
   useEffect(() => {
-    setDisplayName(currentUser?.displayName || '')
+    setDisplayName(currentUser?.user_metadata?.displayName || currentUser?.displayName || '')
   }, [currentUser])
 
   const handleInputChange = (field) => (event) => {

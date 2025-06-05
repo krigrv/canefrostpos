@@ -181,7 +181,7 @@ function Dashboard() {
       if (settings?.showBusinessName) {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        const businessName = settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`;
+        const businessName = settings?.businessName || `Welcome, ${currentUser?.user_metadata?.displayName || currentUser?.displayName || 'Guest'}`;
         doc.text(businessName, pageWidth / 2, yPosition, { align: 'center' });
         yPosition += lineHeight + 2;
         
@@ -680,7 +680,7 @@ function Dashboard() {
             </Avatar>
             <div>
               <h1 className="text-lg font-bold mb-1">
-                Welcome, {currentUser?.displayName || 'Guest'}
+                Welcome, {currentUser?.user_metadata?.displayName || currentUser?.displayName || 'Guest'}
               </h1>
               <p className="text-gray-300 text-sm">
                 Point of Sale System • {format(new Date(), 'EEEE, MMMM do, yyyy')}
@@ -1315,7 +1315,7 @@ function Dashboard() {
                   {/* Header */}
                   {settings?.showBusinessName && (
                     <div className="text-center font-bold text-sm">
-                      {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
+                      {settings?.businessName || `Welcome, ${currentUser?.user_metadata?.displayName || currentUser?.displayName || 'Guest'}`}
                     </div>
                   )}
                   
@@ -1501,7 +1501,7 @@ function Dashboard() {
             {/* Header */}
             {settings?.showBusinessName && (
               <div className="center bold" style={{ fontSize: '16px', marginBottom: '4px' }}>
-                {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
+                {settings?.businessName || `Welcome, ${currentUser?.user_metadata?.displayName || currentUser?.displayName || 'Guest'}`}
               </div>
             )}
             

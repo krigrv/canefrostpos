@@ -221,7 +221,7 @@ const Layout = React.memo(({ children }) => {
               <button
                 className={`w-full min-h-[48px] rounded-lg transition-all duration-200 flex items-center justify-start px-4 py-3 ${
                   item.primary 
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    ? 'bg-accent text-accent-foreground hover:bg-accent/80 border border-primary/20'
                     : (item.path ? isPathActive(item.path) : isParentActive(item.children))
                       ? 'bg-muted text-foreground hover:bg-muted/80'
                       : 'text-muted-foreground hover:bg-muted/50'
@@ -348,7 +348,7 @@ const Layout = React.memo(({ children }) => {
                   sidebarCollapsed ? 'justify-center px-2' : 'justify-start px-4'
                 } py-3 ${
                   item.primary 
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    ? 'bg-accent text-accent-foreground hover:bg-accent/80 border border-primary/20'
                     : (item.path ? isPathActive(item.path) : isParentActive(item.children))
                       ? 'bg-muted text-foreground hover:bg-muted/80'
                       : 'text-muted-foreground hover:bg-muted/50'
