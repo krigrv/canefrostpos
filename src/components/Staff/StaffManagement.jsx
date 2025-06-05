@@ -25,20 +25,19 @@ function StaffManagement() {
     name: '',
     email: '',
     phone: '',
-    role: 'Cashier'
+    role: 'staff'
   })
 
-  const roles = ['Manager', 'Cashier', 'Supervisor', 'Assistant']
+  const roles = ['admin', 'manager', 'staff']
   const permissions = {
-    'Manager': ['All Access', 'Staff Management', 'Reports', 'Settings'],
-    'Supervisor': ['Sales', 'Inventory', 'Reports'],
-    'Cashier': ['Sales', 'Basic Inventory'],
-    'Assistant': ['Sales']
+    'admin': ['All Access', 'Staff Management', 'Reports', 'Settings'],
+    'manager': ['Sales', 'Inventory', 'Reports', 'Staff Management'],
+    'staff': ['Sales', 'Basic Inventory']
   }
 
   const handleAddStaff = () => {
     setEditingStaff(null)
-    setFormData({ name: '', email: '', phone: '', role: 'Cashier' })
+    setFormData({ name: '', email: '', phone: '', role: 'staff' })
     setOpenDialog(true)
   }
 
@@ -62,11 +61,11 @@ function StaffManagement() {
         const newStaff = {
           ...formData,
           status: 'Active',
-          joinDate: new Date(),
-          totalSales: 0,
-          shiftsThisWeek: 0,
-          currentShift: 'Not Assigned',
-          createdAt: new Date()
+          join_date: new Date(),
+          totalsales: 0,
+          shiftsthisweek: 0,
+          currentshift: 'Not Assigned',
+          created_at: new Date()
         }
         await addStaffMember(newStaff)
         toast.success('Staff member added successfully')
@@ -162,9 +161,9 @@ function StaffManagement() {
                   <Separator />
                   
                   <div className="space-y-1 text-sm">
-                    <p><strong>Total Sales:</strong> ₹{member.totalSales.toLocaleString()}</p>
-                    <p><strong>Shifts This Week:</strong> {member.shiftsThisWeek}</p>
-                    <p><strong>Current Shift:</strong> {member.currentShift}</p>
+                    <p><strong>Total Sales:</strong> ₹{member.totalsales.toLocaleString()}</p>
+                <p><strong>Shifts This Week:</strong> {member.shiftsthisweek}</p>
+                    <p><strong>Current Shift:</strong> {member.currentshift}</p>
                   </div>
                   
                   <div className="flex justify-between items-center pt-2">
@@ -256,15 +255,15 @@ function StaffManagement() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="space-y-2 text-sm">
-                    <p><strong>Total Sales:</strong> ₹{member.totalSales.toLocaleString()}</p>
-                    <p><strong>Average per Shift:</strong> ₹{Math.round(member.totalSales / Math.max(member.shiftsThisWeek, 1)).toLocaleString()}</p>
-                    <p><strong>Shifts Completed:</strong> {member.shiftsThisWeek}</p>
+                    <p><strong>Total Sales:</strong> ₹{member.totalsales.toLocaleString()}</p>
+                <p><strong>Average per Shift:</strong> ₹{Math.round(member.totalsales / Math.max(member.shiftsthisweek, 1)).toLocaleString()}</p>
+                <p><strong>Shifts Completed:</strong> {member.shiftsthisweek}</p>
                     <div className="flex items-center gap-2">
                       <strong>Performance Rating:</strong>
                       <Badge 
-                        variant={member.totalSales > 30000 ? 'default' : member.totalSales > 20000 ? 'secondary' : 'outline'}
-                      >
-                        {member.totalSales > 30000 ? 'Excellent' : member.totalSales > 20000 ? 'Good' : 'Average'}
+                        variant={member.totalsales > 30000 ? 'default' : member.totalsales > 20000 ? 'secondary' : 'outline'}
+              >
+                {member.totalsales > 30000 ? 'Excellent' : member.totalsales > 20000 ? 'Good' : 'Average'}
                       </Badge>
                     </div>
                   </div>

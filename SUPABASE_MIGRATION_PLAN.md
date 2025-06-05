@@ -33,7 +33,29 @@ REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### 2.1 Core Tables
 Create these tables in Supabase:
 
+#### User Tables
+
 ```sql
+-- User Profiles table
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  business_details JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- User Settings table
+CREATE TABLE IF NOT EXISTS user_settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
 -- Products table
 CREATE TABLE products (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -65,7 +87,12 @@ CREATE TABLE sales (
   customer_id UUID,
   staff_id UUID,
   outlet_id UUID,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  transactionId TEXT,
+  cashAmount DECIMAL(10,2) DEFAULT 0,
+  upiAmount DECIMAL(10,2) DEFAULT 0,
+  changeAmount DECIMAL(10,2) DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Customers table

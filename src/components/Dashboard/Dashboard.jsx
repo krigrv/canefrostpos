@@ -70,8 +70,7 @@ import { useAuth } from '../../contexts/AuthContextSupabase'
 
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
-import { v4 as uuidv4 } from 'uuid'
-import { render, Printer as ThermalPrinter, Text, Row, Br, Line, Cut } from 'react-thermal-printer'
+// import { render, Printer as ThermalPrinter, Text, Row, Br, Line, Cut } from 'react-thermal-printer'
 import { useReactToPrint } from 'react-to-print'
 import { jsPDF } from 'jspdf'
 
@@ -325,122 +324,18 @@ function Dashboard() {
     }
   }
 
-  // Print function for thermal receipt
+  // Print function for receipt (thermal printing temporarily disabled)
   const handlePrint = async () => {
     if (!lastSale) return;
     
-    // First attempt: Try thermal printing
     try {
-      const width = settings?.printerWidth === '58mm' ? 32 : settings?.printerWidth === 'A4' ? 48 : 42;
-      
-      const receipt = (
-        <ThermalPrinter type="epson" width={width}>
-          {/* Header */}
-          {settings?.showBusinessName && (
-            <>
-              <Text align="center" size={{ width: 2, height: 2 }} bold={true}>
-                {settings?.businessName || `Welcome, ${currentUser?.displayName || 'Guest'}`}
-              </Text>
-              {settings?.thermalHeaderText && (
-                <Text align="center">{settings.thermalHeaderText}</Text>
-              )}
-            </>
-          )}
-          
-          {settings?.showBusinessAddress && settings?.businessAddress && (
-            <Text align="center">{settings.businessAddress}</Text>
-          )}
-          
-          {settings?.showGstNumber && settings?.gstNumber && (
-            <Text align="center">GST: {settings.gstNumber}</Text>
-          )}
-          
-          {settings?.showDividers && <Line />}
-          
-          {/* Transaction Details */}
-          {settings?.showReceiptNumber && (
-            <Text>Receipt #: {lastSale.transactionId}</Text>
-          )}
-          {settings?.showDateTime && (
-            <>
-              <Text>Date: {format(new Date(), 'dd/MM/yyyy')}</Text>
-              <Text>Time: {format(new Date(), 'HH:mm:ss')}</Text>
-            </>
-          )}
-          <Text>Cashier: {currentUser?.displayName || 'Staff'}</Text>
-          
-          {settings?.showDividers && <Line />}
-          
-          {/* Items */}
-          {lastSale.items.map((item, index) => (
-            <div key={index}>
-              <Row 
-                left={item.name} 
-                right={`₹${(item.price * item.quantity).toFixed(2)}`} 
-              />
-              <Text>  {item.quantity} x ₹{item.price.toFixed(2)}</Text>
-            </div>
-          ))}
-          
-          {settings?.showDividers && <Line />}
-          
-          {/* Totals */}
-          <Row left="Subtotal:" right={`₹${lastSale.subtotal.toFixed(2)}`} />
-          
-          {settings?.showTaxBreakdown && (
-            <Row left="GST (12%):" right={`₹${lastSale.tax.toFixed(2)}`} />
-          )}
-          
-          <Line />
-          <Row left={<Text bold={true}>TOTAL:</Text>} right={<Text bold={true}>₹{lastSale.total.toFixed(2)}</Text>} />
-          
-          {/* Payment Details */}
-          {settings?.showPaymentMethod && (
-            <>
-              <Br />
-              <Text>Payment: {lastSale.paymentMethod}</Text>
-              {lastSale.changeAmount > 0 && (
-                <Text>Change: ₹{lastSale.changeAmount.toFixed(2)}</Text>
-              )}
-            </>
-          )}
-          
-          {settings?.showDividers && <Line />}
-          
-          {/* Footer */}
-          <Text align="center">
-            {settings?.thermalFooterText || 'Thank you for your business!'}
-          </Text>
-          
-          <Br />
-          <Br />
-          <Cut />
-        </ThermalPrinter>
-      );
-      
-      // Render and print
-      const data = await render(receipt);
-      
-      // For web browsers, we'll need to use a different approach
-      // This is a placeholder - actual printing would require additional setup
-      console.log('Thermal receipt data generated:', data);
-      toast.success('Receipt generated successfully!');
-      
-      // Fall back to browser printing immediately since thermal printing 
-      // requires additional setup for web browsers
+      // Using browser printing as thermal printing is currently disabled
+      console.log('Using browser print for receipt');
       handleBrowserPrint();
-      
-    } catch (thermalError) {
-      console.warn('Thermal printing failed, falling back to browser print:', thermalError);
-      
-      // Second attempt: Fall back to browser printing
-      try {
-        handleBrowserPrint();
-        toast.success('Receipt sent to browser printer!');
-      } catch (browserError) {
-        console.error('Browser printing also failed:', browserError);
-        toast.error('Failed to print receipt. Please check your printer connection.');
-      }
+      toast.success('Receipt sent to browser printer!');
+    } catch (error) {
+      console.error('Printing failed:', error);
+      toast.error('Failed to print receipt. Please check your printer connection.');
     }
   }
 
@@ -665,7 +560,7 @@ function Dashboard() {
       const saleItems = [...cart]
       if (includePackaging) {
         saleItems.push({
-          id: 'packaging',
+          id: '00000000-0000-0000-0000-000000000001', // Special UUID for packaging
           name: 'PACKAGING CHARGE',
           price: packagingCharge,
           quantity: 1,
@@ -676,7 +571,6 @@ function Dashboard() {
       // Create sale object with all required information
       const transactionId = generateOrderId()
       const sale = {
-        id: uuidv4(),
         transactionId,
         items: saleItems,
         subtotal: getCartTotalWithPackaging() - getCartTaxWithPackaging(),
@@ -685,11 +579,14 @@ function Dashboard() {
         originalTotal: getCartTotalWithPackaging(),
         discount: discount,
         timestamp: new Date(),
-        paymentMethod,
+        payment_method: paymentMethod,
         cashAmount: paymentMethod === 'CASH' ? receivedAmount : (paymentMethod === 'BOTH' ? cashAmount : 0),
         upiAmount: paymentMethod === 'UPI' ? getFinalTotal() : (paymentMethod === 'BOTH' ? upiAmount : 0),
         receivedAmount: paymentMethod === 'CASH' ? receivedAmount : 0,
-        changeAmount: getChangeAmount()
+        changeAmount: getChangeAmount(),
+        customer_id: null,
+        staff_id: null,
+        outlet_id: null
       }
       
       try {
@@ -741,6 +638,34 @@ function Dashboard() {
     
   const totalProducts = products.length
   const lowStockItems = products.filter(p => p.stock < 10).length
+
+  // Run accessibility check on component mount
+  useEffect(() => {
+    const runAccessibilityCheck = async () => {
+      try {
+        // This will check for accessibility issues in the component
+        if (typeof window !== 'undefined') {
+          const { generateAccessibilityReport } = await import('../../utils/accessibility');
+          const report = generateAccessibilityReport();
+          console.log('Dashboard Accessibility Report:', report);
+          
+          // Log any critical issues
+          if (report.wcag && report.wcag.criticalIssues && report.wcag.criticalIssues.length > 0) {
+            console.warn('Critical accessibility issues found in Dashboard:', report.wcag.criticalIssues);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to run accessibility check:', error);
+      }
+    };
+    
+    // Run the check after the component has rendered
+    const timer = setTimeout(() => {
+      runAccessibilityCheck();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="h-full flex flex-col relative">
@@ -827,7 +752,7 @@ function Dashboard() {
                     <div className="text-sm font-medium mb-2">Categories</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                       <Card 
-                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedCategory === 'all' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedCategory === 'all' ? 'ring-2 ring-black bg-muted' : ''}`}
                         onClick={() => setSelectedCategory('all')}
                       >
                         <CardContent className="p-3 flex items-center justify-start">
@@ -838,7 +763,7 @@ function Dashboard() {
                       {categoryFilters.map((category) => (
                         <Card 
                           key={category}
-                          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedCategory === category ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedCategory === category ? 'ring-2 ring-black bg-muted' : ''}`}
                           onClick={() => setSelectedCategory(category)}
                         >
                           <CardContent className="p-3 flex items-center justify-start">
@@ -854,7 +779,7 @@ function Dashboard() {
                     <div className="text-sm font-medium mb-2">Types</div>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
                       <Card 
-                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'all' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'all' ? 'ring-2 ring-black bg-muted' : ''}`}
                         onClick={() => setSelectedType('all')}
                       >
                         <CardContent className="p-3 flex items-center justify-start">
@@ -864,7 +789,7 @@ function Dashboard() {
                       
                       {/* Citrus Category Card */}
                       <Card 
-                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'citrus' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'citrus' ? 'ring-2 ring-black bg-muted' : ''}`}
                         onClick={() => setSelectedType('citrus')}
                       >
                         <CardContent className="p-3 flex items-center justify-start">
@@ -875,7 +800,7 @@ function Dashboard() {
                       
                       {/* Berries Category Card */}
                       <Card 
-                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'berries' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'berries' ? 'ring-2 ring-black bg-muted' : ''}`}
                         onClick={() => setSelectedType('berries')}
                       >
                         <CardContent className="p-3 flex items-center justify-start">
@@ -886,7 +811,7 @@ function Dashboard() {
                       
                       {/* Tropical Category Card */}
                       <Card 
-                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'tropical' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'tropical' ? 'ring-2 ring-black bg-muted' : ''}`}
                         onClick={() => setSelectedType('tropical')}
                       >
                         <CardContent className="p-3 flex items-center justify-start">
@@ -897,7 +822,7 @@ function Dashboard() {
                       
                       {/* Spiced/Herbal/Others Category Card */}
                       <Card 
-                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'spiced/herbal/others' ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === 'spiced/herbal/others' ? 'ring-2 ring-black bg-muted' : ''}`}
                         onClick={() => setSelectedType('spiced/herbal/others')}
                       >
                         <CardContent className="p-3 flex items-center justify-start">
@@ -912,7 +837,7 @@ function Dashboard() {
                         .map((type) => (
                           <Card 
                             key={type}
-                            className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === type ? 'ring-2 ring-black bg-gray-50' : ''}`}
+                            className={`cursor-pointer transition-all duration-200 hover:shadow-md ${selectedType === type ? 'ring-2 ring-black bg-muted' : ''}`}
                             onClick={() => setSelectedType(type)}
                           >
                             <CardContent className="p-3 flex items-center justify-start">
@@ -942,7 +867,7 @@ function Dashboard() {
                         <Card 
           key={product.id} 
           className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-            isInCart ? 'ring-2 ring-black bg-gray-50 relative z-10' : 'hover:bg-gray-50'
+            isInCart ? 'ring-2 ring-black bg-muted relative z-10' : 'hover:bg-muted'
           }`}
           onClick={() => addToCart(product)}
         >
@@ -1019,7 +944,7 @@ function Dashboard() {
                           <div className="flex items-center gap-1 flex-wrap">
                             <p className="text-xs text-muted-foreground">₹{item.price}</p>
                             {item.category && (
-                              <span className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded">
+                              <span className="text-[9px] px-1 py-0.5 bg-muted text-muted-foreground rounded">
                                 {item.category}
                               </span>
                             )}
@@ -1064,6 +989,7 @@ function Dashboard() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="packaging"
+                        size="sm"
                         checked={includePackaging}
                         onCheckedChange={setIncludePackaging}
                       />
@@ -1203,7 +1129,7 @@ function Dashboard() {
               <div className="grid grid-cols-2 gap-2">
                 <Card 
                   className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                    paymentMethod === 'CASH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    paymentMethod === 'CASH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-muted'
                   }`}
                   onClick={() => setPaymentMethod('CASH')}
                 >
@@ -1217,7 +1143,7 @@ function Dashboard() {
                 
                 <Card 
                   className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                    paymentMethod === 'UPI' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    paymentMethod === 'UPI' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-muted'
                   }`}
                   onClick={() => setPaymentMethod('UPI')}
                 >
@@ -1231,7 +1157,7 @@ function Dashboard() {
                 
                 <Card 
                   className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                    paymentMethod === 'BOTH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    paymentMethod === 'BOTH' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-muted'
                   }`}
                   onClick={() => setPaymentMethod('BOTH')}
                 >
@@ -1245,7 +1171,7 @@ function Dashboard() {
                 
                 <Card 
                   className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
-                    paymentMethod === 'CREDIT' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    paymentMethod === 'CREDIT' ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-muted'
                   }`}
                   onClick={() => setPaymentMethod('CREDIT')}
                 >
@@ -1384,7 +1310,7 @@ function Dashboard() {
               </div>
               
               {/* Thermal Receipt Preview */}
-              <div className="border rounded-lg p-2 bg-gray-50 max-h-64 overflow-y-auto">
+              <div className="border rounded-lg p-2 bg-muted max-h-64 overflow-y-auto">
                 <div className="text-xs font-mono leading-tight w-full max-w-sm mx-auto">
                   {/* Header */}
                   {settings?.showBusinessName && (
@@ -1522,7 +1448,7 @@ function Dashboard() {
             <div className="flex space-x-2">
               <Button onClick={handlePrint} variant="outline">
                 <Printer className="h-4 w-4 mr-2" />
-                Thermal Print
+                Print Receipt
               </Button>
               <Button onClick={handlePDFGeneration}>
                 <FileText className="h-4 w-4 mr-2" />
@@ -1676,7 +1602,7 @@ function Dashboard() {
       </div>
 
       {/* Mobile Cart Button - Fixed Bottom */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t shadow-lg">
         {cart.length > 0 ? (
           <div className="p-4">
             <Button 
@@ -1697,7 +1623,7 @@ function Dashboard() {
       {/* Mobile Cart Modal */}
       {showMobileCart && (
         <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
-          <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-lg max-h-[80vh] flex flex-col">
+          <div className="fixed bottom-0 left-0 right-0 bg-background rounded-t-lg max-h-[80vh] flex flex-col">
             {/* Cart Header */}
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
@@ -1722,7 +1648,7 @@ function Dashboard() {
               ) : (
                 <div className="space-y-3">
                   {cart.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div key={item.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                       <div className="flex-1">
                         <h3 className="font-medium text-sm">{item.name}</h3>
                         {item.size && (
@@ -1775,6 +1701,7 @@ function Dashboard() {
                 <div className="flex items-center space-x-2 pb-2">
                   <Checkbox
                     id="mobile-packaging"
+                    size="sm"
                     checked={includePackaging}
                     onCheckedChange={setIncludePackaging}
                   />

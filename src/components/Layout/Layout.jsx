@@ -32,7 +32,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContextSupabase'
 import { useSync } from '../../contexts/SyncContext'
-import DebugProducts from '../DebugProducts'
+import { useAccessibility } from '../../contexts/AccessibilityContext'
+import { useSettings } from '../../contexts/SettingsContext'
+import SkipNavigation from '../SkipNavigation/SkipNavigation'
+import AccessibilitySettings from '../AccessibilitySettings/AccessibilitySettings'
+
 import { supabase } from '../../supabase/config'
 import toast from 'react-hot-toast'
 
@@ -100,6 +104,8 @@ const Layout = React.memo(({ children }) => {
   const location = useLocation()
   const { currentUser, logout } = useAuth()
   const { isOnline, syncStatus, lastSyncTime, forceSyncAll } = useSync()
+  const { announceToScreenReader } = useAccessibility()
+  const { settings } = useSettings()
 
   const currentDrawerWidth = sidebarCollapsed ? collapsedDrawerWidth : drawerWidth
 
@@ -187,7 +193,7 @@ const Layout = React.memo(({ children }) => {
 
   // Create separate drawer content for mobile and desktop
   const mobileDrawer = (
-    <div className="h-full bg-white">
+    <div className="h-full bg-background">
       {/* Header with logo */}
       <div className="flex items-center min-h-[64px] px-4 justify-between">
         <div className="flex items-center gap-2">
@@ -215,10 +221,10 @@ const Layout = React.memo(({ children }) => {
               <button
                 className={`w-full min-h-[48px] rounded-lg transition-all duration-200 flex items-center justify-start px-4 py-3 ${
                   item.primary 
-                    ? 'bg-black text-white hover:bg-gray-800'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                     : (item.path ? isPathActive(item.path) : isParentActive(item.children))
-                      ? 'bg-gray-100 text-black hover:bg-gray-200'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-muted text-foreground hover:bg-muted/80'
+                      : 'text-muted-foreground hover:bg-muted/50'
                 }`}
                 onClick={() => {
                   if (item.expandable) {
@@ -263,8 +269,8 @@ const Layout = React.memo(({ children }) => {
                     <button
                       className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
                         isPathActive(child.path)
-                          ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-muted text-foreground hover:bg-muted/80 border-l-2 border-primary'
+                          : 'text-muted-foreground hover:bg-muted/50'
                       }`}
                       onClick={() => {
                         navigate(child.path)
@@ -284,18 +290,13 @@ const Layout = React.memo(({ children }) => {
           </React.Fragment>
         ))}
         
-        {/* Debug Products - positioned after logout */}
-        {!sidebarCollapsed && (
-          <div className="mt-4 px-2">
-            <DebugProducts />
-          </div>
-        )}
+
       </div>
     </div>
   )
 
   const drawer = (
-    <div className="h-full bg-white">
+    <div className="h-full bg-background">
       {/* Header with logo and collapse button */}
       <div className={`flex items-center min-h-[64px] ${sidebarCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'}`}>
         <div className={`flex items-center ${sidebarCollapsed ? 'gap-0' : 'gap-2'}`}>
@@ -320,7 +321,7 @@ const Layout = React.memo(({ children }) => {
           variant="outline"
           size="sm"
           onClick={handleSidebarToggle}
-          className={`text-gray-500 hover:text-gray-700 hover:bg-gray-50 shadow-sm transition-all duration-300 ${
+          className={`text-muted-foreground hover:text-foreground hover:bg-muted/50 shadow-sm transition-all duration-300 ${
             sidebarCollapsed 
               ? 'w-8 h-8 p-1' 
               : 'p-2'
@@ -347,10 +348,10 @@ const Layout = React.memo(({ children }) => {
                   sidebarCollapsed ? 'justify-center px-2' : 'justify-start px-4'
                 } py-3 ${
                   item.primary 
-                    ? 'bg-black text-white hover:bg-gray-800'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                     : (item.path ? isPathActive(item.path) : isParentActive(item.children))
-                      ? 'bg-gray-100 text-black hover:bg-gray-200'
-                      : 'text-gray-700 hover:bg-gray-50'
+                      ? 'bg-muted text-foreground hover:bg-muted/80'
+                      : 'text-muted-foreground hover:bg-muted/50'
                 }`}
                 onClick={() => {
                   if (item.expandable) {
@@ -401,8 +402,8 @@ const Layout = React.memo(({ children }) => {
                     <button
                       className={`w-full min-h-[40px] rounded-md transition-colors duration-200 flex items-center justify-start px-4 py-2 ml-2 mr-1 ${
                         isPathActive(child.path)
-                          ? 'bg-gray-100 text-black hover:bg-gray-200 border-l-2 border-black'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-muted text-foreground hover:bg-muted/80 border-l-2 border-primary'
+                          : 'text-muted-foreground hover:bg-muted/50'
                       }`}
                       onClick={() => {
                         navigate(child.path)
@@ -424,50 +425,57 @@ const Layout = React.memo(({ children }) => {
           </React.Fragment>
         ))}
         
-        {/* Debug Products - positioned after logout */}
-        {!sidebarCollapsed && (
-          <div className="mt-4 px-2">
-            <DebugProducts />
-          </div>
-        )}
+
       </div>
     </div>
   )
 
   return (
     <div className="flex">
+      <SkipNavigation />
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30 h-14">
+      <header 
+        role="banner" 
+        aria-label="Site header"
+        className="fixed top-0 left-0 right-0 bg-background border-b border-border z-30 h-14"
+      >
         <div className="flex items-center justify-between h-full px-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={handleDrawerToggle}
             className="mr-2 sm:hidden"
+            aria-label="Open navigation menu"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-navigation"
           >
             <MenuIcon className="h-5 w-5" />
           </Button>
           
           <div className="flex items-center justify-center flex-1">
-            <span className="font-bold text-xl tracking-wider">
+            <h1 className="font-bold text-xl tracking-wider">
               {businessName}
-            </span>
+            </h1>
           </div>
           
           <div className="flex items-center gap-2">
-            <span className="hidden md:block text-gray-500 text-sm">
+            <span className="hidden md:block text-gray-500 text-sm" aria-live="polite">
               {lastSyncTime ? `Last synced: ${new Date(lastSyncTime).toLocaleString()}` : 'Never synced'}
             </span>
             
-            <div 
-              className={`flex items-center px-2 py-1 rounded bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors ${
+            <button 
+              className={`flex items-center px-2 py-1 rounded bg-muted hover:bg-muted/80 transition-colors ${
                 isOnline && syncStatus !== 'syncing' ? 'cursor-pointer' : 'cursor-default'
               }`}
               onClick={async () => {
                 if (isOnline && syncStatus !== 'syncing') {
+                  announceToScreenReader('Starting data synchronization')
                   await forceSyncAll()
+                  announceToScreenReader('Data synchronization completed')
                 }
               }}
+              disabled={!isOnline || syncStatus === 'syncing'}
+              aria-label={`Connection status: ${syncStatus === 'syncing' ? 'Syncing data' : isOnline ? 'Online' : 'Offline'}. ${isOnline && syncStatus !== 'syncing' ? 'Click to sync data' : ''}`}
             >
               <div
                 className={`w-2 h-2 rounded-full mr-2 ${
@@ -475,21 +483,25 @@ const Layout = React.memo(({ children }) => {
                     ? (syncStatus === 'syncing' ? 'bg-orange-500 animate-pulse' : 'bg-green-500')
                     : 'bg-red-500'
                 }`}
+                aria-hidden="true"
               />
               <span className="text-xs text-gray-600">
                 {syncStatus === 'syncing' ? 'Syncing...' : isOnline ? 'Online' : 'Offline'}
               </span>
-            </div>
+            </button>
           </div>
         </div>
       </header>
       
-      <nav>
+      {/* Navigation */}
+      <nav role="navigation" aria-label="Main navigation">
         {/* Mobile drawer */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetContent 
             side="left" 
-            className="w-64 p-0 bg-white border-r border-gray-200 overflow-y-auto"
+            className="w-64 p-0 bg-background border-r border-border overflow-y-auto"
+            id="mobile-navigation"
+            aria-label="Mobile navigation menu"
           >
             <div className="h-full">
               {mobileDrawer}
@@ -500,9 +512,11 @@ const Layout = React.memo(({ children }) => {
         {/* Desktop drawer */}
         <div className="hidden sm:block">
           <div 
-            className={`fixed left-0 top-14 h-[calc(100vh-56px)] bg-white border-r border-gray-200 transition-all duration-300 z-10 ${
+            className={`fixed left-0 top-14 h-[calc(100vh-56px)] bg-background border-r border-border transition-all duration-300 z-10 ${
               sidebarCollapsed ? 'w-16 overflow-visible' : 'w-64 overflow-hidden'
             }`}
+            role="complementary"
+            aria-label="Desktop navigation menu"
           >
             {drawer}
           </div>
@@ -511,18 +525,23 @@ const Layout = React.memo(({ children }) => {
       
       {/* Main content area with responsive padding */}
       <main
-        className="flex-1 bg-gray-50 transition-all duration-300 overflow-auto"
+        id="main-content"
+        role="main"
+        aria-label="Main content"
+        className="flex-1 bg-muted/30 transition-all duration-300 overflow-auto"
         style={{
           marginLeft: isMobile ? 0 : (sidebarCollapsed ? 64 : 256),
           marginTop: '56px',
           height: 'calc(100vh - 56px)',
           width: isMobile ? '100%' : (sidebarCollapsed ? 'calc(100% - 64px)' : 'calc(100% - 256px)')
         }}
+        tabIndex={-1}
       >
         <div className="w-full h-full">
           {children}
         </div>
       </main>
+      <AccessibilitySettings />
     </div>
   )
 })

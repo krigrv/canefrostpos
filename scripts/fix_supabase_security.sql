@@ -10,11 +10,10 @@ SELECT
   p.name,
   p.category,
   p.price,
-  p.stock_quantity,
-  p.low_stock_threshold,
+  p.stock,
   CASE 
-    WHEN p.stock_quantity <= p.low_stock_threshold THEN 'Low Stock'
-    WHEN p.stock_quantity = 0 THEN 'Out of Stock'
+    WHEN p.stock <= 5 THEN 'Low Stock'
+    WHEN p.stock = 0 THEN 'Out of Stock'
     ELSE 'In Stock'
   END as stock_status
 FROM products p;
@@ -84,7 +83,7 @@ AS $$
 BEGIN
   -- Update product stock quantities based on sale items
   UPDATE products
-  SET stock_quantity = stock_quantity - (sale_items.quantity)
+  SET stock = stock - (sale_items.quantity)
   FROM (
     SELECT jsonb_array_elements(NEW.items)->>'id' as product_id,
            (jsonb_array_elements(NEW.items)->>'quantity')::numeric as quantity
@@ -137,9 +136,11 @@ ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
+DROP POLICY IF EXISTS "Users can manage own profile" ON public.user_profiles;
 CREATE POLICY "Users can manage own profile" ON public.user_profiles
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can manage own settings" ON public.user_settings;
 CREATE POLICY "Users can manage own settings" ON public.user_settings
   USING (auth.uid() = user_id);
 

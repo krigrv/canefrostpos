@@ -7,6 +7,8 @@ import { SettingsProvider } from './contexts/SettingsContext'
 import { StaffProvider } from './contexts/StaffContext'
 import { CustomerProvider } from './contexts/CustomerContext'
 import { SyncProvider } from './contexts/SyncContext'
+import { AccessibilityProvider } from './contexts/AccessibilityContext'
+import './styles/accessibility.css'
 import Login from './components/Auth/Login'
 const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'))
 const ProductManagement = lazy(() => import('./components/ProductManagement/ProductManagement'))
@@ -209,20 +211,22 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <SyncProvider>
-            <SettingsProvider>
-              <InventoryProvider>
-                <StaffProvider>
-                  <CustomerProvider>
-                  <div className="app">
-                    <AppRoutes />
-                    <Toaster />
-                  </div>
-                  </CustomerProvider>
-                </StaffProvider>
-              </InventoryProvider>
-            </SettingsProvider>
-          </SyncProvider>
+        <AccessibilityProvider>
+          <SyncProvider>
+              <SettingsProvider>
+                <InventoryProvider>
+                  <StaffProvider>
+                    <CustomerProvider>
+                    <div className="app">
+                      <AppRoutes />
+                      <Toaster />
+                    </div>
+                    </CustomerProvider>
+                  </StaffProvider>
+                </InventoryProvider>
+              </SettingsProvider>
+            </SyncProvider>
+        </AccessibilityProvider>
       </AuthProvider>
     </Router>
   )

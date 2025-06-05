@@ -327,12 +327,13 @@ const ProductManagement = React.memo(() => {
 
   // Mobile card view for products
   const MobileProductCard = ({ product, isSelected, onSelect }) => (
-    <div className="bg-white p-3 mb-3 rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-card p-3 mb-3 rounded-lg shadow-sm border border-border">
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-start gap-3 flex-1">
           <Checkbox
             checked={isSelected}
             onCheckedChange={onSelect}
+            size="sm"
             className="mt-1"
           />
           <div className="flex-1">
@@ -447,7 +448,7 @@ const ProductManagement = React.memo(() => {
        </div>
 
       {/* Search and Filter */}
-      <div className="bg-white p-4 md:p-6 mb-6 md:mb-8 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-card p-4 md:p-6 mb-6 md:mb-8 rounded-lg shadow-sm border border-border">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 items-end">
           <div className="relative">
             <Label className="text-sm md:text-base block mb-2">Search</Label>
@@ -564,7 +565,7 @@ const ProductManagement = React.memo(() => {
 
       {/* Bulk Actions */}
       {selectedProducts.size > 0 && (
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="mb-6 p-4 bg-muted rounded-lg border border-border">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-900">
               {selectedProducts.size} product{selectedProducts.size > 1 ? 's' : ''} selected
@@ -579,7 +580,7 @@ const ProductManagement = React.memo(() => {
                   const newVisibility = firstProduct?.visibility === 'shown' ? 'hidden' : 'shown'
                   handleBulkVisibility(newVisibility)
                 }}
-                className="text-gray-600 border-gray-300 hover:bg-gray-100"
+                className="text-gray-600 border-gray-300 hover:bg-muted"
               >
                 {(() => {
                   const firstProduct = products.find(p => selectedProducts.has(p.id))
@@ -594,7 +595,7 @@ const ProductManagement = React.memo(() => {
                 size="sm"
                 variant="outline"
                 onClick={handleBulkDelete}
-                className="text-gray-600 border-gray-300 hover:bg-gray-100"
+                className="text-gray-600 border-gray-300 hover:bg-muted"
               >
                 <DeleteIcon className="w-4 h-4" />
               </Button>
@@ -621,15 +622,16 @@ const ProductManagement = React.memo(() => {
         </div>
       ) : (
         // Desktop table view
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
+        <div className="bg-card rounded-lg shadow-sm border border-border overflow-x-auto">
           <Table>
             <TableHeader>
-               <TableRow className="bg-gray-50">
+               <TableRow className="bg-muted">
                  <TableHead className="w-12 px-4">
                    <div className="flex justify-center">
                      <Checkbox
                        checked={isAllSelected}
                        onCheckedChange={handleSelectAll}
+                       size="sm"
                        ref={(el) => {
                          if (el) el.indeterminate = isIndeterminate
                        }}
@@ -649,13 +651,14 @@ const ProductManagement = React.memo(() => {
                {filteredProducts.map((product) => (
                  <TableRow 
                    key={product.id}
-                   className="hover:bg-gray-50 transition-colors"
+                   className="hover:bg-muted transition-colors"
                   >
                     <TableCell className="px-4">
                       <div className="flex justify-center">
                         <Checkbox
                           checked={selectedProducts.has(product.id)}
                           onCheckedChange={(checked) => handleSelectProduct(product.id, checked)}
+                          size="sm"
                         />
                       </div>
                     </TableCell>

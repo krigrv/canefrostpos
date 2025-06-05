@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useInventory } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContextSupabase'
-import { db } from '../../firebase/config'
-import { doc, getDoc } from 'firebase/firestore'
-import { syncFirebaseToJSON } from '../../utils/inventorySync'
-import { resetDatabaseWithCSV, cleanAllDatabases, validateCSVStructure } from '../../utils/databaseCleanup'
+import { useAccessibility } from '../../contexts/AccessibilityContext'
+import { auditPageContrast, generateScreenReaderReport, generateAccessibilityReport, testKeyboardNavigation } from '../../utils/accessibility'
+import { supabase } from '../../supabase/config'
+
+
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog'
@@ -38,16 +39,41 @@ import {
   Palette as PaletteIcon,
   Upload as CloudSyncIcon,
   Save,
-  X
+  X,
+  Eye,
+  Keyboard,
+  Volume2,
+  Contrast,
+  Type,
+  MousePointer,
+  Accessibility
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import LogAnalyzerPanel from '../DevTools/LogAnalyzerPanel'
+import DebugProducts from '../DebugProducts'
 
 function Settings() {
-  const { settings: contextSettings, saveSettings } = useSettings()
-  const { cleanupDuplicates, uploadAllInventoryToFirebase } = useInventory()
+  const { settings: contextSettings, saveSettings, shuffleThemeColors } = useSettings()
+  const { cleanupDuplicates } = useInventory()
   const { currentUser } = useAuth()
+  const {
+    highContrastMode,
+    reducedMotion,
+    fontSize,
+    skipLinks,
+    screenReaderMode,
+    keyboardNavigation,
+    contrastAuditResults,
+    toggleHighContrast,
+    toggleReducedMotion,
+    setFontSize,
+    toggleSkipLinks,
+    toggleScreenReaderMode,
+    toggleKeyboardNavigation,
+    runContrastAudit,
+    announceToScreenReader
+  } = useAccessibility()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(0)
   const [settings, setSettings] = useState({
@@ -71,22 +97,18 @@ function Settings() {
   const [printSettingsOpen, setPrintSettingsOpen] = useState(false)
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false)
   const [showDevTools, setShowDevTools] = useState(false)
-  const [showFirebaseSync, setShowFirebaseSync] = useState(false)
-  const [syncingToFirebase, setSyncingToFirebase] = useState(false)
-  const [syncingToJSON, setSyncingToJSON] = useState(false)
-  const [resettingDatabase, setResettingDatabase] = useState(false)
-  const [cleaningAllDatabases, setCleaningAllDatabases] = useState(false)
-  const [importingFromCSV, setImportingFromCSV] = useState(false)
-  const [showDatabaseCleanup, setShowDatabaseCleanup] = useState(false)
-  const [selectiveCleanup, setSelectiveCleanup] = useState({
-    products: true,
-    sales: true,
-    customers: true,
-    staff: true,
-    categories: true,
-    localStorage: true,
-    firebaseData: true
-  })
+  
+  // Accessibility testing states
+  const [contrastResults, setContrastResults] = useState(null)
+  const [isAuditing, setIsAuditing] = useState(false)
+  const [screenReaderResults, setScreenReaderResults] = useState(null)
+  const [isTestingScreenReader, setIsTestingScreenReader] = useState(false)
+  const [wcagResults, setWcagResults] = useState(null)
+  const [isTestingWCAG, setIsTestingWCAG] = useState(false)
+  const [keyboardResults, setKeyboardResults] = useState(null)
+  const [isTestingKeyboard, setIsTestingKeyboard] = useState(false)
+
+
   const [printSettings, setPrintSettings] = useState({
     businessName: contextSettings.businessName || businessDetails.businessName,
     businessAddress: contextSettings.businessAddress || businessDetails.businessAddress,
@@ -129,17 +151,23 @@ function Settings() {
     showPackaging: true
   })
 
-  // Load business details from Firebase (synced with Profile component)
+  // Load business details from Supabase (synced with Profile component)
   useEffect(() => {
     const loadBusinessDetails = async () => {
       if (currentUser) {
         try {
-          const userDocRef = doc(db, 'users', currentUser.uid)
-          const userDoc = await getDoc(userDocRef)
-          if (userDoc.exists()) {
-            const userData = userDoc.data()
-            const details = userData.businessDetails || {}
-            
+          const { data, error } = await supabase
+            .from('user_profiles')
+            .select('business_details')
+            .eq('user_id', currentUser.id)
+            .single()
+          
+          if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+            throw error
+          }
+          
+          if (data?.business_details) {
+            const details = data.business_details
             setBusinessDetails(details)
             
             // Update print settings with loaded business details
@@ -149,20 +177,179 @@ function Settings() {
               businessAddress: details.businessAddress || prev.businessAddress || '',
               gstNumber: details.gstin || prev.gstNumber || ''
             }))
+            
+            // Update context settings with business information
+            await saveSettings({
+              storeName: details.businessName || 'CaneFrost POS',
+              storeAddress: details.businessAddress || '',
+              storePhone: details.phoneNumber || '',
+              storeEmail: details.emailId || '',
+              gstin: details.gstin || '',
+              businessName: details.businessName || 'CANEFROST JUICE SHOP',
+              businessAddress: details.businessAddress || '',
+              gstNumber: details.gstin || ''
+            })
           }
         } catch (error) {
           console.error('Error loading business details:', error)
+          // Fallback to localStorage for migration
+          const savedDetails = localStorage.getItem('businessDetails')
+          if (savedDetails) {
+            try {
+              const details = JSON.parse(savedDetails)
+              setBusinessDetails(details)
+              
+              // Update print settings with loaded business details
+              setPrintSettings(prev => ({
+                ...prev,
+                businessName: details.businessName || prev.businessName || '',
+                businessAddress: details.businessAddress || prev.businessAddress || '',
+                gstNumber: details.gstin || prev.gstNumber || ''
+              }))
+            } catch (parseError) {
+              console.error('Error parsing saved business details:', parseError)
+            }
+          }
         }
       }
     }
     loadBusinessDetails()
-  }, [currentUser])
+  }, [currentUser, saveSettings])
+  
+  // Function to save business details separately
+  const saveBusinessDetails = async () => {
+    try {
+      if (!currentUser) {
+        toast.error('User not authenticated. Please log in again.')
+        return
+      }
+      
+      const loadingToast = toast.loading('Saving business information...')
+      
+      // Save to Supabase
+      const { error } = await supabase
+        .from('user_profiles')
+        .upsert({
+          user_id: currentUser.id,
+          business_details: businessDetails
+        })
+      
+      if (error) throw error
+      
+      // Update context settings with business information
+      await saveSettings({
+        storeName: businessDetails.businessName || 'CaneFrost POS',
+        storeAddress: businessDetails.businessAddress || '',
+        storePhone: businessDetails.phoneNumber || '',
+        storeEmail: businessDetails.emailId || '',
+        gstin: businessDetails.gstin || '',
+        businessName: businessDetails.businessName || 'CANEFROST JUICE SHOP',
+        businessAddress: businessDetails.businessAddress || '',
+        gstNumber: businessDetails.gstin || ''
+      })
+      
+      // Also save to localStorage as backup
+      localStorage.setItem('businessDetails', JSON.stringify(businessDetails))
+      
+      toast.dismiss(loadingToast)
+      toast.success('✅ Business information saved successfully!')
+    } catch (error) {
+      console.error('Error saving business details:', error)
+      toast.error('❌ Failed to save business information. Please try again.')
+    }
+  }
+  
+  // Accessibility testing functions
+  const handleContrastAudit = async () => {
+    setIsAuditing(true)
+    announceToScreenReader('Running color contrast audit...')
+    
+    try {
+      await runContrastAudit()
+      // Get results from context after audit
+      setContrastResults(contrastAuditResults)
+      announceToScreenReader(`Contrast audit complete. Found ${contrastAuditResults?.failingElements?.length || 0} issues.`)
+    } catch (error) {
+      console.error('Contrast audit failed:', error)
+      announceToScreenReader('Contrast audit failed. Please try again.')
+    } finally {
+      setIsAuditing(false)
+    }
+  }
 
-  const handleSettingChange = async (setting) => {
-    const newValue = !contextSettings[setting]
+  const runScreenReaderTest = async () => {
+    setIsTestingScreenReader(true)
+    announceToScreenReader('Running screen reader compatibility test...')
+    
+    try {
+      const results = generateScreenReaderReport()
+      setScreenReaderResults(results)
+      announceToScreenReader(`Screen reader test complete. Accessibility score: ${results.score}%. Found ${results.summary.totalIssues} issues.`)
+    } catch (error) {
+      console.error('Screen reader test failed:', error)
+      announceToScreenReader('Screen reader test failed. Please try again.')
+    } finally {
+      setIsTestingScreenReader(false)
+    }
+  }
+
+  const runWCAGTest = async () => {
+    setIsTestingWCAG(true)
+    announceToScreenReader('Running comprehensive WCAG 2.1 AA compliance test...')
+    
+    try {
+      const results = generateAccessibilityReport()
+      setWcagResults(results)
+      announceToScreenReader(`WCAG test complete. Overall score: ${results.overall.score}%. Grade: ${results.overall.grade}.`)
+    } catch (error) {
+      console.error('WCAG test failed:', error)
+      announceToScreenReader('WCAG test failed. Please try again.')
+    } finally {
+      setIsTestingWCAG(false)
+    }
+  }
+
+  const runKeyboardTest = async () => {
+    setIsTestingKeyboard(true)
+    announceToScreenReader('Running keyboard accessibility test...')
+    
+    try {
+      const results = testKeyboardNavigation()
+      setKeyboardResults(results)
+      announceToScreenReader(`Keyboard test complete. Score: ${results.score}%. Found ${results.issues.length} issues.`)
+    } catch (error) {
+      console.error('Keyboard test failed:', error)
+      announceToScreenReader('Keyboard test failed. Please try again.')
+    } finally {
+      setIsTestingKeyboard(false)
+    }
+  }
+  
+  const getContrastBadgeVariant = (ratio) => {
+    if (ratio >= 7) return 'default' // AAA
+    if (ratio >= 4.5) return 'secondary' // AA
+    if (ratio >= 3) return 'outline' // AA Large
+    return 'destructive' // Fail
+  }
+
+  const getContrastLabel = (ratio) => {
+    if (ratio >= 7) return 'AAA'
+    if (ratio >= 4.5) return 'AA'
+    if (ratio >= 3) return 'AA Large'
+    return 'Fail'
+  }
+
+  const handleSettingChange = async (setting, value = null, showToast = true) => {
+    const newValue = value !== null ? value : !contextSettings[setting]
     try {
       await saveSettings({ [setting]: newValue })
-      toast.success(`${setting} ${newValue ? 'enabled' : 'disabled'} and saved to Firebase`)
+      if (showToast) {
+        if (typeof newValue === 'boolean') {
+          toast.success(`${setting} ${newValue ? 'enabled' : 'disabled'} and saved`)
+        } else {
+          toast.success(`${setting} updated to ${newValue}`)
+        }
+      }
     } catch (error) {
       console.error('Error saving setting:', error)
       toast.error(`Failed to save ${setting} setting`)
@@ -188,218 +375,9 @@ function Settings() {
     }
   }
 
-  const handleSyncToFirebase = async () => {
-    if (syncingToFirebase) return
-    
-    setSyncingToFirebase(true)
-    try {
-      await uploadAllInventoryToFirebase()
-      toast.success('Successfully synced inventory to Firebase')
-    } catch (error) {
-      console.error('Error syncing to Firebase:', error)
-      toast.error('Failed to sync inventory to Firebase')
-    } finally {
-      setSyncingToFirebase(false)
-    }
-  }
 
-  const handleSyncToJSON = async () => {
-    if (syncingToJSON) return
-    
-    setSyncingToJSON(true)
-    try {
-      await syncFirebaseToJSON()
-      toast.success('Successfully synced Firebase data to JSON file')
-    } catch (error) {
-      console.error('Error syncing to JSON:', error)
-      toast.error('Failed to sync Firebase data to JSON file')
-    } finally {
-      setSyncingToJSON(false)
-    }
-  }
 
-  const handleResetDatabase = async () => {
-    if (resettingDatabase) return
-    
-    const confirmed = window.confirm(
-      '⚠️ WARNING: This will DELETE ALL PRODUCTS from Firebase!\n\n' +
-      'This action cannot be undone. Are you sure you want to proceed?'
-    )
-    
-    if (!confirmed) return
-    
-    const doubleConfirmed = window.confirm(
-      '🚨 FINAL WARNING: You are about to permanently delete all product data!\n\n' +
-      'Type "DELETE" in the next prompt to confirm.'
-    )
-    
-    if (!doubleConfirmed) return
-    
-    const deleteConfirmation = window.prompt(
-      'Type "DELETE" (in capital letters) to confirm database reset:'
-    )
-    
-    if (deleteConfirmation !== 'DELETE') {
-      toast.error('Database reset cancelled - confirmation text did not match')
-      return
-    }
-    
-    setResettingDatabase(true)
-    try {
-      // Run the reset database script
-      const response = await fetch('/api/reset-database', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to reset database')
-      }
-      
-      const result = await response.json()
-      toast.success(`Database reset completed! Deleted ${result.deletedCount} documents.`)
-    } catch (error) {
-      console.error('Error resetting database:', error)
-      toast.error('Failed to reset database. You may need to run the reset script manually.')
-    } finally {
-      setResettingDatabase(false)
-    }
-  }
 
-  const handleSelectiveCleanup = async () => {
-    if (cleaningAllDatabases) return
-    
-    const selectedItems = Object.entries(selectiveCleanup)
-      .filter(([key, value]) => value)
-      .map(([key]) => key)
-    
-    if (selectedItems.length === 0) {
-      toast.error('Please select at least one data type to clean')
-      return
-    }
-    
-    const itemLabels = {
-      products: 'Products',
-      sales: 'Sales History',
-      customers: 'Customers',
-      staff: 'Staff Records',
-      categories: 'Categories',
-      localStorage: 'Local Storage',
-      firebaseData: 'Firebase Data'
-    }
-    
-    const selectedLabels = selectedItems.map(item => itemLabels[item]).join('\n- ')
-    
-    const confirmed = window.confirm(
-      `⚠️ WARNING: This will DELETE the following data:\n\n- ${selectedLabels}\n\nThis action cannot be undone. Are you sure you want to proceed?`
-    )
-    
-    if (!confirmed) return
-    
-    const deleteConfirmation = window.prompt(
-      'Type "CLEAN SELECTED" (in capital letters) to confirm selective cleanup:'
-    )
-    
-    if (deleteConfirmation !== 'CLEAN SELECTED') {
-      toast.error('Selective cleanup cancelled - confirmation text did not match')
-      return
-    }
-    
-    setCleaningAllDatabases(true)
-    try {
-      await cleanAllDatabases(selectiveCleanup)
-      toast.success(`Successfully cleaned selected data: ${selectedLabels.replace(/\n- /g, ', ')}`)
-      // Refresh the page to reflect changes
-      setTimeout(() => {
-        window.location.reload()
-      }, 2000)
-    } catch (error) {
-      console.error('Error cleaning selected data:', error)
-      toast.error('Failed to clean selected data: ' + error.message)
-    } finally {
-      setCleaningAllDatabases(false)
-    }
-  }
-
-  const handleCleanAllDatabases = async () => {
-    if (cleaningAllDatabases) return
-    
-    const confirmed = window.confirm(
-      '⚠️ WARNING: This will DELETE ALL DATA from both Firebase and local storage!\n\n' +
-      'This includes:\n' +
-      '- All products\n' +
-      '- All sales history\n' +
-      '- All customers\n' +
-      '- All staff records\n' +
-      '- All categories\n' +
-      '- Local storage data\n\n' +
-      'This action cannot be undone. Are you sure you want to proceed?'
-    )
-    
-    if (!confirmed) return
-    
-    const deleteConfirmation = window.prompt(
-      'Type "CLEAN ALL" (in capital letters) to confirm complete database cleanup:'
-    )
-    
-    if (deleteConfirmation !== 'CLEAN ALL') {
-      toast.error('Database cleanup cancelled - confirmation text did not match')
-      return
-    }
-    
-    setCleaningAllDatabases(true)
-    try {
-      await cleanAllDatabases()
-      toast.success('All databases cleaned successfully')
-      // Refresh the page to reflect changes
-      setTimeout(() => {
-        window.location.reload()
-      }, 2000)
-    } catch (error) {
-      console.error('Error cleaning databases:', error)
-      toast.error('Failed to clean databases: ' + error.message)
-    } finally {
-      setCleaningAllDatabases(false)
-    }
-  }
-
-  const handleImportFromCSV = async () => {
-    if (importingFromCSV) return
-    
-    const confirmed = window.confirm(
-      '🔄 CSV Import Process\n\n' +
-      'This will:\n' +
-      '1. Clean all existing data (products, sales, etc.)\n' +
-      '2. Import fresh data from Canefrost Inventory Final.csv\n' +
-      '3. Sync data to both Firebase and local storage\n\n' +
-      'Continue with import?'
-    )
-    
-    if (!confirmed) return
-    
-    setImportingFromCSV(true)
-    try {
-      // First validate CSV structure
-       await validateCSVStructure('/Users/krishnagaurav/Documents/GitHub/canefrostpos/public/Canefrost Inventory Final.csv')
-       
-       // Perform the complete reset and import
-       const result = await resetDatabaseWithCSV('/Users/krishnagaurav/Documents/GitHub/canefrostpos/public/Canefrost Inventory Final.csv')
-      
-      toast.success(`Successfully imported ${result.productCount} products from CSV`)
-      
-      // Refresh the page to reflect changes
-      setTimeout(() => {
-        window.location.reload()
-      }, 2000)
-    } catch (error) {
-      console.error('Error importing from CSV:', error)
-      toast.error('Failed to import from CSV: ' + error.message)
-    } finally {
-      setImportingFromCSV(false)
-    }
-  }
 
   const managementCards = [
     {
@@ -409,30 +387,6 @@ function Settings() {
       color: 'secondary',
       features: ['Receipt Layout', 'Font Size', 'Print Preview', 'Paper Settings'],
       action: () => setPrintSettingsOpen(true)
-    },
-    {
-      title: 'UI Demo',
-      description: 'Explore UI components and design system showcase',
-      icon: <PaletteIcon sx={{ fontSize: 40, color: 'warning.main' }} />,
-      color: 'warning',
-      features: ['Component Library', 'Design System', 'Interactive Examples', 'Style Guide'],
-      action: () => navigate('/demo')
-    },
-    {
-      title: 'Firebase Sync',
-      description: 'Manage Firebase database synchronization and data integrity',
-      icon: <CloudSyncIcon sx={{ fontSize: 40, color: 'info.main' }} />,
-      color: 'info',
-      features: ['Sync to Firebase', 'Sync from Firebase', 'Reset Database', 'Data Management'],
-      action: () => setShowFirebaseSync(true)
-    },
-    {
-      title: 'Database Cleanup',
-      description: 'Clean all databases and import fresh data from CSV',
-      icon: <CleaningServicesIcon sx={{ fontSize: 40, color: 'error.main' }} />,
-      color: 'error',
-      features: ['Clean All Data', 'Import from CSV', 'Complete Reset', 'Fresh Start'],
-      action: () => setShowDatabaseCleanup(true)
     }
   ]
 
@@ -548,7 +502,7 @@ function Settings() {
               <div key={item.title}>
                 <div className="flex items-center justify-between py-3">
                   <div className="flex items-center space-x-4">
-                    <div className="text-gray-600 bg-gray-50 p-2 rounded-lg">
+                    <div className="text-gray-600 bg-muted p-2 rounded-lg">
                       {React.cloneElement(item.icon, { className: 'w-5 h-5' })}
                     </div>
                     <div>
@@ -567,6 +521,121 @@ function Settings() {
            </div>
          </CardContent>
        </Card>
+
+      {/* Theme Settings */}
+      <h2 className="text-2xl font-semibold mb-6 mt-8">
+        Appearance & Themes
+      </h2>
+      
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <PaletteIcon className="w-5 h-5" />
+            Theme Selection
+          </CardTitle>
+          <CardDescription>
+            Choose your preferred color theme for the application
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Light Theme */}
+              <div 
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  contextSettings.customTheme === 'light' || !contextSettings.customTheme 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => handleSettingChange('customTheme', 'light', false)}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">Light Theme</h4>
+                  {(contextSettings.customTheme === 'light' || !contextSettings.customTheme) && (
+                    <CheckCircleIcon className="w-5 h-5 text-blue-500" />
+                  )}
+                </div>
+                <div className="flex space-x-2 mb-3">
+                  <div className="w-6 h-6 bg-background border border-border rounded"></div>
+                  <div className="w-6 h-6 bg-blue-500 rounded"></div>
+                  <div className="w-6 h-6 bg-muted rounded"></div>
+                  <div className="w-6 h-6 bg-gray-800 rounded"></div>
+                </div>
+                <p className="text-sm text-gray-600">Clean and bright interface</p>
+              </div>
+
+              {/* Dark Theme */}
+              <div 
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  contextSettings.customTheme === 'dark' 
+                    ? 'border-blue-500 bg-blue-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => handleSettingChange('customTheme', 'dark', false)}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">Dark Theme</h4>
+                  {contextSettings.customTheme === 'dark' && (
+                    <CheckCircleIcon className="w-5 h-5 text-blue-500" />
+                  )}
+                </div>
+                <div className="flex space-x-2 mb-3">
+                  <div className="w-6 h-6 bg-gray-900 rounded"></div>
+                  <div className="w-6 h-6 bg-blue-400 rounded"></div>
+                  <div className="w-6 h-6 bg-gray-700 rounded"></div>
+                  <div className="w-6 h-6 bg-gray-200 rounded"></div>
+                </div>
+                <p className="text-sm text-gray-600">Easy on the eyes</p>
+              </div>
+
+              {/* CaneFrost Theme */}
+              <div 
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-all relative ${
+                  contextSettings.customTheme === 'canefrost' 
+                    ? 'border-green-600 bg-green-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => handleSettingChange('customTheme', 'canefrost', false)}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold">CaneFrost Theme</h4>
+                  <div className="flex items-center gap-2">
+                    {contextSettings.customTheme === 'canefrost' && (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          shuffleThemeColors();
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1 text-xs px-2 py-1 h-7 hover:bg-green-100 hover:border-green-400 focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                        aria-label="Shuffle theme colors for better accessibility"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Shuffle
+                      </Button>
+                    )}
+                    {contextSettings.customTheme === 'canefrost' && (
+                      <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                    )}
+                  </div>
+                </div>
+                <div className="flex space-x-2 mb-3">
+                  <div className="w-6 h-6 rounded" style={{backgroundColor: '#f5e7d0'}}></div>
+                  <div className="w-6 h-6 rounded" style={{backgroundColor: '#024e39'}}></div>
+                  <div className="w-6 h-6 rounded" style={{backgroundColor: '#127743'}}></div>
+                  <div className="w-6 h-6 rounded" style={{backgroundColor: '#bbadbe'}}></div>
+                </div>
+                <p className="text-sm text-gray-600">Warm champagne background with natural greens</p>
+              </div>
+            </div>
+
+
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Developer Tools */}
       {process.env.NODE_ENV === 'development' && (
@@ -604,8 +673,372 @@ function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Render Developer Tools when enabled */}
+          {showDevTools && (
+            <div className="space-y-6">
+              {/* Log Analyzer Panel */}
+              <LogAnalyzerPanel />
+              
+              {/* Product Debug Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <InfoIcon className="w-5 h-5" />
+                    Product Debug Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="font-semibold mb-2">Database Schema Status</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Sales Table:</span>
+                            <Badge variant="outline">Missing Columns</Badge>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Staff Table:</span>
+                            <Badge variant="outline">Missing Columns</Badge>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Customers Table:</span>
+                            <Badge variant="outline">Missing Columns</Badge>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 bg-muted rounded-lg">
+                        <h4 className="font-semibold mb-2">Required Actions</h4>
+                        <div className="space-y-2 text-sm">
+                          <p>• Run fix_missing_columns.sql in Supabase</p>
+                          <p>• Execute create_user_tables.sql</p>
+                          <p>• Execute fix_supabase_security.sql</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                      <h4 className="font-semibold mb-2 text-amber-800">Console Errors Detected</h4>
+                      <div className="space-y-1 text-sm text-amber-700">
+                        <p>• Column 'transactionId' does not exist in sales table</p>
+                        <p>• Column 'cashAmount' not found in sales schema cache</p>
+                        <p>• Column 'createdAt' not found in staff schema cache</p>
+                        <p>• Column 'createdAt' not found in customers schema cache</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const debugInfo = {
+                            timestamp: new Date().toISOString(),
+                            userAgent: navigator.userAgent,
+                            url: window.location.href,
+                            errors: [
+                              'Column sales.transactionId does not exist',
+                              'Could not find cashAmount column in sales schema cache',
+                              'Could not find createdAt column in staff schema cache',
+                              'Could not find createdAt column in customers schema cache'
+                            ],
+                            requiredSQLScripts: [
+                              'fix_missing_columns.sql',
+                              'create_user_tables.sql', 
+                              'fix_supabase_security.sql'
+                            ]
+                          }
+                          navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))
+                          toast.success('Debug info copied to clipboard')
+                        }}
+                      >
+                        Copy Debug Info
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          console.log('=== PRODUCT DEBUG INFO ===')
+                          console.log('Missing columns detected in database schema')
+                          console.log('Required SQL scripts: fix_missing_columns.sql, create_user_tables.sql, fix_supabase_security.sql')
+                          console.log('==========================')
+                          toast.success('Debug info logged to console')
+                        }}
+                      >
+                        Log to Console
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Product Debug Information */}
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <InfoIcon className="w-5 h-5" />
+                    Product Debug Information
+                  </CardTitle>
+                  <CardDescription>
+                    Real-time product statistics and duplicate detection
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DebugProducts />
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </>
       )}
+
+      {/* Accessibility Settings */}
+      <h2 className="text-2xl font-semibold mb-6 mt-8">
+        Accessibility Settings
+      </h2>
+      
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Accessibility className="w-5 h-5" />
+            Accessibility Features
+          </CardTitle>
+          <CardDescription>
+            Configure accessibility options and run compliance tests
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-8">
+            {/* Visual Settings */}
+            <div>
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                Visual Settings
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Contrast className="w-5 h-5 text-gray-600" />
+                    <div>
+                      <h5 className="font-medium">High Contrast</h5>
+                      <p className="text-sm text-gray-600">Enhance visual contrast for better readability</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={highContrast}
+                    onCheckedChange={toggleHighContrast}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <MousePointer className="w-5 h-5 text-gray-600" />
+                    <div>
+                      <h5 className="font-medium">Reduced Motion</h5>
+                      <p className="text-sm text-gray-600">Minimize animations and transitions</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={reducedMotion}
+                    onCheckedChange={toggleReducedMotion}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-3">
+                    <Type className="w-5 h-5 text-gray-600" />
+                    <div>
+                      <h5 className="font-medium">Font Size</h5>
+                      <p className="text-sm text-gray-600">Adjust text size for better readability</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => adjustFontSize('decrease')}
+                      disabled={fontSize <= 12}
+                    >
+                      A-
+                    </Button>
+                    <span className="text-sm font-medium min-w-[60px] text-center">
+                      {fontSize}px
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => adjustFontSize('increase')}
+                      disabled={fontSize >= 24}
+                    >
+                      A+
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Navigation Settings */}
+            <div>
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <Keyboard className="w-4 h-4" />
+                Navigation Settings
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <MousePointer className="w-5 h-5 text-gray-600" />
+                    <div>
+                      <h5 className="font-medium">Skip Links</h5>
+                      <p className="text-sm text-gray-600">Enable keyboard navigation shortcuts</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={skipLinks}
+                    onCheckedChange={toggleSkipLinks}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Keyboard className="w-5 h-5 text-gray-600" />
+                    <div>
+                      <h5 className="font-medium">Enhanced Keyboard Navigation</h5>
+                      <p className="text-sm text-gray-600">Improve keyboard focus indicators</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={enhancedKeyboardNav}
+                    onCheckedChange={toggleEnhancedKeyboardNav}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Screen Reader Settings */}
+            <div>
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <Volume2 className="w-4 h-4" />
+                Screen Reader Settings
+              </h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Volume2 className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <h5 className="font-medium">Screen Reader Mode</h5>
+                    <p className="text-sm text-gray-600">Optimize interface for screen readers</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={screenReaderMode}
+                  onCheckedChange={toggleScreenReaderMode}
+                />
+              </div>
+            </div>
+            
+            {/* Accessibility Testing */}
+            <div>
+              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
+                <Accessibility className="w-4 h-4" />
+                Accessibility Testing
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button
+                  variant="outline"
+                  onClick={handleContrastAudit}
+                  disabled={isAuditing}
+                  className="h-auto p-4 flex flex-col items-start space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Contrast className="w-4 h-4" />
+                    <span className="font-medium">Color Contrast Audit</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground text-left">
+                    {isAuditing ? 'Running audit...' : 'Check color contrast compliance'}
+                  </span>
+                  {contrastResults && (
+                    <Badge variant={contrastResults.failingElements?.length > 0 ? 'destructive' : 'default'}>
+                      {contrastResults.failingElements?.length || 0} issues found
+                    </Badge>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={runScreenReaderTest}
+                  disabled={isTestingScreenReader}
+                  className="h-auto p-4 flex flex-col items-start space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Volume2 className="w-4 h-4" />
+                    <span className="font-medium">Screen Reader Test</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground text-left">
+                    {isTestingScreenReader ? 'Testing...' : 'Test screen reader compatibility'}
+                  </span>
+                  {screenReaderResults && (
+                    <Badge variant={screenReaderResults.score >= 80 ? 'default' : 'destructive'}>
+                      Score: {screenReaderResults.score}%
+                    </Badge>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={runWCAGTest}
+                  disabled={isTestingWCAG}
+                  className="h-auto p-4 flex flex-col items-start space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Accessibility className="w-4 h-4" />
+                    <span className="font-medium">WCAG 2.1 AA Test</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground text-left">
+                    {isTestingWCAG ? 'Testing...' : 'Run comprehensive accessibility test'}
+                  </span>
+                  {wcagResults && (
+                    <Badge variant={wcagResults.overall?.grade === 'A' ? 'default' : 'destructive'}>
+                      Grade: {wcagResults.overall?.grade || 'N/A'}
+                    </Badge>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={runKeyboardTest}
+                  disabled={isTestingKeyboard}
+                  className="h-auto p-4 flex flex-col items-start space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Keyboard className="w-4 h-4" />
+                    <span className="font-medium">Keyboard Navigation Test</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground text-left">
+                    {isTestingKeyboard ? 'Testing...' : 'Test keyboard accessibility'}
+                  </span>
+                  {keyboardResults && (
+                    <Badge variant={keyboardResults.score >= 80 ? 'default' : 'destructive'}>
+                      Score: {keyboardResults.score}%
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+            </div>
+            
+            {/* Reset Accessibility Settings */}
+            <div className="pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={resetAccessibilitySettings}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                Reset All Accessibility Settings
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <h2 className="text-2xl font-semibold mb-6 mt-8">
@@ -731,8 +1164,8 @@ function Settings() {
                     <Label htmlFor="businessName">Business Name</Label>
                     <Input
                       id="businessName"
-                      value={printSettings.businessName}
-                      onChange={(e) => setPrintSettings(prev => ({ ...prev, businessName: e.target.value }))}
+                      value={businessDetails.businessName}
+                      onChange={(e) => setBusinessDetails(prev => ({ ...prev, businessName: e.target.value }))}
                       placeholder="Enter business name"
                     />
                     <p className="text-sm text-muted-foreground mt-1">This will appear at the top of receipts</p>
@@ -744,8 +1177,8 @@ function Settings() {
                       id="businessAddress"
                       className="w-full p-3 border border-input rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                       rows={3}
-                      value={printSettings.businessAddress}
-                      onChange={(e) => setPrintSettings(prev => ({ ...prev, businessAddress: e.target.value }))}
+                      value={businessDetails.businessAddress}
+                      onChange={(e) => setBusinessDetails(prev => ({ ...prev, businessAddress: e.target.value }))}
                       placeholder="Enter business address"
                     />
                     <p className="text-sm text-muted-foreground mt-1">Use \n for line breaks. Include phone number and other contact details</p>
@@ -755,11 +1188,21 @@ function Settings() {
                     <Label htmlFor="gstNumber">GST Number</Label>
                     <Input
                       id="gstNumber"
-                      value={printSettings.gstNumber}
-                      onChange={(e) => setPrintSettings(prev => ({ ...prev, gstNumber: e.target.value }))}
+                      value={businessDetails.gstin}
+                      onChange={(e) => setBusinessDetails(prev => ({ ...prev, gstin: e.target.value }))}
                       placeholder="Enter GST number"
                     />
                     <p className="text-sm text-muted-foreground mt-1">Your GST registration number</p>
+                  </div>
+                  
+                  <div className="pt-4">
+                    <Button 
+                      onClick={saveBusinessDetails}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Business Information
+                    </Button>
                   </div>
                 </div>
                 
@@ -796,6 +1239,7 @@ function Settings() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="showHeaderText"
+                        size="sm"
                         checked={printSettings.showHeaderText}
                         onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showHeaderText: checked }))}
                       />
@@ -805,6 +1249,7 @@ function Settings() {
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id="showFooterText"
+                        size="sm"
                         checked={printSettings.showFooterText}
                         onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showFooterText: checked }))}
                       />
@@ -873,6 +1318,7 @@ function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="showBusinessName"
+                      size="sm"
                       checked={printSettings.showBusinessName}
                       onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showBusinessName: checked }))}
                     />
@@ -882,6 +1328,7 @@ function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="showBusinessAddress"
+                      size="sm"
                       checked={printSettings.showBusinessAddress}
                       onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showBusinessAddress: checked }))}
                     />
@@ -891,6 +1338,7 @@ function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="showGSTNumber"
+                      size="sm"
                       checked={printSettings.showGSTNumber}
                       onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showGSTNumber: checked }))}
                     />
@@ -900,6 +1348,7 @@ function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="showDateTime"
+                      size="sm"
                       checked={printSettings.showDateTime || true}
                       onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showDateTime: checked }))}
                     />
@@ -909,6 +1358,7 @@ function Settings() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="showReceiptNumber"
+                      size="sm"
                       checked={printSettings.showReceiptNumber || true}
                       onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showReceiptNumber: checked }))}
                     />
@@ -918,6 +1368,7 @@ function Settings() {
                   <div className="flex items-center space-x-2">
                      <Checkbox
                        id="showPaymentMethod"
+                       size="sm"
                        checked={printSettings.showPaymentMethod || true}
                        onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showPaymentMethod: checked }))}
                      />
@@ -929,6 +1380,7 @@ function Settings() {
                    <div className="flex items-center space-x-2">
                      <Checkbox
                        id="showCustomerInfo"
+                       size="sm"
                        checked={printSettings.showCustomerInfo || true}
                        onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showCustomerInfo: checked }))}
                      />
@@ -938,6 +1390,7 @@ function Settings() {
                    <div className="flex items-center space-x-2">
                      <Checkbox
                        id="showItemCodes"
+                       size="sm"
                        checked={printSettings.showItemCodes || false}
                        onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showItemCodes: checked }))}
                      />
@@ -947,6 +1400,7 @@ function Settings() {
                    <div className="flex items-center space-x-2">
                      <Checkbox
                        id="showTaxBreakdown"
+                       size="sm"
                        checked={printSettings.showTaxBreakdown || true}
                        onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showTaxBreakdown: checked }))}
                      />
@@ -956,6 +1410,7 @@ function Settings() {
                    <div className="flex items-center space-x-2">
                      <Checkbox
                        id="showDividers"
+                       size="sm"
                        checked={printSettings.showDividers || true}
                        onCheckedChange={(checked) => setPrintSettings(prev => ({ ...prev, showDividers: checked }))}
                      />
@@ -1133,320 +1588,6 @@ function Settings() {
                  </div>
                </div>
              </div>
-           </div>
-         </DialogContent>
-       </Dialog>
-
-       {/* Firebase Sync Management Dialog */}
-       <Dialog open={showFirebaseSync} onOpenChange={setShowFirebaseSync}>
-         <DialogContent className="max-w-2xl">
-           <DialogHeader>
-             <DialogTitle className="flex items-center gap-2">
-               <CloudSyncIcon className="h-6 w-6 text-blue-600" />
-               Firebase Sync Management
-             </DialogTitle>
-             <DialogDescription>
-               Manage Firebase database synchronization and data integrity. Use these tools to sync data between your local inventory and Firebase.
-             </DialogDescription>
-           </DialogHeader>
-           
-           <div className="space-y-6">
-             {/* Sync Controls */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <Card>
-                 <CardHeader>
-                   <CardTitle className="text-lg flex items-center gap-2">
-                     <CloudSyncIcon className="h-5 w-5 text-green-600" />
-                     Sync to Firebase
-                   </CardTitle>
-                   <CardDescription>
-                     Upload local inventory data to Firebase database
-                   </CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                   <Button 
-                     onClick={handleSyncToFirebase}
-                     disabled={syncingToFirebase}
-                     className="w-full bg-green-600 hover:bg-green-700"
-                   >
-                     {syncingToFirebase ? 'Syncing...' : 'Sync to Firebase'}
-                   </Button>
-                 </CardContent>
-               </Card>
-
-               <Card>
-                 <CardHeader>
-                   <CardTitle className="text-lg flex items-center gap-2">
-                     <CloudSyncIcon className="h-5 w-5 text-blue-600" />
-                     Sync from Firebase
-                   </CardTitle>
-                   <CardDescription>
-                     Download Firebase data to local JSON file
-                   </CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                   <Button 
-                     onClick={handleSyncToJSON}
-                     disabled={syncingToJSON}
-                     className="w-full bg-blue-600 hover:bg-blue-700"
-                   >
-                     {syncingToJSON ? 'Syncing...' : 'Sync from Firebase'}
-                   </Button>
-                 </CardContent>
-               </Card>
-             </div>
-
-             {/* Danger Zone */}
-             <Card className="border-red-200">
-               <CardHeader>
-                 <CardTitle className="text-lg text-red-600 flex items-center gap-2">
-                   <AlertTriangleIcon className="h-5 w-5" />
-                   Danger Zone
-                 </CardTitle>
-                 <CardDescription className="text-red-600">
-                   Irreversible actions that will permanently delete data
-                 </CardDescription>
-               </CardHeader>
-               <CardContent>
-                 <Button 
-                   onClick={handleResetDatabase}
-                   disabled={resettingDatabase}
-                   variant="destructive"
-                   className="w-full"
-                 >
-                   {resettingDatabase ? 'Resetting...' : 'Reset Firebase Database'}
-                 </Button>
-                 <p className="text-sm text-red-600 mt-2">
-                   ⚠️ This will delete ALL products from Firebase. This action cannot be undone.
-                 </p>
-               </CardContent>
-             </Card>
-
-             {/* Auto-sync Status */}
-             <Card className="bg-yellow-50 border-yellow-200">
-               <CardHeader>
-                 <CardTitle className="text-lg text-yellow-800">
-                   Auto-sync Status
-                 </CardTitle>
-                 <CardDescription className="text-yellow-700">
-                   Auto-sync is currently DISABLED to prevent data duplication
-                 </CardDescription>
-               </CardHeader>
-               <CardContent>
-                 <p className="text-sm text-yellow-800">
-                   Auto-sync has been temporarily disabled to prevent the data multiplication issue. 
-                   Use the manual sync options above to control when data is synchronized.
-                 </p>
-               </CardContent>
-             </Card>
-           </div>
-
-           <div className="flex justify-end">
-             <Button 
-               variant="outline" 
-               onClick={() => setShowFirebaseSync(false)}
-             >
-               Close
-             </Button>
-           </div>
-         </DialogContent>
-       </Dialog>
-
-       {/* Database Cleanup Dialog */}
-       <Dialog open={showDatabaseCleanup} onOpenChange={setShowDatabaseCleanup}>
-         <DialogContent className="w-[95vw] max-w-4xl h-[90vh] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-           <DialogHeader>
-             <DialogTitle className="flex items-center gap-2">
-               <CleaningServicesIcon className="h-6 w-6 text-red-600" />
-               Database Cleanup & CSV Import
-             </DialogTitle>
-             <DialogDescription>
-               Complete database cleanup and fresh data import from CSV file
-             </DialogDescription>
-           </DialogHeader>
-
-           <div className="space-y-6">
-             {/* Warning Section */}
-             <Alert className="border-red-200 bg-red-50">
-               <AlertTriangleIcon className="h-4 w-4 text-red-600" />
-               <AlertTitle className="text-red-800">⚠️ Critical Operation</AlertTitle>
-               <AlertDescription className="text-red-700">
-                 These operations will permanently delete all existing data. Make sure you have backups if needed.
-               </AlertDescription>
-             </Alert>
-
-             {/* Selective Cleanup */}
-             <Card className="bg-orange-50 border-orange-200">
-               <CardHeader>
-                 <CardTitle className="text-lg text-orange-800 flex items-center gap-2">
-                   <CheckCircleIcon className="h-5 w-5" />
-                   Selective Data Cleanup
-                 </CardTitle>
-                 <CardDescription className="text-orange-700">
-                   Choose which data types to clean. Only selected items will be deleted.
-                 </CardDescription>
-               </CardHeader>
-               <CardContent>
-                 <div className="space-y-3 mb-4">
-                   <Label className="text-sm font-medium text-orange-800">Select data to clean:</Label>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                     {Object.entries({
-                       products: 'Products',
-                       sales: 'Sales History',
-                       customers: 'Customers',
-                       staff: 'Staff Records',
-                       categories: 'Categories',
-                       localStorage: 'Local Storage',
-                       firebaseData: 'Firebase Data'
-                     }).map(([key, label]) => (
-                       <div key={key} className="flex items-center space-x-2">
-                         <Checkbox
-                           id={key}
-                           checked={selectiveCleanup[key]}
-                           onCheckedChange={(checked) => setSelectiveCleanup(prev => ({
-                             ...prev,
-                             [key]: checked
-                           }))}
-                         />
-                         <Label htmlFor={key} className="text-sm text-orange-700">
-                           {label}
-                         </Label>
-                       </div>
-                     ))}
-                   </div>
-                 </div>
-                 
-                 <div className="flex gap-2 mb-3">
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => setSelectiveCleanup({
-                       products: true,
-                       sales: true,
-                       customers: true,
-                       staff: true,
-                       categories: true,
-                       localStorage: true,
-                       firebaseData: true
-                     })}
-                   >
-                     Select All
-                   </Button>
-                   <Button
-                     variant="outline"
-                     size="sm"
-                     onClick={() => setSelectiveCleanup({
-                       products: false,
-                       sales: false,
-                       customers: false,
-                       staff: false,
-                       categories: false,
-                       localStorage: false,
-                       firebaseData: false
-                     })}
-                   >
-                     Select None
-                   </Button>
-                 </div>
-                 
-                 <Button 
-                   onClick={handleSelectiveCleanup}
-                   disabled={cleaningAllDatabases}
-                   className="w-full bg-orange-600 hover:bg-orange-700"
-                 >
-                   {cleaningAllDatabases ? 'Cleaning...' : 'Clean Selected Data'}
-                 </Button>
-                 <p className="text-sm text-orange-600 mt-2">
-                   🎯 Only the selected data types will be deleted from your databases.
-                 </p>
-               </CardContent>
-             </Card>
-
-             {/* Clean All Databases */}
-             <Card className="bg-red-50 border-red-200">
-               <CardHeader>
-                 <CardTitle className="text-lg text-red-800 flex items-center gap-2">
-                   <CleaningServicesIcon className="h-5 w-5" />
-                   Clean All Databases
-                 </CardTitle>
-                 <CardDescription className="text-red-700">
-                   Remove all data from Firebase and local storage
-                 </CardDescription>
-               </CardHeader>
-               <CardContent>
-                 <Button 
-                   onClick={handleCleanAllDatabases}
-                   disabled={cleaningAllDatabases}
-                   variant="destructive"
-                   className="w-full"
-                 >
-                   {cleaningAllDatabases ? 'Cleaning...' : 'Clean All Databases'}
-                 </Button>
-                 <p className="text-sm text-red-600 mt-2">
-                   ⚠️ This will delete ALL data including products, sales, customers, and staff records.
-                 </p>
-               </CardContent>
-             </Card>
-
-             {/* Import from CSV */}
-             <Card className="bg-blue-50 border-blue-200">
-               <CardHeader>
-                 <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
-                   <CloudSyncIcon className="h-5 w-5" />
-                   Import from CSV
-                 </CardTitle>
-                 <CardDescription className="text-blue-700">
-                   Clean all data and import fresh inventory from Canefrost Inventory Final.csv
-                 </CardDescription>
-               </CardHeader>
-               <CardContent>
-                 <Button 
-                   onClick={handleImportFromCSV}
-                   disabled={importingFromCSV}
-                   className="w-full"
-                 >
-                   {importingFromCSV ? 'Importing...' : 'Clean & Import from CSV'}
-                 </Button>
-                 <p className="text-sm text-blue-600 mt-2">
-                   📁 Will import from: /Users/krishnagaurav/Documents/GitHub/canefrostpos/public/Canefrost Inventory Final.csv
-                 </p>
-               </CardContent>
-             </Card>
-
-             {/* Process Information */}
-             <Card className="bg-gray-50 border-gray-200">
-               <CardHeader>
-                 <CardTitle className="text-lg text-gray-800 flex items-center gap-2">
-                   <InfoIcon className="h-5 w-5" />
-                   Process Information
-                 </CardTitle>
-               </CardHeader>
-               <CardContent>
-                 <div className="space-y-2 text-sm text-gray-700">
-                   <p><strong>CSV Import Process:</strong></p>
-                   <ul className="list-disc list-inside space-y-1 ml-4">
-                     <li>Validates CSV structure and format</li>
-                     <li>Cleans all existing data (products, sales, customers, etc.)</li>
-                     <li>Imports products from CSV with proper formatting</li>
-                     <li>Syncs data to both Firebase and local storage</li>
-                     <li>Refreshes the application to reflect changes</li>
-                   </ul>
-                   <p className="mt-3"><strong>Expected CSV Format:</strong></p>
-                   <p className="font-mono text-xs bg-gray-100 p-2 rounded">
-                     Item Name, Category, Size, MRP, Barcode, Stock Count
-                   </p>
-                 </div>
-               </CardContent>
-             </Card>
-           </div>
-
-           <div className="flex justify-end">
-             <Button 
-               variant="outline" 
-               onClick={() => setShowDatabaseCleanup(false)}
-             >
-               Close
-             </Button>
            </div>
          </DialogContent>
        </Dialog>

@@ -68,4 +68,25 @@
   }
 }
 
+/* Theme transition styles to prevent flickering */
+:root {
+  transition: 
+    background-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out;
+}
+
+* {
+  transition: 
+    background-color 0.2s ease-in-out,
+    color 0.2s ease-in-out,
+    border-color 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
+}
+
+/* Disable transitions during theme application to prevent flickering */
+.theme-changing * {
+  transition: none !important;
+}
+
 /* Custom styles */

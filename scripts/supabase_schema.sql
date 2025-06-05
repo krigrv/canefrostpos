@@ -64,7 +64,12 @@ CREATE TABLE IF NOT EXISTS sales (
   customer_id UUID REFERENCES customers(id),
   staff_id UUID REFERENCES staff(id),
   outlet_id UUID REFERENCES outlets(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  transactionId TEXT,
+  cashAmount DECIMAL(10,2) DEFAULT 0,
+  upiAmount DECIMAL(10,2) DEFAULT 0,
+  changeAmount DECIMAL(10,2) DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Access codes table
@@ -365,6 +370,60 @@ LEFT JOIN staff st ON s.staff_id = st.id
 LEFT JOIN outlets o ON s.outlet_id = o.id
 ORDER BY s.created_at DESC;
 
+-- User profiles table
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  business_details JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- User settings table
+CREATE TABLE IF NOT EXISTS user_settings (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  settings JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- Enable Row Level Security for user tables
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies for user_profiles
+CREATE POLICY "Users can view own profile" ON user_profiles 
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own profile" ON user_profiles 
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own profile" ON user_profiles 
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own profile" ON user_profiles 
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Create RLS policies for user_settings
+CREATE POLICY "Users can view own settings" ON user_settings 
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own settings" ON user_settings 
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own settings" ON user_settings 
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own settings" ON user_settings 
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Create indexes for user tables
+CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_settings_user_id ON user_settings(user_id);
+
 -- Grant necessary permissions (adjust based on your needs)
 -- These are basic permissions - customize based on your security requirements
 
@@ -380,6 +439,8 @@ COMMENT ON TABLE security_logs IS 'Security event logs';
 COMMENT ON TABLE audit_logs IS 'Data change audit logs';
 COMMENT ON TABLE backups IS 'Database backup records';
 COMMENT ON TABLE compliance_reports IS 'Compliance and regulatory reports';
+COMMENT ON TABLE user_profiles IS 'User business profile information';
+COMMENT ON TABLE user_settings IS 'User application settings and preferences';
 
 -- Success message
 SELECT 'Supabase schema setup completed successfully!' as message;

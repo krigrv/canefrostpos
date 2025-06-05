@@ -428,7 +428,7 @@ export const InventoryProvider = ({ children }) => {
       // Add unique transaction ID if not present
       const saleWithId = {
         ...saleData,
-        transactionId: saleData.transactionId || uuidv4(),
+        transactionId: saleData.transactionId || `INVCFN${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

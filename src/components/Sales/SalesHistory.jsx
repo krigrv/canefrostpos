@@ -92,14 +92,14 @@ const SalesHistory = React.memo(() => {
     loadSales()
 
     // Set up real-time subscription for sales
-    const subscription = supabaseOperations.subscriptions.sales((payload) => {
+    const unsubscribe = supabaseOperations.subscriptions.sales((payload) => {
       console.log('SalesHistory: Real-time sales update:', payload)
       loadSales() // Reload all sales on any change
     })
 
     return () => {
-      if (subscription) {
-        subscription.unsubscribe()
+      if (unsubscribe) {
+        unsubscribe()
       }
     }
   }, [])
@@ -244,12 +244,25 @@ const SalesHistory = React.memo(() => {
   const handleDeleteSale = async (sale) => {
     try {
       console.log('Deleting sale with ID:', sale.id)
+      // Optimistically update UI first
+      const updatedSales = sales.filter(s => s.id !== sale.id)
+      setSales(updatedSales)
+      
+      // Then perform the actual deletion
       await supabaseOperations.sales.delete(sale.id)
       toast.success('Sale deleted successfully!')
-      setDeleteDialogOpen(false)
     } catch (error) {
       console.error('Error deleting sale:', error)
       toast.error('Failed to delete sale')
+      // Reload data on error to restore correct state
+      const salesData = await supabaseOperations.sales.getAll()
+      const formattedSales = salesData.map(sale => ({
+        ...sale,
+        id: sale.transaction_id || sale.id,
+        timestamp: new Date(sale.created_at),
+        customerName: sale.customer_name || 'Walk-in Customer'
+      }))
+      setSales(formattedSales)
     }
   }
 
@@ -257,13 +270,27 @@ const SalesHistory = React.memo(() => {
   const handleDeleteSelected = async () => {
     try {
       console.log('Deleting selected sales:', selectedSales)
+      // Optimistically update UI first
+      const updatedSales = sales.filter(sale => !selectedSales.includes(sale.id))
+      setSales(updatedSales)
+      setSelectedSales([])
+      setDeleteAllDialogOpen(false)
+      
+      // Then perform the actual deletion
       await supabaseOperations.sales.bulkDelete(selectedSales)
       toast.success(`${selectedSales.length} sales deleted successfully`)
-      setSelectedSales([])
-      setDeleteDialogOpen(false)
     } catch (error) {
       console.error('Error deleting selected sales:', error)
       toast.error('Failed to delete selected sales')
+      // Reload data on error to restore correct state
+      const salesData = await supabaseOperations.sales.getAll()
+      const formattedSales = salesData.map(sale => ({
+        ...sale,
+        id: sale.transaction_id || sale.id,
+        timestamp: new Date(sale.created_at),
+        customerName: sale.customer_name || 'Walk-in Customer'
+      }))
+      setSales(formattedSales)
     }
   }
 
@@ -271,12 +298,26 @@ const SalesHistory = React.memo(() => {
   const handleDeleteAllSales = async () => {
     try {
       console.log('Deleting all sales')
-      await supabaseOperations.sales.deleteAll()
+      const salesCount = sales.length
+      // Optimistically update UI first
+      setSales([])
       setDeleteAllDialogOpen(false)
-      toast.success(`All ${sales.length} sales deleted successfully!`)
+      
+      // Then perform the actual deletion
+      await supabaseOperations.sales.deleteAll()
+      toast.success(`All ${salesCount} sales deleted successfully!`)
     } catch (error) {
       console.error('Error deleting all sales:', error)
       toast.error('Failed to delete all sales')
+      // Reload data on error to restore correct state
+      const salesData = await supabaseOperations.sales.getAll()
+      const formattedSales = salesData.map(sale => ({
+        ...sale,
+        id: sale.transaction_id || sale.id,
+        timestamp: new Date(sale.created_at),
+        customerName: sale.customer_name || 'Walk-in Customer'
+      }))
+      setSales(formattedSales)
     }
   }
 
@@ -443,6 +484,7 @@ const SalesHistory = React.memo(() => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Checkbox
+                  size="sm"
                   checked={selectedSales.length === filteredSales.length && filteredSales.length > 0}
                   onCheckedChange={handleSelectAll}
                   aria-label="Select all"
@@ -465,6 +507,7 @@ const SalesHistory = React.memo(() => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Checkbox
+                      size="sm"
                       checked={selectedSales.includes(sale.id)}
                       onCheckedChange={() => handleSelectSale(sale.id)}
                       aria-label={`Select sale ${sale.id}`}
@@ -559,6 +602,7 @@ const SalesHistory = React.memo(() => {
               <TableRow>
                 <TableHead className="w-12">
                   <Checkbox
+                    size="sm"
                     checked={selectedSales.length === filteredSales.length && filteredSales.length > 0}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all"
@@ -578,6 +622,7 @@ const SalesHistory = React.memo(() => {
                 <TableRow key={sale.id}>
                   <TableCell>
                     <Checkbox
+                      size="sm"
                       checked={selectedSales.includes(sale.id)}
                       onCheckedChange={() => handleSelectSale(sale.id)}
                       aria-label={`Select sale ${sale.id}`}

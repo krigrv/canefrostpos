@@ -228,10 +228,10 @@ function Reports() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header Section */}
-         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-8">
+         <div className="bg-card rounded-xl shadow-sm border border-border p-6 md:p-8">
            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
              <div>
                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Reports & Analytics</h1>
@@ -250,7 +250,7 @@ function Reports() {
          </div>
 
          {/* Date Range Selector */}
-         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+         <div className="bg-card rounded-xl shadow-sm border border-border p-6">
            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Date Range:</label>
              <div className="flex flex-wrap gap-2">
@@ -280,7 +280,7 @@ function Reports() {
 
       {/* Tab Navigation and Content */}
       <Tabs value={tabValue} onValueChange={setTabValue} className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-2">
           <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
             <TabsTrigger value="infographics" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
@@ -317,7 +317,7 @@ function Reports() {
 
         {/* Infographics Tab */}
         <TabsContent value="infographics" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
         <div className="space-y-8">
           {/* Key Metrics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -467,7 +467,7 @@ function Reports() {
 
         {/* Order Details Tab */}
         <TabsContent value="orders" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
@@ -538,7 +538,7 @@ function Reports() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b bg-gray-50">
+                          <tr className="border-b bg-muted">
                             <th className="text-left py-4 px-6 font-medium">Order ID</th>
                             <th className="text-left py-4 px-6 font-medium">Date & Time</th>
                             <th className="text-left py-4 px-6 font-medium">Customer</th>
@@ -552,7 +552,7 @@ function Reports() {
                           {filteredSales.slice(0, 20).map((sale, index) => {
                             const saleDate = sale.createdAt?.toDate ? sale.createdAt.toDate() : new Date(sale.createdAt)
                             return (
-                              <tr key={sale.id || index} className="border-b hover:bg-gray-50 transition-colors">
+                              <tr key={sale.id || index} className="border-b hover:bg-muted transition-colors">
                                 <td className="py-4 px-6">
                                   <div className="flex items-center">
                                     <ReceiptIcon className="mr-2 h-4 w-4 text-blue-600" />
@@ -626,7 +626,7 @@ function Reports() {
                   )}
                   
                   {filteredSales.length > 0 && (
-                    <div className="px-6 py-4 bg-gray-50 border-t">
+                    <div className="px-6 py-4 bg-muted border-t">
                       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                         <p className="text-sm text-gray-600">
                           Showing {Math.min(filteredSales.length, 20)} of {filteredSales.length} orders
@@ -652,7 +652,7 @@ function Reports() {
 
         {/* Trends Tab */}
         <TabsContent value="trends" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -715,7 +715,7 @@ function Reports() {
 
         {/* Peak Hours Tab */}
         <TabsContent value="peak" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -745,7 +745,7 @@ function Reports() {
                             variant={index === 0 ? 'default' : index === 1 ? 'secondary' : 'outline'}
                             className={`${
                               index === 0 ? 'bg-blue-500 text-white' :
-                              index === 1 ? 'bg-purple-500 text-white' : 'bg-gray-100'
+                              index === 1 ? 'bg-purple-500 text-white' : 'bg-muted'
                             }`}
                           >
                             {index + 1}
@@ -790,7 +790,7 @@ function Reports() {
 
         {/* Popular Items Tab */}
         <TabsContent value="popular" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -820,7 +820,7 @@ function Reports() {
                             variant={index === 0 ? 'default' : index === 1 ? 'secondary' : 'outline'}
                             className={`${
                               index === 0 ? 'bg-blue-500 text-white' :
-                              index === 1 ? 'bg-purple-500 text-white' : 'bg-gray-100'
+                              index === 1 ? 'bg-purple-500 text-white' : 'bg-muted'
                             }`}
                           >
                             {index + 1}
@@ -865,7 +865,7 @@ function Reports() {
 
         {/* GST & Audit Tab */}
         <TabsContent value="gst" className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Tax Summary Cards */}
               <Card>
@@ -982,21 +982,21 @@ function Reports() {
                     Generate GST Return
                   </button>
                   <button
-                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-muted transition-colors"
                     onClick={handleGenerateTaxReport}
                   >
                     <TaxIcon className="w-4 h-4" />
                     GST Filing Report
                   </button>
                   <button
-                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-muted transition-colors"
                     onClick={() => handleExportReport('Audit Trail')}
                   >
                     <DownloadIcon className="w-4 h-4" />
                     Audit Trail
                   </button>
                   <button
-                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors"
+                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-muted transition-colors"
                     onClick={() => handleExportReport('Financial Summary')}
                   >
                     <AssessmentIcon className="w-4 h-4" />

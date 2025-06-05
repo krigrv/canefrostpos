@@ -353,7 +353,7 @@ export const supabaseOperations = {
         const { error } = await supabase
           .from('sales')
           .delete()
-          .neq('id', 0) // Delete all records
+          .neq('id', '00000000-0000-0000-0000-000000000000') // Delete all records
         
         if (error) throw error
         return true

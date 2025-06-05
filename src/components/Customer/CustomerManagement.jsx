@@ -105,14 +105,14 @@ function CustomerManagement() {
       } else {
         const newCustomer = {
           ...formData,
-          joinDate: new Date(),
-          totalPurchases: 0,
-          visitCount: 0,
-          lastVisit: null,
-          loyaltyPoints: 0,
+          join_date: new Date(),
+          totalpurchases: 0,
+          visitcount: 0,
+          lastvisit: null,
+          loyaltypoints: 0,
           tier: 'Bronze',
-          favoriteItems: [],
-          createdAt: new Date()
+          favoriteitems: [],
+          created_at: new Date()
         }
         await addCustomer(newCustomer)
         toast.success('Customer added successfully')
@@ -226,36 +226,36 @@ function CustomerManagement() {
                    
                    <div className="space-y-2 text-sm">
                      <div>
-                       <strong>Total Purchases:</strong> ₹{customer.totalPurchases.toLocaleString()}
+                       <strong>Total Purchases:</strong> ₹{customer.totalpurchases.toLocaleString()}
                      </div>
                      
                      <div>
-                       <strong>Visits:</strong> {customer.visitCount}
+                       <strong>Visits:</strong> {customer.visitcount}
                      </div>
                      
                      <div>
-                       <strong>Loyalty Points:</strong> {customer.loyaltyPoints}
+                       <strong>Loyalty Points:</strong> {customer.loyaltypoints}
                      </div>
                      
                      <div>
-                       <strong>Last Visit:</strong> {customer.lastVisit ? format(new Date(customer.lastVisit), 'MMM dd, yyyy') : 'Never'}
+                       <strong>Last Visit:</strong> {customer.lastvisit ? format(new Date(customer.lastvisit), 'MMM dd, yyyy') : 'Never'}
                      </div>
                    </div>
                    
-                   {customer.favoriteItems.length > 0 && (
+                   {customer.favoriteitems.length > 0 && (
                      <div className="mt-4">
                        <div className="text-sm font-medium mb-2">
                          Favorite Items:
                        </div>
                        <div className="flex flex-wrap gap-1">
-                         {customer.favoriteItems.slice(0, 2).map((item, index) => (
+                         {customer.favoriteitems.slice(0, 2).map((item, index) => (
                            <Badge key={index} variant="outline" className="text-xs">
                              {item}
                            </Badge>
                          ))}
-                         {customer.favoriteItems.length > 2 && (
-                           <Badge variant="outline" className="text-xs">
-                             +{customer.favoriteItems.length - 2} more
+                         {customer.favoriteitems.length > 2 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{customer.favoriteitems.length - 2} more
                            </Badge>
                          )}
                        </div>
@@ -280,7 +280,7 @@ function CustomerManagement() {
        <TabsContent value="1">
          <h2 className="text-xl font-semibold mb-4">Purchase History</h2>
          
-         <div className="bg-white rounded-lg shadow">
+         <div className="bg-card rounded-lg shadow">
            <Table>
              <TableHeader>
                <TableRow>
@@ -362,7 +362,7 @@ function CustomerManagement() {
                   <h3 className="text-lg font-semibold mb-4">Top Customers by Points</h3>
                   <div className="space-y-3">
                     {customers
-                      .sort((a, b) => b.loyaltyPoints - a.loyaltyPoints)
+                      .sort((a, b) => b.loyaltypoints - a.loyaltypoints)
                       .slice(0, 5)
                       .map((customer) => (
                         <div key={customer.id} className="flex items-center space-x-3">
@@ -374,11 +374,11 @@ function CustomerManagement() {
                           <div className="flex-1">
                             <div className="font-medium">{customer.name}</div>
                             <div className="text-sm text-gray-600">
-                              {customer.loyaltyPoints} points • {customer.tier} tier
+                              {customer.loyaltypoints} points • {customer.tier} tier
                             </div>
                           </div>
                           <div className="text-sm text-gray-600">
-                            ₹{customer.totalPurchases.toLocaleString()}
+                            ₹{customer.totalpurchases.toLocaleString()}
                           </div>
                         </div>
                       ))

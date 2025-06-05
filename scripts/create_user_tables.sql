@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_settings ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing RLS policies if they exist
+DROP POLICY IF EXISTS "Users can view own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can delete own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can view own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can insert own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can update own settings" ON public.user_settings;
+DROP POLICY IF EXISTS "Users can delete own settings" ON public.user_settings;
+
 -- Create RLS policies for user_profiles
 CREATE POLICY "Users can view own profile" ON public.user_profiles 
   FOR SELECT USING (auth.uid() = user_id);
