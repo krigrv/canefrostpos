@@ -909,8 +909,8 @@ function Settings() {
                     </div>
                   </div>
                   <Switch
-                    checked={enhancedKeyboardNav}
-                    onCheckedChange={toggleEnhancedKeyboardNav}
+                    checked={keyboardNavigation}
+                    onCheckedChange={toggleKeyboardNavigation}
                   />
                 </div>
               </div>
