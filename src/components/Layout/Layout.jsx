@@ -28,7 +28,8 @@ import {
   TrendingUp as TrendingUpIcon,
   Palette as PaletteIcon,
   X as CloseIcon,
-  Building2 as BuildingIcon
+  Building2 as BuildingIcon,
+  Mail as MailIcon
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContextSupabase'
 import { useSync } from '../../contexts/SyncContext'
@@ -72,7 +73,11 @@ const menuItems = [
     icon: <AssessmentIcon />,
     path: '/reports'
   },
-
+  {
+    text: 'Mail',
+    icon: <MailIcon />,
+    path: '/mail'
+  },
   { 
     text: 'Profile', 
     icon: <PersonIcon />, 
