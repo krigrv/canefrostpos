@@ -10,9 +10,6 @@
     "preview": "vite preview",
     "start": "vite",
     "vercel-build": "vite build",
-
-
-
     "test": "jest"
   },
   "dependencies": {
@@ -41,12 +38,14 @@
     "@vercel/speed-insights": "^1.2.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "color-contrast-checker": "^2.1.0",
     "cors": "^2.8.5",
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "firebase": "^10.12.2",
     "framer-motion": "^12.16.0",
+    "hsn-code-package": "^1.0.2",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.263.1",
     "papaparse": "^5.4.1",
@@ -57,6 +56,7 @@
     "react-router-dom": "^6.23.1",
     "react-thermal-printer": "^0.13.0",
     "react-to-print": "^3.1.0",
+    "sonner": "^2.0.5",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^9.0.1",

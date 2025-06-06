@@ -1,12 +1,15 @@
-import React, { useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { Alert, AlertDescription } from '../ui/alert'
 import { format, subDays, startOfDay, endOfDay } from 'date-fns'
-import toast from 'react-hot-toast'
+import { toast } from 'sonner'
 import { useInventory } from '../../hooks/useInventory'
+import gstAuditService from '../../services/gstAuditService'
+import SKUHSNMapper from '../SKUHSNMapper'
 import {
   BarChart3,
   BarChart3 as AssessmentIcon,
@@ -17,13 +20,61 @@ import {
   Receipt as ReceiptIcon,
   Building2 as TaxIcon,
   Download as DownloadIcon,
-  Calendar as DateRangeIcon
+  Calendar as DateRangeIcon,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Eye,
+  RefreshCw,
+  FileText,
+  Shield,
+  Calculator
 } from 'lucide-react'
 
 function Reports() {
   const [tabValue, setTabValue] = useState('infographics')
   const [dateRange, setDateRange] = useState('7days')
+  const [gstData, setGstData] = useState({
+    hsnSacCodes: [],
+    complianceStatus: null,
+    reconciliationData: null,
+    gstrFilings: [],
+    auditTrail: [],
+    alerts: []
+  })
+  const [loading, setLoading] = useState(false)
   const { sales } = useInventory()
+  
+  // Load GST audit data
+  useEffect(() => {
+    loadGSTData()
+  }, [dateRange])
+  
+  const loadGSTData = async () => {
+    try {
+      setLoading(true)
+      const [hsnSacCodes, complianceStatus, auditTrail, alerts] = await Promise.all([
+        gstAuditService.hsnSacService.getAllCodes(),
+        gstAuditService.complianceService.checkCompliance(),
+        gstAuditService.complianceService.getAuditTrail(),
+        gstAuditService.complianceService.getComplianceAlerts()
+      ])
+      
+      setGstData({
+        hsnSacCodes,
+        complianceStatus,
+        auditTrail,
+        alerts,
+        reconciliationData: null,
+        gstrFilings: []
+      })
+    } catch (error) {
+      console.error('Error loading GST data:', error)
+      toast.error('Failed to load GST data')
+    } finally {
+      setLoading(false)
+    }
+  }
   
   // Calculate date range for filtering
   const dateRangeFilter = useMemo(() => {
@@ -180,34 +231,60 @@ function Reports() {
     }
   }, [filteredSales])
   
-  // Calculate tax data from real sales
+  // Calculate comprehensive tax data from real sales
   const taxData = useMemo(() => {
     if (!filteredSales.length) {
       return {
         totalTaxCollected: 0,
-        gstBreakdown: { cgst: 0, sgst: 0, igst: 0 },
+        gstBreakdown: { cgst: 0, sgst: 0, igst: 0, utgst: 0 },
         taxableAmount: 0,
         exemptAmount: 0,
-        monthlyTaxSummary: []
+        monthlyTaxSummary: [],
+        hsnBreakdown: {}
       }
     }
     
-    const totalTaxCollected = filteredSales.reduce((sum, sale) => sum + (sale.tax || 0), 0)
-    const taxableAmount = filteredSales.reduce((sum, sale) => sum + (sale.subtotal || 0), 0)
+    const salesWithTax = filteredSales.map(sale => {
+      const taxBreakdown = gstAuditService.calculateTax(
+        sale.total - (sale.tax || 0), // taxable amount
+        sale.tax_rate || 18, // default 18% if not specified
+        sale.customer_state || 'same', // assume same state if not specified
+        'goods' // assume goods for now
+      )
+      return { ...sale, taxBreakdown }
+    })
     
-    // Assuming CGST and SGST are half of total tax each for intra-state transactions
-    const cgst = totalTaxCollected / 2
-    const sgst = totalTaxCollected / 2
-    const igst = 0 // For inter-state transactions
+    const totalTaxable = salesWithTax.reduce((sum, sale) => sum + (sale.total - (sale.tax || 0)), 0)
+    const totalTaxCollected = salesWithTax.reduce((sum, sale) => sum + (sale.tax || 0), 0)
+    const totalCGST = salesWithTax.reduce((sum, sale) => sum + (sale.taxBreakdown?.cgst || 0), 0)
+    const totalSGST = salesWithTax.reduce((sum, sale) => sum + (sale.taxBreakdown?.sgst || 0), 0)
+    const totalIGST = salesWithTax.reduce((sum, sale) => sum + (sale.taxBreakdown?.igst || 0), 0)
+    const totalUTGST = salesWithTax.reduce((sum, sale) => sum + (sale.taxBreakdown?.utgst || 0), 0)
+    
+    // HSN-wise breakdown
+    const hsnBreakdown = salesWithTax.reduce((acc, sale) => {
+      const hsn = sale.hsn_code || 'UNCLASSIFIED'
+      if (!acc[hsn]) {
+        acc[hsn] = { taxableAmount: 0, tax: 0, cgst: 0, sgst: 0, igst: 0, utgst: 0 }
+      }
+      acc[hsn].taxableAmount += sale.total - (sale.tax || 0)
+      acc[hsn].tax += sale.tax || 0
+      acc[hsn].cgst += sale.taxBreakdown?.cgst || 0
+      acc[hsn].sgst += sale.taxBreakdown?.sgst || 0
+      acc[hsn].igst += sale.taxBreakdown?.igst || 0
+      acc[hsn].utgst += sale.taxBreakdown?.utgst || 0
+      return acc
+    }, {})
     
     return {
       totalTaxCollected,
-      gstBreakdown: { cgst, sgst, igst },
-      taxableAmount,
+      gstBreakdown: { cgst: totalCGST, sgst: totalSGST, igst: totalIGST, utgst: totalUTGST },
+      taxableAmount: totalTaxable,
       exemptAmount: 0,
-      monthlyTaxSummary: []
+      monthlyTaxSummary: [],
+      hsnBreakdown
     }
-  }, [filteredSales])
+  }, [filteredSales, gstData])
 
   const handleExportReport = (reportType) => {
     // In a real app, this would generate and download the actual report
@@ -217,6 +294,85 @@ function Reports() {
   const handleGenerateTaxReport = () => {
     // In a real app, this would generate tax compliance reports
     toast.success('Tax report generated for filing!')
+  }
+  
+  // GST Audit Functions
+  const handleGSTRGeneration = async (gstrType) => {
+    try {
+      setLoading(true)
+      const gstrData = await gstAuditService.generateGSTR(gstrType, dateRangeFilter.startDate, dateRangeFilter.endDate)
+      
+      // Create and download the GSTR file
+      const blob = new Blob([JSON.stringify(gstrData, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${gstrType}_${format(new Date(), 'yyyy-MM-dd')}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      
+      toast.success(`${gstrType} generated successfully`)
+    } catch (error) {
+      console.error('Error generating GSTR:', error)
+      toast.error(`Failed to generate ${gstrType}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleGSTRFiling = async (gstrType) => {
+    try {
+      setLoading(true)
+      const result = await gstAuditService.fileGSTR(gstrType, dateRangeFilter.startDate, dateRangeFilter.endDate)
+      
+      if (result.success) {
+        toast.success(`${gstrType} filed successfully. Reference: ${result.reference}`)
+        loadGSTData() // Refresh data
+      } else {
+        toast.error(`Filing failed: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Error filing GSTR:', error)
+      toast.error(`Failed to file ${gstrType}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleReconciliation = async () => {
+    try {
+      setLoading(true)
+      const reconciliationData = await gstAuditService.performReconciliation(
+        dateRangeFilter.startDate,
+        dateRangeFilter.endDate
+      )
+      
+      setGstData(prev => ({ ...prev, reconciliationData }))
+      toast.success('GST reconciliation completed')
+    } catch (error) {
+      console.error('Error performing reconciliation:', error)
+      toast.error('Failed to perform reconciliation')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleGenerateEWayBill = async (saleId) => {
+    try {
+      setLoading(true)
+      const eWayBill = await gstAuditService.generateEWayBill(saleId)
+      
+      if (eWayBill.success) {
+        toast.success(`E-Way Bill generated: ${eWayBill.eWayBillNumber}`)
+      } else {
+        toast.error(`E-Way Bill generation failed: ${eWayBill.error}`)
+      }
+    } catch (error) {
+      console.error('Error generating E-Way Bill:', error)
+      toast.error('Failed to generate E-Way Bill')
+    } finally {
+      setLoading(false)
+    }
   }
 
 
@@ -865,154 +1021,351 @@ function Reports() {
 
         {/* GST & Audit Tab */}
         <TabsContent value="gst" className="space-y-6">
-          <div className="bg-card rounded-xl shadow-sm border border-border p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Tax Summary Cards */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Total GST Collected</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">
-                    ₹{taxData.totalTaxCollected.toLocaleString()}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    This month
-                  </p>
-                </CardContent>
-              </Card>
+          {/* GST Sub-tabs */}
+          <Tabs defaultValue="overview" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="hsn-mapping">HSN Mapping</TabsTrigger>
+              <TabsTrigger value="filing">Filing</TabsTrigger>
+              <TabsTrigger value="audit">Audit</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="space-y-6">
+              {/* Compliance Alerts */}
+              {gstData.alerts.length > 0 && (
+                <div className="space-y-2">
+                  {gstData.alerts.map((alert, index) => (
+                    <Alert key={index} className={alert.severity === 'high' ? 'border-red-500' : alert.severity === 'medium' ? 'border-yellow-500' : 'border-blue-500'}>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>{alert.title}:</strong> {alert.message}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              )}
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Taxable Amount</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">
-                ₹{taxData.taxableAmount.toLocaleString()}
-              </div>
-              <p className="text-sm text-gray-600 mt-1">
-                Before GST
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>GST Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-yellow-600">
-                12%
-              </div>
-              <p className="text-sm text-gray-600 mt-1">
-                GST applicable
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* GST Breakdown */}
-          <div className="md:col-span-2">
+          {/* GST Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>GST Breakdown</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total GST Collected</CardTitle>
+                <TaxIcon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="font-medium">CGST (6%)</span>
-                    <span className="text-gray-600">₹{taxData.gstBreakdown.cgst.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 border-b">
-                    <span className="font-medium">SGST (6%)</span>
-                    <span className="text-gray-600">₹{taxData.gstBreakdown.sgst.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="font-medium">IGST (0%)</span>
-                    <span className="text-gray-600">₹{taxData.gstBreakdown.igst.toLocaleString()}</span>
-                  </div>
+                <div className="text-2xl font-bold">₹{taxData.totalTaxCollected.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">
+                  From {filteredSales.length} transactions
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxable Amount</CardTitle>
+                <ReceiptIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">₹{taxData.taxableAmount.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Before tax calculation
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Compliance Score</CardTitle>
+                <Shield className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold flex items-center gap-2">
+                  {gstData.complianceStatus?.score || 85}%
+                  {(gstData.complianceStatus?.score || 85) >= 90 ? 
+                    <CheckCircle className="h-5 w-5 text-green-500" /> : 
+                    (gstData.complianceStatus?.score || 85) >= 70 ? 
+                    <AlertTriangle className="h-5 w-5 text-yellow-500" /> : 
+                    <XCircle className="h-5 w-5 text-red-500" />
+                  }
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {gstData.complianceStatus?.status || 'Good'} compliance status
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">HSN Codes</CardTitle>
+                <Calculator className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{gstData.hsnSacCodes.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  Active HSN/SAC codes
+                </p>
               </CardContent>
             </Card>
           </div>
-
-          {/* Monthly Tax Summary */}
-          <div className="md:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly GST Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2">Month</th>
-                        <th className="text-right py-2">Sales</th>
-                        <th className="text-right py-2">GST</th>
+          
+          {/* Enhanced GST Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle>GST Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-lg font-semibold text-blue-600">CGST</div>
+                  <div className="text-2xl font-bold">₹{taxData.gstBreakdown.cgst.toFixed(2)}</div>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-lg font-semibold text-green-600">SGST</div>
+                  <div className="text-2xl font-bold">₹{taxData.gstBreakdown.sgst.toFixed(2)}</div>
+                </div>
+                <div className="text-center p-4 bg-purple-50 rounded-lg">
+                  <div className="text-lg font-semibold text-purple-600">IGST</div>
+                  <div className="text-2xl font-bold">₹{taxData.gstBreakdown.igst.toFixed(2)}</div>
+                </div>
+                <div className="text-center p-4 bg-orange-50 rounded-lg">
+                  <div className="text-lg font-semibold text-orange-600">UTGST</div>
+                  <div className="text-2xl font-bold">₹{taxData.gstBreakdown.utgst.toFixed(2)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* HSN-wise Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle>HSN/SAC Code-wise Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">HSN/SAC Code</th>
+                      <th className="text-right p-2">Taxable Amount</th>
+                      <th className="text-right p-2">CGST</th>
+                      <th className="text-right p-2">SGST</th>
+                      <th className="text-right p-2">IGST</th>
+                      <th className="text-right p-2">Total Tax</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(taxData.hsnBreakdown).map(([hsn, data]) => (
+                      <tr key={hsn} className="border-b">
+                        <td className="p-2 font-medium">{hsn}</td>
+                        <td className="text-right p-2">₹{data.taxableAmount.toFixed(2)}</td>
+                        <td className="text-right p-2">₹{data.cgst.toFixed(2)}</td>
+                        <td className="text-right p-2">₹{data.sgst.toFixed(2)}</td>
+                        <td className="text-right p-2">₹{data.igst.toFixed(2)}</td>
+                        <td className="text-right p-2 font-semibold">₹{data.tax.toFixed(2)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {taxData.monthlyTaxSummary.map((month) => (
-                        <tr key={month.month} className="border-b">
-                          <td className="py-2">{month.month}</td>
-                          <td className="text-right py-2">₹{month.sales.toLocaleString()}</td>
-                          <td className="text-right py-2">₹{month.tax.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Tax Compliance Actions */}
-          <div className="col-span-full">
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* GSTR Filing & Compliance Tools */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>GST Compliance & Audit Tools</CardTitle>
+                <CardTitle>GSTR Filing</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <button
-                    className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                    onClick={() => handleExportReport('GST Return')}
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button 
+                    onClick={() => handleGSTRGeneration('GSTR-1')}
+                    className="flex items-center gap-2"
+                    disabled={loading}
                   >
-                    <ReceiptIcon className="w-4 h-4" />
-                    Generate GST Return
-                  </button>
-                  <button
-                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-muted transition-colors"
-                    onClick={handleGenerateTaxReport}
+                    <DownloadIcon className="h-4 w-4" />
+                    Generate GSTR-1
+                  </Button>
+                  <Button 
+                    onClick={() => handleGSTRGeneration('GSTR-3B')}
+                    className="flex items-center gap-2"
+                    disabled={loading}
                   >
-                    <TaxIcon className="w-4 h-4" />
-                    GST Filing Report
-                  </button>
-                  <button
-                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-muted transition-colors"
-                    onClick={() => handleExportReport('Audit Trail')}
+                    <DownloadIcon className="h-4 w-4" />
+                    Generate GSTR-3B
+                  </Button>
+                  <Button 
+                    onClick={() => handleGSTRFiling('GSTR-1')}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    disabled={loading}
                   >
-                    <DownloadIcon className="w-4 h-4" />
-                    Audit Trail
-                  </button>
-                  <button
-                    className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-muted transition-colors"
-                    onClick={() => handleExportReport('Financial Summary')}
+                    <FileText className="h-4 w-4" />
+                    File GSTR-1
+                  </Button>
+                  <Button 
+                    onClick={() => handleGSTRFiling('GSTR-3B')}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    disabled={loading}
                   >
-                    <AssessmentIcon className="w-4 h-4" />
-                    Financial Summary
-                  </button>
+                    <FileText className="h-4 w-4" />
+                    File GSTR-3B
+                  </Button>
                 </div>
                 
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <strong className="text-blue-800">Compliance Status:</strong>
-                  <span className="text-blue-700 ml-2">All GST records are up to date. Next GST filing due: 20th January 2025</span>
+                {/* Filing Status */}
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium mb-2">Recent Filings</h4>
+                  {gstData.gstrFilings.length > 0 ? (
+                    <div className="space-y-2">
+                      {gstData.gstrFilings.slice(0, 3).map((filing, index) => (
+                        <div key={index} className="flex justify-between items-center text-sm">
+                          <span>{filing.type} - {format(new Date(filing.period), 'MMM yyyy')}</span>
+                          <Badge variant={filing.status === 'filed' ? 'default' : 'secondary'}>
+                            {filing.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No recent filings</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Audit & Reconciliation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <Button 
+                    onClick={handleReconciliation}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                    disabled={loading}
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Perform Reconciliation
+                  </Button>
+                  <Button 
+                    onClick={() => toast.success('Audit trail exported!')}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View Audit Trail
+                  </Button>
+                  <Button 
+                    onClick={() => toast.success('Compliance report generated!')}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Shield className="h-4 w-4" />
+                    Compliance Report
+                  </Button>
+                </div>
+                
+                {/* Reconciliation Status */}
+                {gstData.reconciliationData && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium mb-2">Last Reconciliation</h4>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>Matched Transactions:</span>
+                        <span className="font-medium">{gstData.reconciliationData.matched}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Discrepancies:</span>
+                        <span className="font-medium text-red-600">{gstData.reconciliationData.discrepancies}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Accuracy:</span>
+                        <span className="font-medium">{gstData.reconciliationData.accuracy}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </div>
-        </div>
+          
+              {/* Monthly GST Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Monthly GST Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2">Month</th>
+                          <th className="text-right p-2">Sales</th>
+                          <th className="text-right p-2">Taxable Amount</th>
+                          <th className="text-right p-2">CGST</th>
+                          <th className="text-right p-2">SGST</th>
+                          <th className="text-right p-2">IGST</th>
+                          <th className="text-right p-2">Total GST</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="p-2">Current Period</td>
+                          <td className="text-right p-2">₹{salesData.totalSales.toFixed(2)}</td>
+                          <td className="text-right p-2">₹{taxData.taxableAmount.toFixed(2)}</td>
+                          <td className="text-right p-2">₹{taxData.gstBreakdown.cgst.toFixed(2)}</td>
+                          <td className="text-right p-2">₹{taxData.gstBreakdown.sgst.toFixed(2)}</td>
+                          <td className="text-right p-2">₹{taxData.gstBreakdown.igst.toFixed(2)}</td>
+                          <td className="text-right p-2 font-semibold">₹{taxData.totalTaxCollected.toFixed(2)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="hsn-mapping">
+              <SKUHSNMapper />
+            </TabsContent>
+            
+            <TabsContent value="filing" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>GST Return Filing</CardTitle>
+                  <CardDescription>
+                    File your GST returns and manage compliance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500">GST Filing functionality will be available here</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="audit" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>GST Audit Trail</CardTitle>
+                  <CardDescription>
+                    View audit logs and compliance history
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Shield className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500">Audit trail functionality will be available here</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
       </div>

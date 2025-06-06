@@ -63,10 +63,23 @@ const SalesHistory = React.memo(() => {
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   
-  // Device detection
+  // Device detection and responsive layout
   const deviceInfo = useAdvancedDeviceDetection()
   const { isMobile, isTablet, orientation } = deviceInfo
-  const showMobileLayout = isMobile || (isTablet && orientation === 'portrait')
+  const [showMobileLayout, setShowMobileLayout] = useState(false)
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      // Use window width for more reliable responsive behavior
+      const isMobileScreen = window.innerWidth < 1024
+      const isDeviceMobile = isMobile || (isTablet && orientation === 'portrait')
+      setShowMobileLayout(isMobileScreen || isDeviceMobile)
+    }
+
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [isMobile, isTablet, orientation])
 
   // Load sales data from Supabase
   useEffect(() => {
@@ -163,9 +176,15 @@ const SalesHistory = React.memo(() => {
 
   const handleSaveEdit = async () => {
     try {
-      const { id, ...updateData } = editedSale
+      const { id, customerName, ...updateData } = editedSale
       
-      await supabaseOperations.sales.update(id, updateData)
+      // Remove customerName as it's not a column in sales table (it's in customers table)
+      // Only update fields that exist in the sales table
+      const dbUpdateData = {
+        ...updateData
+      }
+      
+      await supabaseOperations.sales.update(id, dbUpdateData)
       
       setSelectedSale(editedSale)
       setIsEditing(false)
@@ -512,7 +531,7 @@ const SalesHistory = React.memo(() => {
                       onCheckedChange={() => handleSelectSale(sale.id)}
                       aria-label={`Select sale ${sale.id}`}
                     />
-                    <span className="font-bold text-lg">{sale.id}</span>
+                    <span className="font-bold text-lg">#{sale.transactionId || sale.id}</span>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -561,10 +580,10 @@ const SalesHistory = React.memo(() => {
                 </div>
                 
                 {/* Customer & Items Row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-sm text-gray-600">Customer</p>
-                    <p className="font-medium">{sale.customerName}</p>
+                    <p className="font-medium truncate">{sale.customerName}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Items</p>
@@ -575,7 +594,7 @@ const SalesHistory = React.memo(() => {
                 </div>
                 
                 {/* Payment & Total Row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <p className="text-sm text-gray-600">Payment</p>
                     <Badge 
@@ -597,7 +616,8 @@ const SalesHistory = React.memo(() => {
       ) : (
         /* Desktop Table Layout */
         <Card>
-          <Table>
+          <div className="overflow-x-auto">
+            <Table className="min-w-full">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">
@@ -630,7 +650,7 @@ const SalesHistory = React.memo(() => {
                   </TableCell>
                   <TableCell>
                     <span className="font-bold text-sm">
-                      {sale.id}
+                      #{sale.transactionId || sale.id}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -703,65 +723,47 @@ const SalesHistory = React.memo(() => {
               ))}
             </TableBody>
           </Table>
+          </div>
         </Card>
       )}
 
       {/* Sale Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
-              <div className="flex items-center">
-                <ReceiptIcon className="h-5 w-5 mr-2" />
-                Order Details - {selectedSale?.id}
-              </div>
+              <span>Order #{selectedSale?.transactionId || selectedSale?.id}</span>
               {!isEditing && (
                 <Button variant="ghost" size="sm" onClick={handleEditOrder}>
                   <EditIcon className="h-4 w-4" />
                 </Button>
               )}
             </DialogTitle>
-            <DialogDescription>
-              View and edit order details, customer information, and payment details.
-            </DialogDescription>
           </DialogHeader>
           {selectedSale && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Date & Time</p>
-                  <p className="font-medium">
-                    {format(new Date(selectedSale.timestamp), 'MMMM dd, yyyy HH:mm:ss')}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Customer</p>
-                  {isEditing ? (
-                    <Input
-                      value={editedSale?.customerName || ''}
-                      onChange={(e) => handleEditChange('customerName', e.target.value)}
-                      className="mt-1"
-                    />
-                  ) : (
-                    <p className="font-medium">{selectedSale.customerName}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Payment Method</p>
-                  <Badge 
-                    variant={selectedSale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
-                    className={selectedSale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
-                  >
-                    {selectedSale.paymentMethod}
-                  </Badge>
-                </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-600">{format(new Date(selectedSale.timestamp), 'MMM dd, yyyy HH:mm')}</span>
+                <Badge 
+                  variant={selectedSale.paymentMethod === 'Cash' ? 'default' : 'secondary'}
+                  className={selectedSale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}
+                >
+                  {selectedSale.paymentMethod}
+                </Badge>
               </div>
+              
+              {selectedSale.customerName && (
+                <div className="text-sm">
+                  <span className="text-gray-600">Customer: </span>
+                  <span className="font-medium">{selectedSale.customerName}</span>
+                </div>
+              )}
 
               <div>
-                <h3 className="text-lg font-semibold mb-4">Items Ordered</h3>
-                <div className="space-y-3">
+                <h3 className="text-sm font-medium mb-2">Items</h3>
+                <div className="text-sm">
                   {(isEditing ? editedSale?.items : selectedSale.items)?.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div key={index} className="flex items-center justify-between py-2">
                       {isEditing ? (
                         <div className="flex items-center gap-2 w-full">
                           <Input
@@ -769,41 +771,40 @@ const SalesHistory = React.memo(() => {
                             value={item.name}
                             onChange={(e) => handleItemChange(index, 'name', e.target.value)}
                             className="flex-1"
+                            size="sm"
                           />
                           <Input
-                            placeholder="Quantity"
+                            placeholder="Qty"
                             type="number"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                            className="w-20"
+                            className="w-16"
+                            size="sm"
                           />
                           <Input
                             placeholder="Price"
                             type="number"
                             value={item.price}
                             onChange={(e) => handleItemChange(index, 'price', e.target.value)}
-                            className="w-24"
+                            className="w-20"
+                            size="sm"
                           />
-                          <span className="font-semibold text-sm min-w-[80px]">
-                            ₹{(item.quantity * item.price).toFixed(2)}
-                          </span>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveItem(index)}
+                            className="h-7 w-7 p-0"
                           >
-                            <DeleteIcon className="w-4 h-4 text-red-500" />
+                            <DeleteIcon className="w-3 h-3 text-red-500" />
                           </Button>
                         </div>
                       ) : (
                         <>
-                          <div>
-                            <p className="font-medium">{item.name}</p>
-                            <p className="text-sm text-gray-600">Quantity: {item.quantity} × ₹{item.price}</p>
+                          <div className="flex-1">
+                            <span>{item.name}</span>
+                            <span className="text-gray-500 ml-1">×{item.quantity}</span>
                           </div>
-                          <span className="font-bold text-sm">
-                            ₹{(item.quantity * item.price).toFixed(2)}
-                          </span>
+                          <span>₹{(item.quantity * item.price).toFixed(2)}</span>
                         </>
                       )}
                     </div>
@@ -811,42 +812,30 @@ const SalesHistory = React.memo(() => {
                 </div>
               </div>
 
-              <Separator className="my-4" />
-
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>₹{(isEditing ? editedSale?.subtotal : selectedSale.subtotal)?.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>GST:</span>
-                  <span>₹{(isEditing ? editedSale?.tax : selectedSale.tax)?.toFixed(2)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-semibold text-lg">
+              <div className="border-t pt-3 mt-3">
+                <div className="flex justify-between font-semibold">
                   <span>Total:</span>
-                  <span className="text-primary">₹{(isEditing ? editedSale?.total : selectedSale.total)?.toFixed(2)}</span>
+                  <span>₹{(isEditing ? editedSale?.total : selectedSale.total)?.toFixed(2)}</span>
                 </div>
               </div>
             </div>
           )}
           {isEditing ? (
-            <div className="flex gap-2 mt-6">
-              <Button variant="outline" onClick={handleCancelEdit}>
-                <CancelIcon className="w-4 h-4 mr-2" />
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                 Cancel
               </Button>
               <Button
+                size="sm"
                 onClick={handleSaveEdit}
                 disabled={!editedSale}
               >
-                <SaveIcon className="w-4 h-4 mr-2" />
-                Save Changes
+                Save
               </Button>
             </div>
           ) : (
-            <div className="mt-6">
-              <Button onClick={handleCloseDetails}>Close</Button>
+            <div className="mt-4">
+              <Button size="sm" onClick={handleCloseDetails}>Close</Button>
             </div>
           )}
         </DialogContent>

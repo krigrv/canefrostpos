@@ -32,10 +32,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContextSupabase'
 import { useSync } from '../../contexts/SyncContext'
-import { useAccessibility } from '../../contexts/AccessibilityContext'
 import { useSettings } from '../../contexts/SettingsContext'
-import SkipNavigation from '../SkipNavigation/SkipNavigation'
-import AccessibilitySettings from '../AccessibilitySettings/AccessibilitySettings'
 
 import { supabase } from '../../supabase/config'
 import toast from 'react-hot-toast'
@@ -104,7 +101,7 @@ const Layout = React.memo(({ children }) => {
   const location = useLocation()
   const { currentUser, logout } = useAuth()
   const { isOnline, syncStatus, lastSyncTime, forceSyncAll } = useSync()
-  const { announceToScreenReader } = useAccessibility()
+
   const { settings } = useSettings()
 
   const currentDrawerWidth = sidebarCollapsed ? collapsedDrawerWidth : drawerWidth
@@ -435,7 +432,6 @@ const Layout = React.memo(({ children }) => {
 
   return (
     <div className="flex">
-      <SkipNavigation />
       {/* Header */}
       <header 
         role="banner" 
@@ -472,9 +468,7 @@ const Layout = React.memo(({ children }) => {
               }`}
               onClick={async () => {
                 if (isOnline && syncStatus !== 'syncing') {
-                  announceToScreenReader('Starting data synchronization')
                   await forceSyncAll()
-                  announceToScreenReader('Data synchronization completed')
                 }
               }}
               disabled={!isOnline || syncStatus === 'syncing'}
@@ -544,7 +538,6 @@ const Layout = React.memo(({ children }) => {
           {children}
         </div>
       </main>
-      <AccessibilitySettings />
     </div>
   )
 })

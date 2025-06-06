@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useSettings } from '../../contexts/SettingsContext'
 import { useInventory } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContextSupabase'
-import { useAccessibility } from '../../contexts/AccessibilityContext'
-import { auditPageContrast, generateScreenReaderReport, generateAccessibilityReport, testKeyboardNavigation } from '../../utils/accessibility'
+
 import { supabase } from '../../supabase/config'
 
 
@@ -52,29 +51,14 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import LogAnalyzerPanel from '../DevTools/LogAnalyzerPanel'
 import DebugProducts from '../DebugProducts'
+import { contrastChecker, validateTheme, shuffleAccessibleColors } from '../../utils/enhancedContrastChecker'
+import { auditPageContrast } from '../../utils/contrastTesting'
 
 function Settings() {
   const { settings: contextSettings, saveSettings, shuffleThemeColors } = useSettings()
   const { cleanupDuplicates } = useInventory()
   const { currentUser } = useAuth()
-  const {
-    highContrastMode,
-    reducedMotion,
-    fontSize,
-    skipLinks,
-    screenReaderMode,
-    keyboardNavigation,
-    contrastAuditResults,
-    toggleHighContrast,
-    toggleReducedMotion,
-    setFontSize,
-    toggleSkipLinks,
-    toggleScreenReaderMode,
-    toggleKeyboardNavigation,
-    runContrastAudit,
-    announceToScreenReader,
-    resetAccessibilitySettings
-  } = useAccessibility()
+
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(0)
   const [settings, setSettings] = useState({
@@ -99,15 +83,12 @@ function Settings() {
   const [cleaningDuplicates, setCleaningDuplicates] = useState(false)
   const [showDevTools, setShowDevTools] = useState(false)
   
-  // Accessibility testing states
-  const [contrastResults, setContrastResults] = useState(null)
+  // Accessibility state
   const [isAuditing, setIsAuditing] = useState(false)
-  const [screenReaderResults, setScreenReaderResults] = useState(null)
-  const [isTestingScreenReader, setIsTestingScreenReader] = useState(false)
-  const [wcagResults, setWcagResults] = useState(null)
-  const [isTestingWCAG, setIsTestingWCAG] = useState(false)
-  const [keyboardResults, setKeyboardResults] = useState(null)
-  const [isTestingKeyboard, setIsTestingKeyboard] = useState(false)
+  const [contrastResults, setContrastResults] = useState(null)
+  const [contrastAuditResults, setContrastAuditResults] = useState(null)
+  
+
 
 
   const [printSettings, setPrintSettings] = useState({
@@ -232,26 +213,14 @@ function Settings() {
         .from('user_profiles')
         .upsert({
           user_id: currentUser.id,
-          business_details: businessDetails
+          business_details: businessDetails,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
         })
       
       if (error) {
-        // Handle specific constraint violation error
-        if (error.code === '23505' && error.message.includes('user_profiles_user_id_key')) {
-          console.log('Profile already exists, attempting update...')
-          // Try updating instead
-          const { error: updateError } = await supabase
-            .from('user_profiles')
-            .update({
-              business_details: businessDetails,
-              updated_at: new Date().toISOString()
-            })
-            .eq('user_id', currentUser.id)
-          
-          if (updateError) throw updateError
-        } else {
-          throw error
-        }
+        throw error
       }
       
       // Update context settings with business information
@@ -277,71 +246,110 @@ function Settings() {
     }
   }
   
-  // Accessibility testing functions
+  // Accessibility helper functions
+  const announceToScreenReader = (message) => {
+    const announcement = document.createElement('div')
+    announcement.setAttribute('aria-live', 'polite')
+    announcement.setAttribute('aria-atomic', 'true')
+    announcement.style.position = 'absolute'
+    announcement.style.left = '-10000px'
+    announcement.style.width = '1px'
+    announcement.style.height = '1px'
+    announcement.style.overflow = 'hidden'
+    announcement.textContent = message
+    document.body.appendChild(announcement)
+    setTimeout(() => document.body.removeChild(announcement), 1000)
+  }
+
+  const runContrastAudit = async () => {
+    const results = await auditPageContrast()
+    setContrastAuditResults(results)
+    return results
+  }
+
+  // Enhanced accessibility testing functions
   const handleContrastAudit = async () => {
     setIsAuditing(true)
     announceToScreenReader('Running color contrast audit...')
     
     try {
-      await runContrastAudit()
-      // Get results from context after audit
-      setContrastResults(contrastAuditResults)
-      announceToScreenReader(`Contrast audit complete. Found ${contrastAuditResults?.failingElements?.length || 0} issues.`)
+      const auditResults = await runContrastAudit()
+      
+      // Also validate current theme
+      const themeValidation = validateTheme(contextSettings.theme || 'canefrost', contextSettings.themeColors)
+      
+      const combinedResults = {
+        ...auditResults,
+        themeValidation,
+        timestamp: new Date().toISOString()
+      }
+      
+      setContrastResults(combinedResults)
+      setContrastAuditResults(combinedResults)
+      
+      const issueCount = (auditResults?.failingElements?.length || 0) + (themeValidation?.criticalIssues?.length || 0)
+      announceToScreenReader(`Contrast audit complete. Found ${issueCount} issues.`)
+      
+      if (themeValidation?.criticalIssues?.length > 0) {
+        toast.warning(`⚠️ Found ${themeValidation.criticalIssues.length} critical theme contrast issues`)
+      }
     } catch (error) {
       console.error('Contrast audit failed:', error)
       announceToScreenReader('Contrast audit failed. Please try again.')
+      toast.error('❌ Contrast audit failed. Please try again.')
     } finally {
       setIsAuditing(false)
     }
   }
 
-  const runScreenReaderTest = async () => {
-    setIsTestingScreenReader(true)
-    announceToScreenReader('Running screen reader compatibility test...')
-    
+  // New accessibility functions
+  const handleAccessibleShuffle = async () => {
     try {
-      const results = generateScreenReaderReport()
-      setScreenReaderResults(results)
-      announceToScreenReader(`Screen reader test complete. Accessibility score: ${results.score}%. Found ${results.summary.totalIssues} issues.`)
+      const currentTheme = contextSettings.theme || 'canefrost'
+      const currentColors = contextSettings.themeColors
+      
+      if (currentTheme === 'canefrost' && currentColors) {
+        const accessibleColors = shuffleAccessibleColors(currentColors)
+        await saveSettings({ themeColors: accessibleColors })
+        toast.success('🎨 Theme colors shuffled with accessibility compliance!')
+        announceToScreenReader('Theme colors have been shuffled while maintaining accessibility standards.')
+      } else {
+        toast('ℹ️ Accessible shuffle is only available for CaneFrost theme')
+      }
     } catch (error) {
-      console.error('Screen reader test failed:', error)
-      announceToScreenReader('Screen reader test failed. Please try again.')
-    } finally {
-      setIsTestingScreenReader(false)
+      console.error('Error shuffling accessible colors:', error)
+      toast.error('❌ Failed to shuffle colors. Please try again.')
     }
   }
 
-  const runWCAGTest = async () => {
-    setIsTestingWCAG(true)
-    announceToScreenReader('Running comprehensive WCAG 2.1 AA compliance test...')
-    
+  const handleThemeValidation = async () => {
     try {
-      const results = generateAccessibilityReport()
-      setWcagResults(results)
-      announceToScreenReader(`WCAG test complete. Overall score: ${results.overall.score}%. Grade: ${results.overall.grade}.`)
+      const currentTheme = contextSettings.theme || 'canefrost'
+      const currentColors = contextSettings.themeColors
+      
+      const validation = validateTheme(currentTheme, currentColors)
+      
+      if (validation.isAccessible) {
+        toast.success('✅ Current theme meets accessibility standards!')
+        announceToScreenReader('Current theme passes all accessibility checks.')
+      } else {
+        const issueCount = validation.criticalIssues?.length || 0
+        toast.error(`⚠️ Found ${issueCount} accessibility issues in current theme`)
+        announceToScreenReader(`Current theme has ${issueCount} accessibility issues that need attention.`)
+      }
+      
+      setContrastResults({ themeValidation: validation, timestamp: new Date().toISOString() })
     } catch (error) {
-      console.error('WCAG test failed:', error)
-      announceToScreenReader('WCAG test failed. Please try again.')
-    } finally {
-      setIsTestingWCAG(false)
+      console.error('Error validating theme:', error)
+      toast.error('❌ Failed to validate theme. Please try again.')
     }
   }
 
-  const runKeyboardTest = async () => {
-    setIsTestingKeyboard(true)
-    announceToScreenReader('Running keyboard accessibility test...')
-    
-    try {
-      const results = testKeyboardNavigation()
-      setKeyboardResults(results)
-      announceToScreenReader(`Keyboard test complete. Score: ${results.score}%. Found ${results.issues.length} issues.`)
-    } catch (error) {
-      console.error('Keyboard test failed:', error)
-      announceToScreenReader('Keyboard test failed. Please try again.')
-    } finally {
-      setIsTestingKeyboard(false)
-    }
-  }
+
+
+
+
+
   
   const getContrastBadgeVariant = (ratio) => {
     if (ratio >= 7) return 'default' // AAA
@@ -619,21 +627,49 @@ function Settings() {
                   <h4 className="font-semibold">CaneFrost Theme</h4>
                   <div className="flex items-center gap-2">
                     {contextSettings.customTheme === 'canefrost' && (
-                      <Button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          shuffleThemeColors();
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-1 text-xs px-2 py-1 h-7 hover:bg-green-100 hover:border-green-400 focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-                        aria-label="Shuffle theme colors for better accessibility"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Shuffle
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            shuffleThemeColors();
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1 text-xs px-2 py-1 h-7 hover:bg-green-100 hover:border-green-400 focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                          aria-label="Shuffle theme colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Shuffle
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAccessibleShuffle();
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1 text-xs px-2 py-1 h-7 hover:bg-blue-100 hover:border-blue-400 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                          aria-label="Shuffle theme colors with accessibility compliance"
+                        >
+                          <Accessibility className="w-3 h-3" />
+                          A11y Shuffle
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleThemeValidation();
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-1 text-xs px-2 py-1 h-7 hover:bg-purple-100 hover:border-purple-400 focus:ring-2 focus:ring-purple-500 focus:ring-offset-1"
+                          aria-label="Validate theme accessibility"
+                        >
+                          <Contrast className="w-3 h-3" />
+                          Validate
+                        </Button>
+                      </div>
                     )}
                     {contextSettings.customTheme === 'canefrost' && (
                       <CheckCircleIcon className="w-5 h-5 text-green-600" />
@@ -812,251 +848,7 @@ function Settings() {
         </>
       )}
 
-      {/* Accessibility Settings */}
-      <h2 className="text-2xl font-semibold mb-6 mt-8">
-        Accessibility Settings
-      </h2>
-      
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Accessibility className="w-5 h-5" />
-            Accessibility Features
-          </CardTitle>
-          <CardDescription>
-            Configure accessibility options and run compliance tests
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-8">
-            {/* Visual Settings */}
-            <div>
-              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
-                <Eye className="w-4 h-4" />
-                Visual Settings
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Contrast className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <h5 className="font-medium">High Contrast</h5>
-                      <p className="text-sm text-gray-600">Enhance visual contrast for better readability</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={highContrastMode}
-                    onCheckedChange={toggleHighContrast}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <MousePointer className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <h5 className="font-medium">Reduced Motion</h5>
-                      <p className="text-sm text-gray-600">Minimize animations and transitions</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={reducedMotion}
-                    onCheckedChange={toggleReducedMotion}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-3">
-                    <Type className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <h5 className="font-medium">Font Size</h5>
-                      <p className="text-sm text-gray-600">Adjust text size for better readability</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => adjustFontSize('decrease')}
-                      disabled={fontSize <= 12}
-                    >
-                      A-
-                    </Button>
-                    <span className="text-sm font-medium min-w-[60px] text-center">
-                      {fontSize}px
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => adjustFontSize('increase')}
-                      disabled={fontSize >= 24}
-                    >
-                      A+
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Navigation Settings */}
-            <div>
-              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
-                <Keyboard className="w-4 h-4" />
-                Navigation Settings
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <MousePointer className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <h5 className="font-medium">Skip Links</h5>
-                      <p className="text-sm text-gray-600">Enable keyboard navigation shortcuts</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={skipLinks}
-                    onCheckedChange={toggleSkipLinks}
-                  />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Keyboard className="w-5 h-5 text-gray-600" />
-                    <div>
-                      <h5 className="font-medium">Enhanced Keyboard Navigation</h5>
-                      <p className="text-sm text-gray-600">Improve keyboard focus indicators</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={keyboardNavigation}
-                    onCheckedChange={toggleKeyboardNavigation}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Screen Reader Settings */}
-            <div>
-              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
-                <Volume2 className="w-4 h-4" />
-                Screen Reader Settings
-              </h4>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Volume2 className="w-5 h-5 text-gray-600" />
-                  <div>
-                    <h5 className="font-medium">Screen Reader Mode</h5>
-                    <p className="text-sm text-gray-600">Optimize interface for screen readers</p>
-                  </div>
-                </div>
-                <Switch
-                  checked={screenReaderMode}
-                  onCheckedChange={toggleScreenReaderMode}
-                />
-              </div>
-            </div>
-            
-            {/* Accessibility Testing */}
-            <div>
-              <h4 className="font-semibold text-base mb-4 flex items-center gap-2">
-                <Accessibility className="w-4 h-4" />
-                Accessibility Testing
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button
-                  variant="outline"
-                  onClick={handleContrastAudit}
-                  disabled={isAuditing}
-                  className="h-auto p-4 flex flex-col items-start space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Contrast className="w-4 h-4" />
-                    <span className="font-medium">Color Contrast Audit</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground text-left">
-                    {isAuditing ? 'Running audit...' : 'Check color contrast compliance'}
-                  </span>
-                  {contrastResults && (
-                    <Badge variant={contrastResults.failingElements?.length > 0 ? 'destructive' : 'default'}>
-                      {contrastResults.failingElements?.length || 0} issues found
-                    </Badge>
-                  )}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={runScreenReaderTest}
-                  disabled={isTestingScreenReader}
-                  className="h-auto p-4 flex flex-col items-start space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Volume2 className="w-4 h-4" />
-                    <span className="font-medium">Screen Reader Test</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground text-left">
-                    {isTestingScreenReader ? 'Testing...' : 'Test screen reader compatibility'}
-                  </span>
-                  {screenReaderResults && (
-                    <Badge variant={screenReaderResults.score >= 80 ? 'default' : 'destructive'}>
-                      Score: {screenReaderResults.score}%
-                    </Badge>
-                  )}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={runWCAGTest}
-                  disabled={isTestingWCAG}
-                  className="h-auto p-4 flex flex-col items-start space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Accessibility className="w-4 h-4" />
-                    <span className="font-medium">WCAG 2.1 AA Test</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground text-left">
-                    {isTestingWCAG ? 'Testing...' : 'Run comprehensive accessibility test'}
-                  </span>
-                  {wcagResults && (
-                    <Badge variant={wcagResults.overall?.grade === 'A' ? 'default' : 'destructive'}>
-                      Grade: {wcagResults.overall?.grade || 'N/A'}
-                    </Badge>
-                  )}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={runKeyboardTest}
-                  disabled={isTestingKeyboard}
-                  className="h-auto p-4 flex flex-col items-start space-y-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <Keyboard className="w-4 h-4" />
-                    <span className="font-medium">Keyboard Navigation Test</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground text-left">
-                    {isTestingKeyboard ? 'Testing...' : 'Test keyboard accessibility'}
-                  </span>
-                  {keyboardResults && (
-                    <Badge variant={keyboardResults.score >= 80 ? 'default' : 'destructive'}>
-                      Score: {keyboardResults.score}%
-                    </Badge>
-                  )}
-                </Button>
-              </div>
-            </div>
-            
-            {/* Reset Accessibility Settings */}
-            <div className="pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={resetAccessibilitySettings}
-                className="text-red-600 border-red-200 hover:bg-red-50"
-              >
-                Reset All Accessibility Settings
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Quick Actions */}
       <h2 className="text-2xl font-semibold mb-6 mt-8">
@@ -1117,6 +909,193 @@ function Settings() {
           </div>
         </CardContent>
       </Card>
+
+       {/* Accessibility Tools */}
+       <h2 className="text-2xl font-semibold mb-6 mt-8">
+         Accessibility Tools
+       </h2>
+       
+       <Card className="mb-8">
+         <CardHeader>
+           <CardTitle className="text-lg flex items-center gap-2">
+             <Accessibility className="w-5 h-5" />
+             Color Contrast & Accessibility
+           </CardTitle>
+           <CardDescription>
+             Ensure your theme meets WCAG accessibility standards
+           </CardDescription>
+         </CardHeader>
+         <CardContent>
+           <div className="space-y-6">
+             {/* Accessibility Actions */}
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+               <Button
+                 variant="outline"
+                 className="w-full h-12 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                 onClick={handleContrastAudit}
+                 disabled={isAuditing}
+               >
+                 <Contrast className="w-4 h-4 mr-2 text-blue-600" />
+                 {isAuditing ? 'Running Audit...' : 'Run Contrast Audit'}
+               </Button>
+               
+               <Button
+                 variant="outline"
+                 className="w-full h-12 bg-purple-50 hover:bg-purple-100 border-purple-200"
+                 onClick={handleThemeValidation}
+               >
+                 <CheckCircleIcon className="w-4 h-4 mr-2 text-purple-600" />
+                 Validate Theme
+               </Button>
+               
+               {contextSettings.customTheme === 'canefrost' && (
+                 <Button
+                   variant="outline"
+                   className="w-full h-12 bg-green-50 hover:bg-green-100 border-green-200"
+                   onClick={handleAccessibleShuffle}
+                 >
+                   <Accessibility className="w-4 h-4 mr-2 text-green-600" />
+                   Accessible Shuffle
+                 </Button>
+               )}
+             </div>
+             
+             {/* Contrast Results */}
+             {contrastResults && (
+               <div className="mt-6 p-4 bg-muted rounded-lg">
+                 <h4 className="font-semibold mb-3 flex items-center gap-2">
+                   <InfoIcon className="w-4 h-4" />
+                   Accessibility Report
+                   <Badge variant="outline" className="text-xs">
+                     {new Date(contrastResults.timestamp).toLocaleTimeString()}
+                   </Badge>
+                 </h4>
+                 
+                 {/* Page Audit Results */}
+                 {contrastResults.failingElements && (
+                   <div className="mb-4">
+                     <h5 className="font-medium mb-2">Page Elements</h5>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                       <div className="flex items-center justify-between p-2 bg-background rounded">
+                         <span className="text-sm">Total Elements Checked</span>
+                         <Badge variant="outline">{contrastResults.totalElements || 0}</Badge>
+                       </div>
+                       <div className="flex items-center justify-between p-2 bg-background rounded">
+                         <span className="text-sm">Failing Elements</span>
+                         <Badge variant={contrastResults.failingElements.length > 0 ? 'destructive' : 'default'}>
+                           {contrastResults.failingElements.length}
+                         </Badge>
+                       </div>
+                     </div>
+                     
+                     {contrastResults.failingElements.length > 0 && (
+                       <div className="mt-3">
+                         <h6 className="text-sm font-medium mb-2">Issues Found:</h6>
+                         <div className="space-y-1 max-h-32 overflow-y-auto">
+                           {contrastResults.failingElements.slice(0, 5).map((element, index) => (
+                             <div key={index} className="text-xs p-2 bg-red-50 border border-red-200 rounded">
+                               <div className="flex items-center justify-between">
+                                 <span className="font-mono">{element.selector}</span>
+                                 <Badge variant="destructive" className="text-xs">
+                                   {element.contrastRatio?.toFixed(2) || 'N/A'}
+                                 </Badge>
+                               </div>
+                               <div className="text-gray-600 mt-1">
+                                 {element.foreground} on {element.background}
+                               </div>
+                             </div>
+                           ))}
+                           {contrastResults.failingElements.length > 5 && (
+                             <div className="text-xs text-gray-500 text-center py-1">
+                               ... and {contrastResults.failingElements.length - 5} more issues
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 )}
+                 
+                 {/* Theme Validation Results */}
+                 {contrastResults.themeValidation && (
+                   <div className="mb-4">
+                     <h5 className="font-medium mb-2">Theme Accessibility</h5>
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                       <div className="flex items-center justify-between p-2 bg-background rounded">
+                         <span className="text-sm">Overall Status</span>
+                         <Badge variant={contrastResults.themeValidation.isAccessible ? 'default' : 'destructive'}>
+                           {contrastResults.themeValidation.isAccessible ? 'Pass' : 'Fail'}
+                         </Badge>
+                       </div>
+                       <div className="flex items-center justify-between p-2 bg-background rounded">
+                         <span className="text-sm">Accessibility Score</span>
+                         <Badge variant="outline">
+                           {contrastResults.themeValidation.accessibilityScore || 0}%
+                         </Badge>
+                       </div>
+                       <div className="flex items-center justify-between p-2 bg-background rounded">
+                         <span className="text-sm">Critical Issues</span>
+                         <Badge variant={contrastResults.themeValidation.criticalIssues?.length > 0 ? 'destructive' : 'default'}>
+                           {contrastResults.themeValidation.criticalIssues?.length || 0}
+                         </Badge>
+                       </div>
+                     </div>
+                     
+                     {contrastResults.themeValidation.criticalIssues?.length > 0 && (
+                       <div className="mt-3">
+                         <h6 className="text-sm font-medium mb-2">Critical Issues:</h6>
+                         <div className="space-y-1 max-h-24 overflow-y-auto">
+                           {contrastResults.themeValidation.criticalIssues.map((issue, index) => (
+                             <div key={index} className="text-xs p-2 bg-red-50 border border-red-200 rounded">
+                               <div className="flex items-center justify-between">
+                                 <span>{issue.element}</span>
+                                 <Badge variant="destructive" className="text-xs">
+                                   {issue.contrastRatio?.toFixed(2)}
+                                 </Badge>
+                               </div>
+                               <div className="text-gray-600 mt-1">
+                                 Recommended: {issue.recommendation}
+                               </div>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                     
+                     {contrastResults.themeValidation.recommendations?.length > 0 && (
+                       <div className="mt-3">
+                         <h6 className="text-sm font-medium mb-2">Recommendations:</h6>
+                         <div className="space-y-1 max-h-24 overflow-y-auto">
+                           {contrastResults.themeValidation.recommendations.slice(0, 3).map((rec, index) => (
+                             <div key={index} className="text-xs p-2 bg-blue-50 border border-blue-200 rounded">
+                               <div className="font-medium">{rec.element}</div>
+                               <div className="text-gray-600 mt-1">{rec.suggestion}</div>
+                               {rec.alternativeColors && (
+                                 <div className="flex gap-1 mt-1">
+                                   <div 
+                                     className="w-4 h-4 rounded border" 
+                                     style={{backgroundColor: rec.alternativeColors.background}}
+                                     title={`Background: ${rec.alternativeColors.background}`}
+                                   ></div>
+                                   <div 
+                                     className="w-4 h-4 rounded border" 
+                                     style={{backgroundColor: rec.alternativeColors.foreground}}
+                                     title={`Foreground: ${rec.alternativeColors.foreground}`}
+                                   ></div>
+                                 </div>
+                               )}
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                 )}
+               </div>
+             )}
+           </div>
+         </CardContent>
+       </Card>
 
        {/* System Status */}
        <h2 className="text-2xl font-semibold mb-6 mt-8">

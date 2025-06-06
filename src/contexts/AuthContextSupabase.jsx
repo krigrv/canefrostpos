@@ -93,6 +93,58 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Staff login with mobile number and access code
+  const loginStaff = React.useCallback(async (mobileNumber, accessCode) => {
+    try {
+      setLoading(true);
+      
+      // Query the staff table to find matching mobile number and access code
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('phone', mobileNumber)
+        .eq('accessCode', accessCode)
+        .eq('status', 'active')
+        .single();
+      
+      if (staffError || !staffData) {
+        throw new Error('Invalid mobile number or access code');
+      }
+      
+      // Create a temporary user session for staff
+      // Since staff don't have email/password, we'll create a custom session
+      const staffUser = {
+        id: `staff_${staffData.id}`,
+        email: `staff_${staffData.id}@internal.pos`,
+        user_metadata: {
+          name: staffData.name,
+          role: 'staff',
+          staff_id: staffData.id,
+          phone: staffData.phone,
+          position: staffData.role
+        },
+        app_metadata: {
+          provider: 'staff',
+          providers: ['staff']
+        }
+      };
+      
+      // Set the staff user as current user
+      setCurrentUser(staffUser);
+      setUser(staffUser);
+      setIsAuthenticated(true);
+      
+      toast.success('Staff login successful!');
+      return { user: staffUser };
+    } catch (error) {
+      console.error('Staff login failed:', error);
+      toast.error(error.message || 'Staff login failed');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Sign out
   const logout = React.useCallback(async () => {
     try {
@@ -249,6 +301,7 @@ export function AuthProvider({ children }) {
     login,
     signUp,
     loginWithGoogle,
+    loginStaff,
     logout,
     resetPassword,
     updateProfile: updateUserProfile,
@@ -263,6 +316,7 @@ export function AuthProvider({ children }) {
     login,
     signUp,
     loginWithGoogle,
+    loginStaff,
     logout,
     resetPassword,
     updateUserProfile,

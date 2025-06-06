@@ -249,7 +249,8 @@ function Dashboard() {
       // Items
       doc.setFont('helvetica', 'normal');
       lastSale.items.forEach((item) => {
-        doc.text(item.name, 20, yPosition);
+        const itemName = item.category ? `${item.name} - ${item.category}` : item.name;
+        doc.text(itemName, 20, yPosition);
         doc.text(item.quantity.toString(), pageWidth - 80, yPosition);
         doc.text(`₹${item.price.toFixed(2)}`, pageWidth - 60, yPosition);
         doc.text(`₹${(item.price * item.quantity).toFixed(2)}`, pageWidth - 30, yPosition, { align: 'right' });
@@ -677,17 +678,7 @@ function Dashboard() {
   useEffect(() => {
     const runAccessibilityCheck = async () => {
       try {
-        // This will check for accessibility issues in the component
-        if (typeof window !== 'undefined') {
-          const { generateAccessibilityReport } = await import('../../utils/accessibility');
-          const report = generateAccessibilityReport();
-          console.log('Dashboard Accessibility Report:', report);
-          
-          // Log any critical issues
-          if (report.wcag && report.wcag.criticalIssues && report.wcag.criticalIssues.length > 0) {
-            console.warn('Critical accessibility issues found in Dashboard:', report.wcag.criticalIssues);
-          }
-        }
+        // Accessibility check removed due to missing utility file
       } catch (error) {
         console.error('Failed to run accessibility check:', error);
       }
@@ -928,7 +919,7 @@ function Dashboard() {
                                   ></div>
                                   {isInCart && (
                                     <div className="flex items-center justify-center">
-                                      <CheckCircle className="h-4 w-4 text-green-600" />
+                                      <CheckCircle className="h-3 w-3 text-green-500 opacity-60" />
                                     </div>
                                   )}
                                 </div>
@@ -979,10 +970,10 @@ function Dashboard() {
                                               className={`h-2 w-2 rounded-full ${product.stock > 15 ? 'bg-green-500' : product.stock > 10 ? 'bg-orange-500' : 'bg-red-500'}`}
                                             ></div>
                                             {isInCart && (
-                                              <div className="flex items-center justify-center">
-                                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                              </div>
-                                            )}
+                              <div className="flex items-center justify-center">
+                                <CheckCircle className="h-3 w-3 text-green-500 opacity-60" />
+                              </div>
+                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -1032,10 +1023,10 @@ function Dashboard() {
                                               className={`h-2 w-2 rounded-full ${product.stock > 15 ? 'bg-green-500' : product.stock > 10 ? 'bg-orange-500' : 'bg-red-500'}`}
                                             ></div>
                                             {isInCart && (
-                                              <div className="flex items-center justify-center">
-                                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                              </div>
-                                            )}
+                              <div className="flex items-center justify-center">
+                                <CheckCircle className="h-3 w-3 text-green-500 opacity-60" />
+                              </div>
+                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -1205,7 +1196,7 @@ function Dashboard() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
-                      <span>GST (12%):</span>
+                      <span>GST (12% incl):</span>
                       <span>₹{getCartTaxWithPackaging().toLocaleString()}</span>
                     </div>
                     <Separator />
@@ -1234,7 +1225,7 @@ function Dashboard() {
 
       {/* Checkout Dialog */}
       <Dialog open={checkoutDialog} onOpenChange={setCheckoutDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Checkout</DialogTitle>
             <DialogDescription>
@@ -1242,7 +1233,28 @@ function Dashboard() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-6 pb-4">
+            {/* Cart Items */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Items in Cart</h4>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {cart.map((item, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm">
+                    <div className="flex-1">
+                      <span className="font-medium">
+                        {item.name}
+                        {item.category && ` - ${item.category}`}
+                      </span>
+                      {item.quantity > 1 && (
+                        <span className="text-gray-500 ml-2">x{item.quantity}</span>
+                      )}
+                    </div>
+                    <span className="font-medium">₹{(item.price * item.quantity).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Order Summary */}
             <div className="space-y-2">
               <h4 className="font-medium">Order Summary</h4>
@@ -1258,7 +1270,7 @@ function Dashboard() {
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span>GST (12%):</span>
+                  <span>GST (12% incl):</span>
                   <span>₹{getCartTaxWithPackaging().toLocaleString()}</span>
                 </div>
                 {discount > 0 && (
@@ -1484,7 +1496,7 @@ function Dashboard() {
 
       {/* Receipt Dialog */}
       <Dialog open={receiptDialog} onOpenChange={setReceiptDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-[95vw] max-w-md sm:max-w-lg md:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Order Completed</DialogTitle>
             <DialogDescription>
@@ -1552,7 +1564,10 @@ function Dashboard() {
                     {(lastSale.items || []).map((item, index) => (
                       <div key={index}>
                         <div className="flex justify-between">
-                          <span className="truncate flex-1 mr-2">{item.name || 'Unknown Item'}</span>
+                          <span className="truncate flex-1 mr-2">
+                            {item.name || 'Unknown Item'}
+                            {item.category && ` - ${item.category}`}
+                          </span>
                           <span className="flex-shrink-0">₹{(item.price || 0).toLocaleString()}</span>
                         </div>
                         {(item.quantity || 1) > 1 && (
@@ -1639,16 +1654,16 @@ function Dashboard() {
             </div>
           )}
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReceiptDialog(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setReceiptDialog(false)} className="w-full sm:w-auto">
               Close
             </Button>
-            <div className="flex space-x-2">
-              <Button onClick={handlePrint} variant="outline">
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button onClick={handlePrint} variant="outline" className="w-full sm:w-auto">
                 <Printer className="h-4 w-4 mr-2" />
                 Print Receipt
               </Button>
-              <Button onClick={handlePDFGeneration}>
+              <Button onClick={handlePDFGeneration} className="w-full sm:w-auto">
                 <FileText className="h-4 w-4 mr-2" />
                 Save as PDF
               </Button>
@@ -1744,7 +1759,10 @@ function Dashboard() {
               {lastSale.items.map((item, index) => (
                 <div key={index}>
                   <div className="item-row">
-                    <span>{item.name}</span>
+                    <span>
+                      {item.name}
+                      {item.category && ` - ${item.category}`}
+                    </span>
                     <span>₹{(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                   <div style={{ paddingLeft: '8px', fontSize: '11px' }}>
@@ -1765,7 +1783,7 @@ function Dashboard() {
               
               {settings?.showTaxBreakdown && (
                 <div className="item-row">
-                  <span>GST (12%):</span>
+                  <span>GST (12% incl):</span>
                   <span>₹{lastSale.tax.toFixed(2)}</span>
                 </div>
               )}
@@ -1921,7 +1939,7 @@ function Dashboard() {
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
-                    <span>GST (12%):</span>
+                    <span>GST (12% incl):</span>
                     <span>₹{getCartTaxWithPackaging().toFixed(2)}</span>
                   </div>
                   <div className="border-t pt-2">

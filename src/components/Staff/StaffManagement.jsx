@@ -25,8 +25,10 @@ function StaffManagement() {
     name: '',
     email: '',
     phone: '',
-    role: 'staff'
+    role: 'staff',
+    accessCode: ''
   })
+  const [generateAccessCode, setGenerateAccessCode] = useState(true)
 
   const roles = ['admin', 'manager', 'staff']
   const permissions = {
@@ -35,9 +37,15 @@ function StaffManagement() {
     'staff': ['Sales', 'Basic Inventory']
   }
 
+  const generateRandomAccessCode = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase()
+  }
+
   const handleAddStaff = () => {
     setEditingStaff(null)
-    setFormData({ name: '', email: '', phone: '', role: 'staff' })
+    const newAccessCode = generateRandomAccessCode()
+    setFormData({ name: '', email: '', phone: '', role: 'staff', accessCode: newAccessCode })
+    setGenerateAccessCode(true)
     setOpenDialog(true)
   }
 
@@ -47,8 +55,10 @@ function StaffManagement() {
       name: staffMember.name,
       email: staffMember.email,
       phone: staffMember.phone,
-      role: staffMember.role
+      role: staffMember.role,
+      accessCode: staffMember.accessCode || ''
     })
+    setGenerateAccessCode(false)
     setOpenDialog(true)
   }
 
@@ -65,7 +75,8 @@ function StaffManagement() {
           totalsales: 0,
           shiftsthisweek: 0,
           currentshift: 'Not Assigned',
-          created_at: new Date()
+          created_at: new Date(),
+          accessCode: formData.accessCode || generateRandomAccessCode()
         }
         await addStaffMember(newStaff)
         toast.success('Staff member added successfully')
@@ -330,6 +341,30 @@ function StaffManagement() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="accessCode">Access Code</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="accessCode"
+                  value={formData.accessCode}
+                  onChange={(e) => setFormData({ ...formData, accessCode: e.target.value })}
+                  placeholder="Access code for staff login"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setFormData({ ...formData, accessCode: generateRandomAccessCode() })}
+                  className="px-3"
+                >
+                  Generate
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This code will be used for staff login along with their mobile number.
+              </p>
             </div>
             
             {formData.role && (

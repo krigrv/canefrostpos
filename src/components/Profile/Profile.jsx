@@ -159,25 +159,12 @@ function Profile() {
             user_id: currentUser.id,
             business_details: businessDetails,
             updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
           })
         
         if (error) {
-          // Handle specific constraint violation error
-          if (error.code === '23505' && error.message.includes('user_profiles_user_id_key')) {
-            console.log('Profile already exists, attempting update...')
-            // Try updating instead
-            const { error: updateError } = await supabase
-              .from('user_profiles')
-              .update({
-                business_details: businessDetails,
-                updated_at: new Date().toISOString()
-              })
-              .eq('user_id', currentUser.id)
-            
-            if (updateError) throw updateError
-          } else {
-            throw error
-          }
+          throw error
         }
         
         // Also save to localStorage as backup

@@ -16,7 +16,16 @@ export const supabaseOperations = {
           .order('created_at', { ascending: false })
         
         if (error) throw error
-        return data || []
+        
+        // Map tax_percentage to taxPercentage for frontend compatibility
+        const products = (data || []).map(product => {
+          if (product.tax_percentage !== undefined) {
+            product.taxPercentage = product.tax_percentage;
+          }
+          return product;
+        });
+        
+        return products;
       } catch (error) {
         handleSupabaseError(error, 'fetch products')
       }
@@ -31,7 +40,13 @@ export const supabaseOperations = {
           .single()
         
         if (error) throw error
-        return data
+        
+        // Map tax_percentage to taxPercentage for frontend compatibility
+        if (data && data.tax_percentage !== undefined) {
+          data.taxPercentage = data.tax_percentage;
+        }
+        
+        return data;
       } catch (error) {
         handleSupabaseError(error, 'fetch product by ID')
       }
@@ -46,7 +61,16 @@ export const supabaseOperations = {
           .order('name')
         
         if (error) throw error
-        return data || []
+        
+        // Map tax_percentage to taxPercentage for frontend compatibility
+        const products = (data || []).map(product => {
+          if (product.tax_percentage !== undefined) {
+            product.taxPercentage = product.tax_percentage;
+          }
+          return product;
+        });
+        
+        return products;
       } catch (error) {
         handleSupabaseError(error, 'fetch products by category')
       }
@@ -60,13 +84,26 @@ export const supabaseOperations = {
           updated_at: new Date().toISOString()
         }
 
+        // Map taxPercentage to tax_percentage for database compatibility
+        if (productData.taxPercentage !== undefined) {
+          productData.tax_percentage = productData.taxPercentage;
+          delete productData.taxPercentage;
+        }
+
         const { data, error } = await supabase
           .from('products')
           .insert([productData])
           .select()
         
         if (error) throw error
-        return data[0]
+        
+        // Map tax_percentage back to taxPercentage for frontend compatibility
+        const result = data[0];
+        if (result && result.tax_percentage !== undefined) {
+          result.taxPercentage = result.tax_percentage;
+        }
+        
+        return result;
       } catch (error) {
         handleSupabaseError(error, 'create product')
       }
@@ -79,6 +116,12 @@ export const supabaseOperations = {
           updated_at: new Date().toISOString()
         }
 
+        // Map taxPercentage to tax_percentage for database compatibility
+        if (updateData.taxPercentage !== undefined) {
+          updateData.tax_percentage = updateData.taxPercentage;
+          delete updateData.taxPercentage;
+        }
+
         const { data, error } = await supabase
           .from('products')
           .update(updateData)
@@ -86,7 +129,14 @@ export const supabaseOperations = {
           .select()
         
         if (error) throw error
-        return data[0]
+        
+        // Map tax_percentage back to taxPercentage for frontend compatibility
+        const result = data[0];
+        if (result && result.tax_percentage !== undefined) {
+          result.taxPercentage = result.tax_percentage;
+        }
+        
+        return result;
       } catch (error) {
         handleSupabaseError(error, 'update product')
       }

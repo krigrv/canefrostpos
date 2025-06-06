@@ -11,12 +11,12 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Initialize Supabase client
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
+const supabaseUrl = process.env.VITE_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ Missing Supabase environment variables')
-  console.log('Required: REACT_APP_SUPABASE_URL, SUPABASE_SERVICE_KEY')
+  console.log('Required: VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY')
   process.exit(1)
 }
 
@@ -295,7 +295,12 @@ async function populateDatabase() {
 }
 
 // Run the script
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  populateDatabase()
+}
+
+// Also run if this is the main module
+if (import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/'))) {
   populateDatabase()
 }
 
