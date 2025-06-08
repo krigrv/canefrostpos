@@ -73,11 +73,7 @@ const menuItems = [
     icon: <AssessmentIcon />,
     path: '/reports'
   },
-  {
-    text: 'Mail',
-    icon: <MailIcon />,
-    path: '/mail'
-  },
+
   { 
     text: 'Profile', 
     icon: <PersonIcon />, 
@@ -205,14 +201,14 @@ const Layout = React.memo(({ children }) => {
           <img 
             src="/static/logo.jpg" 
             alt="Canefrost Logo" 
-            className="object-cover rounded-lg w-10 h-10"
+            className="object-cover rounded-lg w-8 h-8 sm:w-10 sm:h-10"
             onError={(e) => {
               e.target.style.display = 'none'
               console.error('Logo image failed to load')
             }}
           />
-          <h6 className="font-bold text-black text-lg">
-            CANEFROST
+          <h6 className="font-bold text-black text-sm sm:text-lg truncate max-w-[120px] sm:max-w-none">
+            {businessName}
           </h6>
         </div>
       </div>
@@ -317,7 +313,7 @@ const Layout = React.memo(({ children }) => {
                 }}
               />
               <h6 className="font-bold text-black text-lg">
-                CANEFROST
+                {businessName}
               </h6>
             </>
           )}
@@ -463,7 +459,7 @@ const Layout = React.memo(({ children }) => {
           </div>
           
           <div className="flex items-center gap-2">
-            <span className="hidden md:block text-gray-500 text-sm" aria-live="polite">
+            <span className="hidden lg:block text-gray-500 text-sm" aria-live="polite">
               {lastSyncTime ? `Last synced: ${new Date(lastSyncTime).toLocaleString()}` : 'Never synced'}
             </span>
             
@@ -487,10 +483,31 @@ const Layout = React.memo(({ children }) => {
                 }`}
                 aria-hidden="true"
               />
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-gray-600 hidden sm:inline">
                 {syncStatus === 'syncing' ? 'Syncing...' : isOnline ? 'Online' : 'Offline'}
               </span>
             </button>
+            
+            {/* Notifications Icon */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="p-2 hover:bg-muted/50"
+              aria-label="Notifications"
+            >
+              <NotificationsIcon className="h-5 w-5 text-muted-foreground" />
+            </Button>
+            
+            {/* Logout Button */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleLogout}
+              className="p-2 hover:bg-muted/50"
+              aria-label="Logout"
+            >
+              <LogoutIcon className="h-5 w-5 text-muted-foreground" />
+            </Button>
           </div>
         </div>
       </header>

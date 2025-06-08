@@ -20,6 +20,7 @@ function StaffManagement() {
   const { staff, shifts, addStaffMember, updateStaffMember, deleteStaffMember, addShift, updateShift, deleteShift, loading } = useStaff()
   
   const [openDialog, setOpenDialog] = useState(false)
+  const [openShiftDialog, setOpenShiftDialog] = useState(false)
   const [editingStaff, setEditingStaff] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -27,6 +28,13 @@ function StaffManagement() {
     phone: '',
     role: 'staff',
     accessCode: ''
+  })
+  const [shiftFormData, setShiftFormData] = useState({
+    staffId: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    status: 'Scheduled'
   })
   const [generateAccessCode, setGenerateAccessCode] = useState(true)
 
@@ -64,26 +72,49 @@ function StaffManagement() {
 
   const handleSaveStaff = async () => {
     try {
+      const staffData = {
+        ...formData,
+        accessCode: generateAccessCode ? generateRandomAccessCode() : formData.accessCode
+      }
+
       if (editingStaff) {
-        await updateStaffMember(editingStaff.id, formData)
+        await updateStaffMember(editingStaff.id, staffData)
         toast.success('Staff member updated successfully')
       } else {
-        const newStaff = {
-          ...formData,
-          status: 'Active',
-          join_date: new Date(),
-          totalsales: 0,
-          shiftsthisweek: 0,
-          currentshift: 'Not Assigned',
-          created_at: new Date(),
-          accessCode: formData.accessCode || generateRandomAccessCode()
-        }
-        await addStaffMember(newStaff)
+        await addStaffMember(staffData)
         toast.success('Staff member added successfully')
       }
+      
       setOpenDialog(false)
+      setEditingStaff(null)
+      setFormData({ name: '', email: '', phone: '', role: 'staff', accessCode: '' })
     } catch (error) {
-      toast.error('Error saving staff member')
+      toast.error('Failed to save staff member')
+    }
+  }
+
+  const handleSaveShift = async () => {
+    try {
+      const selectedStaff = staff.find(s => s.id === shiftFormData.staffId)
+      const shiftData = {
+        ...shiftFormData,
+        staffName: selectedStaff?.name || 'Unknown',
+        sales: 0
+      }
+
+      await addShift(shiftData)
+      toast.success('Shift assigned successfully')
+      
+      setOpenShiftDialog(false)
+      setShiftFormData({
+        staffId: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        status: 'Scheduled'
+      })
+    } catch (error) {
+      toast.error('Failed to assign shift')
     }
   }
 
@@ -214,7 +245,13 @@ function StaffManagement() {
 
         {/* Shift Management Tab */}
         <TabsContent value="shifts" className="space-y-6">
-          <h2 className="text-lg font-semibold">Shift Management</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Shift Management</h2>
+            <Button onClick={() => setOpenShiftDialog(true)} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Assign Shift
+            </Button>
+          </div>
           
           <Card>
             <Table>
@@ -385,6 +422,91 @@ function StaffManagement() {
             </Button>
             <Button onClick={handleSaveStaff}>
               {editingStaff ? 'Update' : 'Add'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shift Assignment Dialog */}
+      <Dialog open={openShiftDialog} onOpenChange={setOpenShiftDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Assign Shift</DialogTitle>
+            <DialogDescription>
+              Assign a new shift to a staff member
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="staffSelect">Staff Member</Label>
+              <Select value={shiftFormData.staffId} onValueChange={(value) => setShiftFormData({ ...shiftFormData, staffId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select staff member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {staff.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
+                      {member.name} - {member.role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="shiftDate">Date</Label>
+              <Input
+                id="shiftDate"
+                type="date"
+                value={shiftFormData.date}
+                onChange={(e) => setShiftFormData({ ...shiftFormData, date: e.target.value })}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startTime">Start Time</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={shiftFormData.startTime}
+                  onChange={(e) => setShiftFormData({ ...shiftFormData, startTime: e.target.value })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="endTime">End Time</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={shiftFormData.endTime}
+                  onChange={(e) => setShiftFormData({ ...shiftFormData, endTime: e.target.value })}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="shiftStatus">Status</Label>
+              <Select value={shiftFormData.status} onValueChange={(value) => setShiftFormData({ ...shiftFormData, status: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Scheduled">Scheduled</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenShiftDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveShift}>
+              Assign Shift
             </Button>
           </DialogFooter>
         </DialogContent>

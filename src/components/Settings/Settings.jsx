@@ -87,6 +87,7 @@ function Settings() {
   const [isAuditing, setIsAuditing] = useState(false)
   const [contrastResults, setContrastResults] = useState(null)
   const [contrastAuditResults, setContrastAuditResults] = useState(null)
+  const [accessibilityReportStatus, setAccessibilityReportStatus] = useState('ready') // ready, running, completed, error
   
 
 
@@ -270,6 +271,7 @@ function Settings() {
   // Enhanced accessibility testing functions
   const handleContrastAudit = async () => {
     setIsAuditing(true)
+    setAccessibilityReportStatus('running')
     announceToScreenReader('Running color contrast audit...')
     
     try {
@@ -286,6 +288,7 @@ function Settings() {
       
       setContrastResults(combinedResults)
       setContrastAuditResults(combinedResults)
+      setAccessibilityReportStatus('completed')
       
       const issueCount = (auditResults?.failingElements?.length || 0) + (themeValidation?.criticalIssues?.length || 0)
       announceToScreenReader(`Contrast audit complete. Found ${issueCount} issues.`)
@@ -295,6 +298,7 @@ function Settings() {
       }
     } catch (error) {
       console.error('Contrast audit failed:', error)
+      setAccessibilityReportStatus('error')
       announceToScreenReader('Contrast audit failed. Please try again.')
       toast.error('❌ Contrast audit failed. Please try again.')
     } finally {
@@ -569,7 +573,7 @@ function Settings() {
               {/* Light Theme */}
               <div 
                 className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  contextSettings.customTheme === 'light' || !contextSettings.customTheme 
+                  contextSettings.customTheme === 'light'
                     ? 'border-blue-500 bg-blue-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -577,7 +581,7 @@ function Settings() {
               >
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold">Light Theme</h4>
-                  {(contextSettings.customTheme === 'light' || !contextSettings.customTheme) && (
+                  {contextSettings.customTheme === 'light' && (
                     <CheckCircleIcon className="w-5 h-5 text-blue-500" />
                   )}
                 </div>
@@ -617,7 +621,7 @@ function Settings() {
               {/* CaneFrost Theme */}
               <div 
                 className={`p-4 border-2 rounded-lg cursor-pointer transition-all relative ${
-                  contextSettings.customTheme === 'canefrost' 
+                  contextSettings.customTheme === 'canefrost' || !contextSettings.customTheme
                     ? 'border-green-600 bg-green-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
@@ -626,7 +630,7 @@ function Settings() {
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold">CaneFrost Theme</h4>
                   <div className="flex items-center gap-2">
-                    {contextSettings.customTheme === 'canefrost' && (
+                    {(contextSettings.customTheme === 'canefrost' || !contextSettings.customTheme) && (
                       <div className="flex items-center gap-1">
                         <Button
                           onClick={(e) => {
@@ -671,7 +675,7 @@ function Settings() {
                         </Button>
                       </div>
                     )}
-                    {contextSettings.customTheme === 'canefrost' && (
+                    {(contextSettings.customTheme === 'canefrost' || !contextSettings.customTheme) && (
                       <CheckCircleIcon className="w-5 h-5 text-green-600" />
                     )}
                   </div>
@@ -931,12 +935,17 @@ function Settings() {
              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                <Button
                  variant="outline"
-                 className="w-full h-12 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                 className={`w-full h-12 ${accessibilityReportStatus === 'error' ? 'bg-red-50 hover:bg-red-100 border-red-200' : 
+                   accessibilityReportStatus === 'completed' ? 'bg-green-50 hover:bg-green-100 border-green-200' : 
+                   'bg-blue-50 hover:bg-blue-100 border-blue-200'}`}
                  onClick={handleContrastAudit}
-                 disabled={isAuditing}
+                 disabled={isAuditing || accessibilityReportStatus === 'running'}
                >
-                 <Contrast className="w-4 h-4 mr-2 text-blue-600" />
-                 {isAuditing ? 'Running Audit...' : 'Run Contrast Audit'}
+                 <Contrast className={`w-4 h-4 mr-2 ${accessibilityReportStatus === 'error' ? 'text-red-600' : 
+                   accessibilityReportStatus === 'completed' ? 'text-green-600' : 'text-blue-600'}`} />
+                 {isAuditing || accessibilityReportStatus === 'running' ? 'Running Audit...' : 
+                  accessibilityReportStatus === 'completed' ? 'Audit Completed' : 
+                  accessibilityReportStatus === 'error' ? 'Audit Failed' : 'Run Contrast Audit'}
                </Button>
                
                <Button

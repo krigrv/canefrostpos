@@ -19,7 +19,6 @@ const StaffManagement = lazy(() => import('./components/Staff/StaffManagement'))
 const CustomerManagement = lazy(() => import('./components/Customer/CustomerManagement'))
 const Reports = lazy(() => import('./components/Reports/Reports'))
 const Settings = lazy(() => import('./components/Settings/Settings'))
-const Mail = lazy(() => import('./components/Mail/Mail'))
 import Layout from './components/Layout/Layout'
 const ShadcnDemo = lazy(() => import('./components/Demo/ShadcnDemo'))
 
@@ -189,18 +188,6 @@ function AppRoutes() {
             <Layout>
               <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
                 <Profile />
-              </Suspense>
-            </Layout>
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/mail" 
-        element={
-          <ProtectedRoute>
-            <Layout>
-              <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                <Mail />
               </Suspense>
             </Layout>
           </ProtectedRoute>
